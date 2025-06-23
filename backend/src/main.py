@@ -1,7 +1,7 @@
 from logging import getLogger
 from fastapi import FastAPI
-
-from settings.loger import set_log
+from fastapi.middleware.cors import CORSMiddleware
+from src.settings.loger import set_log
 
 set_log()
 
@@ -14,8 +14,20 @@ def hell_word():
     return {"message": "hello word"}
 
 
-if __name__ == "__main__":
-    import uvicorn
-    log.info("Run app")
-    uvicorn.run(app)
-    log.info("Stop app")
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
