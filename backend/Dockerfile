@@ -13,7 +13,8 @@ COPY pyproject.toml poetry.lock ./
 
 RUN poetry install
 
-COPY . .
+COPY ./.env .
 
+COPY ./src ./src
 
 CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

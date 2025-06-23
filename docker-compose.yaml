@@ -10,6 +10,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    volumes:
+      - pg_data:/var/lib/postgresql/data
   pgadmin:
     image: dpage/pgadmin4
     environment:
@@ -21,6 +23,8 @@ services:
     depends_on:
       pg:
         condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
   app:
     build:
       dockerfile: /Dockerfile
@@ -30,3 +34,9 @@ services:
     depends_on:
       pg:
         condition: service_healthy
+    volumes:
+      - ./backend/src/:/app/src/
+
+volumes:
+  pg_data:
+  pgadmin_data:
