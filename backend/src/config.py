@@ -29,8 +29,31 @@ class Log(ConfigABC):
     )
 
 
+class DatabaseSettings(BaseSettings):
+    """
+    Настройки для подключения к базе данных.
+    Здесь есть параметры Optional с той целью, потому что может использоваться sqlite.
+    """
+
+    host: str | None = Field(alias="DATABASE_HOST", default=None)
+    port: int | None = Field(alias="DATABASE_PORT_NETWORK", default=None)
+    user: str | None = Field(alias="DATABASE_USER", default=None)
+    password: str | None = Field(alias="DATABASE_PASSWORD", default=None)
+    name: str = Field(alias="DATABASE_NAME")
+    dialect: str = Field(alias="DATABASE_DIALECT")
+    driver: str = Field(alias="DATABASE_DRIVER")
+
+    @property
+    def url(self) -> str:
+        if self.dialect == "sqlite":
+            return f"{self.dialect}+{self.driver}:///{self.name}"
+
+        return f"{self.dialect}+{self.driver}://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+
+
 class Settings(ConfigABC):
     log: Log = Log()
+    db: DatabaseSettings = DatabaseSettings()
 
 
 @lru_cache(1)
