@@ -5,13 +5,13 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class ConfigABC(BaseSettings, ABC):
 
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file=Path(__file__).resolve().parent.parent.parent / ".env",
         env_file_encoding="utf-8",
         extra="allow",
     )
@@ -29,10 +29,10 @@ class Log(ConfigABC):
     )
 
 
-class DatabaseSettings(BaseSettings):
+class DatabaseSettings(ConfigABC):
     """
     Настройки для подключения к базе данных.
-    Здесь есть параметры Optional с той целью, потому что может использоваться sqlite.
+    Здесь есть параметры Optional с той целью, потому что может использоваться sqlite(не может мне лень).
     """
 
     host: str | None = Field(alias="DATABASE_HOST", default=None)

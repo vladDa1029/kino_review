@@ -1,6 +1,6 @@
 import logging
 
-from src.config import get_settings
+from config import get_settings
 
 
 
