@@ -17,7 +17,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:6060"
+      - "5050:80"
     depends_on:
       pg:
         condition: service_healthy
