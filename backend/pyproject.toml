@@ -23,8 +23,27 @@ dependencies = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry]
-package-mode = false
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.16.1"
 
+[tool.poetry]
+package-mode = false
+
+[tool.mypy]
+# Включает строгую проверку типов (аналогично флагу --strict)
+strict = true
+
+# Указывает директории или модули для проверки
+modules = ["src"]
+
+# Исключает файлы/папки из проверки (например, тесты или виртуальное окружение)
+exclude = [
+  "tests.*",
+  "__pycache__.*",
+  ".venv.*",
+  "src/settings/config.py",
+]
+
+# Дополнительные параметры (опционально)
+show_error_codes = true
+pretty = true
