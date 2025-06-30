@@ -6,7 +6,7 @@ from .config import get_settings
 
 settings = get_settings()
 
-def set_log():
+def set_log()->None:
     logging.basicConfig(
         level=getattr(logging, settings.log.level.upper(), logging.DEBUG),
         format=settings.log.format,
