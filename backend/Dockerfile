@@ -17,4 +17,5 @@ COPY ./.env .
 
 COPY ./src ./src
 
+COPY ./migrations ./migrations
 CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

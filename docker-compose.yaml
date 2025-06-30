@@ -10,8 +10,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    ports: # Для разработки прокидуется ссылка для подключения в не контейнера
+      - "5433:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "listen_addresses=*"] # Для разработки слушает все порты
   pgadmin:
     image: dpage/pgadmin4
     environment:
