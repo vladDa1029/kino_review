@@ -19,7 +19,7 @@ app = FastAPI()
 log = getLogger(__name__)
 
 
-@app.get("/", tags=["dev"], description="Проверка а не не проверка")
+@app.get("/", tags=["dev"], description="Проверка, а не не проверка")
 async def hell_word() -> dict[str, str]:
     return {"message": "hello word"}
 

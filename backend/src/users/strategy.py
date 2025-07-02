@@ -1,3 +1,4 @@
+# TODO: написать другие стратегии
 from fastapi_users.authentication import AuthenticationBackend
 from src.settings.config import get_settings
 
