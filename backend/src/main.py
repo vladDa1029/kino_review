@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.db import database_session
+from src.db import DbDep
 from src.settings.loger import set_log
 from src.users.manager import get_user_manager
 from src.users.models import User
@@ -31,7 +31,7 @@ async def hell_word() -> dict[str, str]:
     summary="Важно",
 )
 async def test_work_db(
-    session: AsyncSession = Depends(database_session.session_dependency),
+    session: DbDep,
 ) -> dict[str, Any]:
 
     await session.connection()
@@ -40,7 +40,7 @@ async def test_work_db(
 
 @app.get("/test_request", tags=["dev"], description="Проверка на запросы в БД")
 async def test_request(
-    session: AsyncSession = Depends(database_session.session_dependency),
+    session: DbDep,
 ) -> dict[str, Any | None]:
     result = await session.execute(text("SELECT 1"))
     current_result = result.scalars().first()
@@ -60,7 +60,12 @@ app.include_router(
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
-    prefix="/auth/jwt",
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/auth",
     tags=["auth"],
 )
 origins = [

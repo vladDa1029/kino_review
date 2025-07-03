@@ -1,6 +1,7 @@
 from abc import ABC
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
+from fastapi import Depends
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
@@ -89,6 +90,10 @@ class Settings(ConfigABC):
     auth: Auth = Auth()
 
 
+
 @lru_cache(1)
 def get_settings() -> Settings:
     return Settings()
+
+
+SetDep = Annotated[Settings, Depends(get_settings)]
