@@ -38,6 +38,8 @@ class Auth(ConfigABC):
     access_token_time: int = Field(alias="ACCESS_TOKEN_TIME_SECONDS", default=600)
     refresh_token_time: int = Field(alias="REFRESH_TOKEN_TIME_SECONDS", default=3600)
     algoritm: str = Field(alias="AUTH_ALGORITM", default="RS256")
+    reset_time: int = Field(alias="RESET_TIME_SECONDS", default=600)
+    forgot_time: int = Field(alias="FORGOT_TIME_SECONDS", default=3600)
 
     @property
     def PRIVATE_KEY(self) -> str | None:
@@ -57,6 +59,27 @@ class Auth(ConfigABC):
             / "src"
             / "auth"
             / "public_key.pem",
+            mode="rb",
+        ) as file:
+            return file.read()
+    @property
+    def RESET_SECRET(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "reset_secret.key",
+            mode="rb",
+        ) as file:
+            return file.read()
+
+    @property
+    def FORGOT_SECRET(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "forgot_secret.key",
             mode="rb",
         ) as file:
             return file.read()
