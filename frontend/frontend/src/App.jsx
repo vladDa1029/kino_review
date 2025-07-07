@@ -4,10 +4,40 @@ import './App.css';
 function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
 
+  // Проверяем предпочтения пользователя при загрузке
   useEffect(() => {
-    // Анимация будет работать автоматически благодаря CSS
+    // Проверяем системные настройки
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // Проверяем сохраненные настройки в localStorage
+    const savedMode = localStorage.getItem('darkMode');
+    
+    // Устанавливаем тему (если есть сохраненные настройки - используем их, иначе системные)
+    setDarkMode(savedMode ? savedMode === 'true' : prefersDark);
+    
+    // Слушатель изменений системной темы
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => setDarkMode(e.matches);
+    mediaQuery.addListener(handleChange);
+    
+    return () => mediaQuery.removeListener(handleChange);
   }, []);
+
+  // При изменении темы обновляем класс и сохраняем в localStorage
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark-theme');
+    } else {
+      document.documentElement.classList.remove('dark-theme');
+    }
+    localStorage.setItem('darkMode', darkMode.toString());
+  }, [darkMode]);
+
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
+  };
 
   return (
     <div className="app-container">
@@ -20,12 +50,37 @@ function App() {
           <a href="#pricing">Pricing</a>
           <a href="#about">About</a>
         </nav>
-        <button 
-          className="auth-btn"
-          onClick={() => setShowAuth(true)}
-        >
-          Sign In
-        </button>
+        <div className="header-controls">
+          <button 
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2" />
+                <path d="M12 21v2" />
+                <path d="M4.22 4.22l1.42 1.42" />
+                <path d="M18.36 18.36l1.42 1.42" />
+                <path d="M1 12h2" />
+                <path d="M21 12h2" />
+                <path d="M4.22 19.78l1.42-1.42" />
+                <path d="M18.36 5.64l1.42-1.42" />
+              </svg>
+            )}
+          </button>
+          <button 
+            className="auth-btn"
+            onClick={() => setShowAuth(true)}
+          >
+            Sign In
+          </button>
+        </div>
       </header>
 
       <main className="hero-section">
