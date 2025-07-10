@@ -1,6 +1,7 @@
 from abc import ABC
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
+from fastapi import Depends
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
@@ -29,6 +30,61 @@ class Log(ConfigABC):
     )
 
 
+class Auth(ConfigABC):
+    """
+    Настройки для работы авторизационной системы.
+    """
+
+    access_token_time: int = Field(alias="ACCESS_TOKEN_TIME_SECONDS", default=600)
+    refresh_token_time: int = Field(alias="REFRESH_TOKEN_TIME_SECONDS", default=3600)
+    algoritm: str = Field(alias="AUTH_ALGORITM", default="RS256")
+    reset_time: int = Field(alias="RESET_TIME_SECONDS", default=600)
+    forgot_time: int = Field(alias="FORGOT_TIME_SECONDS", default=3600)
+
+    @property
+    def PRIVATE_KEY(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "private_key.pem",
+            mode="rb",
+        ) as file:
+            return file.read()
+
+    @property
+    def PUBLIC_KEY(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "public_key.pem",
+            mode="rb",
+        ) as file:
+            return file.read()
+    @property
+    def RESET_SECRET(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "reset_secret.key",
+            mode="rb",
+        ) as file:
+            return file.read()
+
+    @property
+    def FORGOT_SECRET(self) -> str | None:
+        with open(
+            file=Path(__file__).resolve().parent.parent.parent
+            / "src"
+            / "auth"
+            / "forgot_secret.key",
+            mode="rb",
+        ) as file:
+            return file.read()
+
+
 class DatabaseSettings(ConfigABC):
     """
     Настройки для подключения к базе данных.
@@ -54,8 +110,13 @@ class DatabaseSettings(ConfigABC):
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
+    auth: Auth = Auth()
+
 
 
 @lru_cache(1)
 def get_settings() -> Settings:
     return Settings()
+
+
+SetDep = Annotated[Settings, Depends(get_settings)]

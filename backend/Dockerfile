@@ -16,5 +16,6 @@ RUN poetry install
 COPY ./.env .
 
 COPY ./src ./src
-
-CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY alembic.ini .
+COPY ./migrations ./migrations
+# CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
