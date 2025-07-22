@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.adapters.orm import metadata
 from alembic import context
 
-from config import get_settings
+from app.config import get_settings
 
 
 setting = get_settings()

@@ -1,5 +1,4 @@
-FROM python:3.11-bookworm
-
+FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
@@ -15,7 +14,8 @@ RUN poetry install
 
 COPY ./.env .
 
-COPY ./src ./src
+COPY ./app ./app
 COPY alembic.ini .
 COPY ./migrations ./migrations
+COPY main.py .
 # CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
