@@ -1,11 +1,12 @@
 from sqlalchemy import Table, MetaData, Column, String, Boolean
-from sqlalchemy.orm import mapper
+from sqlalchemy.orm import mapper, registry
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.domain import entities
 
 
 metadata = MetaData()
+mapper_registry = registry(metadata=metadata)
 
 users = Table(
     "users",
@@ -20,4 +21,7 @@ users = Table(
 
 
 def start_mappers():
-    mapper(entities.User, users)
+    mapper_registry.map_imperatively(
+        entities.User,
+        users,
+    )

@@ -1,26 +1,36 @@
 import abc
 from app.domain import entities
-
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class AbstractRepository(abc.ABC):
     @abc.abstractmethod
-    def add(self, user: entities.User):
+    async def add(self, user: entities.User):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get(self, reference) -> entities.User:
+    async def get(self, reference) -> entities.User:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def list(self):
+        raise NotImplementedError
 
 class SqlAlchemyRepository(AbstractRepository):
-    def __init__(self, session):
+    def __init__(self, session: AsyncSession):
         self.session = session
 
-    def add(self, user: entities.User):
+    async def add(self, user: entities.User):
         self.session.add(user)
+        await self.session.commit()
+        await self.session.refresh(user)
 
-    def get(self, reference):
-        return self.session.query(entities.User).filter_by(email=reference).one()
+    async def get(self, reference):
+        result = await self.session.execute(
+            select(entities.User).where(entities.User.oid == reference)
+        )
+        return result.scalars().first()
 
-    def list(self):
-        return self.session.query(entities.User).all()
+    async def list(self):
+        result = await self.session.execute(select(entities.User))
+        return result.scalars().all()
