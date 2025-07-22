@@ -6,18 +6,18 @@ function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Проверяем предпочтения пользователя при загрузке
+
   useEffect(() => {
-    // Проверяем системные настройки
+
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
-    // Проверяем сохраненные настройки в localStorage
+
     const savedMode = localStorage.getItem('darkMode');
     
-    // Устанавливаем тему (если есть сохраненные настройки - используем их, иначе системные)
+
     setDarkMode(savedMode ? savedMode === 'true' : prefersDark);
     
-    // Слушатель изменений системной темы
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e) => setDarkMode(e.matches);
     mediaQuery.addListener(handleChange);
@@ -25,7 +25,7 @@ function App() {
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
-  // При изменении темы обновляем класс и сохраняем в localStorage
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark-theme');
