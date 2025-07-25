@@ -22,7 +22,7 @@ settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
-async def get_user_oid(token: Annotated[str, Depends(oauth2_scheme)], jwt: JwtDep):
+async def get_user_oid(token: Annotated[UUID, Depends(oauth2_scheme)], jwt: JwtDep):
     try:
         payload = jwt.decode_token(token)
         sub = payload.get("sub")
@@ -64,7 +64,6 @@ async def create(user: CreateUsers, uow: UserUoWDep):
         if not old_user:
             entity.password = uow.hasher.hash_password(entity.password)
             await uow.users.add(entity)
-            print(entity.password)
             await uow.commit()
         else:
             raise HTTPException(
@@ -74,7 +73,7 @@ async def create(user: CreateUsers, uow: UserUoWDep):
 
 
 @router.get("/users", response_model=List[ResponseUsers])
-async def list(uow: UserUoWDep):
+async def get_users(uow: UserUoWDep):
     async with uow:
         entities = await uow.users.list()
         users_data = [asdict(entity) for entity in entities]
@@ -84,7 +83,6 @@ async def list(uow: UserUoWDep):
 
 @router.get("/user")
 async def get(uow: UserUoWDep, oid: Annotated[str, Depends(get_user_oid)]):
-    
     async with uow as uow:
         entities = await uow.users.get(oid)
         if not entities:
