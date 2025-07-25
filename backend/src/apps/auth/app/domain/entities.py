@@ -27,6 +27,7 @@ class User(Base):
 
     def __post_init__(self):
         self.validate_email()
+        self.validate_password()
 
     def validate_email(self) -> None:
         if not self.email:

@@ -16,14 +16,6 @@ engine = create_async_engine(
 session_factory = async_sessionmaker(
     bind=engine,
     autoflush=False,
-    expire_on_commit=False,
+    expire_on_commit=True,
     autocommit=False,
 )
-
-
-async def get_session():
-    async with session_factory() as session:
-        yield session
-
-
-SesDep = Annotated[AsyncSession, Depends(get_session)]

@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, EmailStr
+from pydantic import UUID4, BaseModel, EmailStr
 
 from app.domain.entities import User
 
@@ -17,6 +17,7 @@ class CreateUsers(BaseModel):
 
 
 class ResponseUsers(BaseModel):
+    oid: UUID4
     email: str
     password: str
     is_active: bool
