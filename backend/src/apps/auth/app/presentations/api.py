@@ -81,7 +81,7 @@ async def get_users(uow: UserUoWDep):
     return response
 
 
-@router.get("/user")
+@router.get("/user", response_model=ResponseUsers)
 async def get(uow: UserUoWDep, oid: Annotated[str, Depends(get_user_oid)]):
     async with uow as uow:
         entities = await uow.users.get(oid)
