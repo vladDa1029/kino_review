@@ -41,8 +41,8 @@ class Auth(ConfigABC):
     @property
     def PRIVATE_KEY(self) -> str | None:
         with open(
-            file=Path(__file__).resolve().parent.parent.parent
-            / "auth"
+            file=Path(__file__).resolve().parent.parent
+            / "app"
             / "key"
             / "private_key.pem",
             mode="rb",
@@ -52,8 +52,8 @@ class Auth(ConfigABC):
     @property
     def PUBLIC_KEY(self) -> str | None:
         with open(
-            file=Path(__file__).resolve().parent.parent.parent
-            / "auth"
+            file=Path(__file__).resolve().parent.parent
+            / "app"
             / "key"
             / "public_key.pem",
             mode="rb",

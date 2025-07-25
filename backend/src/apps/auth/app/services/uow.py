@@ -1,11 +1,10 @@
 import abc
 
 from app.adapters.repository import AbstractRepository, UserSqlAlchemyRepository
+from app.infrastructure.password_hasher import PasswordHasher
 
 
 class UnitOfWork(abc.ABC):
-    def __init__(self):
-        self.users: AbstractRepository
 
     async def __aenter__(self):
         return self
@@ -28,6 +27,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
 
     async def __aenter__(self):
         self.session = self.session_factory()
+        self.hasher = PasswordHasher()
         self.users = UserSqlAlchemyRepository(self.session)
         return await super().__aenter__()
 

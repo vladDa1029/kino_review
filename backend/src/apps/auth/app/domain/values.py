@@ -26,7 +26,9 @@ class TokenPayload:
     sub: str = field()
     add_exp: int = field()
     iat: int = field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).timestamp()
+        default_factory=lambda: int(
+            datetime.datetime.now(datetime.timezone.utc).timestamp()
+        )
     )
     exp: int = field(init=False)
 
@@ -34,15 +36,17 @@ class TokenPayload:
         object.__setattr__(
             self,
             "exp",
-            (
-                datetime.datetime.now(datetime.timezone.utc)
-                + datetime.timedelta(seconds=self.add_exp)
-            ).timestamp(),
+            int(
+                (
+                    datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(seconds=self.add_exp)
+                ).timestamp()
+            ),
         )
 
     def is_expired(self) -> bool:
         """Check if token has expired."""
-        return self.exp < self.iat
+        return self.exp < int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 
     def to_dict(
         self,

@@ -16,7 +16,8 @@ dependencies = [
     "asyncpg (>=0.30.0,<0.31.0)",
     "sqlalchemy (>=2.0.41,<3.0.0)",
     "alembic (>=1.16.4,<2.0.0)",
-    "pydantic[email] (>=2.11.7,<3.0.0)"
+    "pydantic[email] (>=2.11.7,<3.0.0)",
+    "python-multipart (>=0.0.20,<0.0.21)"
 ]
 
 

@@ -31,9 +31,15 @@ class UserSqlAlchemyRepository(AbstractRepository[entities.User]):
         await self.session.commit()
         await self.session.refresh(entity)
 
-    async def get(self, reference):
+    async def get(self, oid):
         result = await self.session.execute(
-            select(entities.User).where(entities.User.oid == reference)
+            select(entities.User).where(entities.User.oid == oid)
+        )
+        return result.scalars().first()
+
+    async def get_by_email(self, email:str) -> entities.User | None:
+        result = await self.session.execute(
+            select(entities.User).where(entities.User.email == email)
         )
         return result.scalars().first()
 

@@ -4,6 +4,11 @@ from pydantic import UUID4, BaseModel, EmailStr
 from app.domain.entities import User
 
 
+class LoginUser(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class CreateUsers(BaseModel):
     email: EmailStr
     password: str
@@ -23,3 +28,8 @@ class ResponseUsers(BaseModel):
     is_active: bool
     is_superuser: bool
     is_verified: bool
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
