@@ -6,7 +6,7 @@ help:
 	@echo run -d   -  run docker-compose with flags -d.
 	@echo build --pull  -  pull last version and build and up docker-compose file with flags -d.
 
-run -d:
+up -d:
 	docker-compose up -d
 
 
