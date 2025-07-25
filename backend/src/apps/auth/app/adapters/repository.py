@@ -28,8 +28,6 @@ class UserSqlAlchemyRepository(AbstractRepository[entities.User]):
 
     async def add(self, entity: entities.User):
         self.session.add(entity)
-        await self.session.commit()
-        await self.session.refresh(entity)
 
     async def get(self, oid):
         result = await self.session.execute(

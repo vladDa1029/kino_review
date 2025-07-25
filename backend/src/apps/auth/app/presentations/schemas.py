@@ -24,7 +24,6 @@ class CreateUsers(BaseModel):
 class ResponseUsers(BaseModel):
     oid: UUID4
     email: str
-    password: str
     is_active: bool
     is_superuser: bool
     is_verified: bool
