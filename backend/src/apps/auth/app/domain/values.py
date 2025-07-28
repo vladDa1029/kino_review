@@ -1,8 +1,9 @@
-
 from dataclasses import dataclass, field
 import datetime
 from enum import Enum
 from typing import Any, Dict, Optional, Set
+from uuid import uuid4
+import uuid
 
 
 class TokenType(str, Enum):
@@ -67,3 +68,14 @@ class TokenPayload:
                 data.pop(key, None)
 
         return data
+
+
+@dataclass(frozen=True)
+class RefreshTokenJti:
+    jti: str = field(default_factory=lambda: str(uuid4()))
+
+    def __post_init__(self):
+        try:
+            uuid.UUID(self.jti, version=4)
+        except ValueError:
+            raise ValueError("Invalid UUID format")
