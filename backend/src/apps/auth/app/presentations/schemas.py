@@ -1,20 +1,19 @@
 import uuid
-from pydantic import UUID4, BaseModel, EmailStr
+from pydantic import UUID4, BaseModel, EmailStr, Field
 
 from app.domain.entities import User
 
 
-class LoginUser(BaseModel):
-    email: EmailStr
-    password: str
 
 
 class CreateUsers(BaseModel):
+    username: str = Field(min_length=3, max_length=125)
     email: EmailStr
     password: str
 
     def from_entities(self) -> User:
         return User(
+            username=self.username,
             oid=uuid.uuid4(),
             email=str(self.email),
             password=self.password,
@@ -22,6 +21,7 @@ class CreateUsers(BaseModel):
 
 
 class ResponseUsers(BaseModel):
+    username:str
     oid: UUID4
     email: str
     is_active: bool

@@ -1,5 +1,6 @@
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import re
 from uuid import UUID
 
@@ -19,15 +20,21 @@ class Base(ABC):
 
 @dataclass
 class User(Base):
+    username: str
     email: str
     password: str
-    is_active: bool = False
+    is_active: bool = True
     is_superuser: bool = False
     is_verified: bool = False
+    create_at:datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         self.validate_email()
         self.validate_password()
+
+    def validate_username(self):
+        if not self.email:
+            raise ValueError("Име не должно быть пустым")
 
     def validate_email(self) -> None:
         if not self.email:
@@ -46,5 +53,8 @@ class User(Base):
 
         if value_length not in range(3, 100):
             raise ValueError(
-                f"Длина пароля от 3 до 100 символов а у вас {str(value_length)}"
+                f"Длина пароля от 3 до 100 символов а у вас {self.password}"
             )
+
+    def __str__(self):
+        return f"User is : oid {self.oid} ; username {self.username}"

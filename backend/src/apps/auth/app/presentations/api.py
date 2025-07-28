@@ -9,7 +9,6 @@ from app.config import get_settings
 from app.presentations.dependens import JwtDep, UserUoWDep
 from app.presentations.schemas import (
     CreateUsers,
-    LoginUser,
     ResponseUsers,
     TokenResponse,
 )
