@@ -1,81 +1,37 @@
-from dataclasses import dataclass, field
-import datetime
-from enum import Enum
-from typing import Any, Dict, Optional, Set
-from uuid import uuid4
-import uuid
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, fields
 
 
-class TokenType(str, Enum):
-    ACCESS = "access"
-    REFRESH = "refresh"
+from app.domain.exaptions import DomainFieldExaption
 
 
-@dataclass(frozen=True)
-class TokenPayload:
+@dataclass(frozen=True, eq=True, unsafe_hash=True)
+class BaseValueObject(ABC):
     """
-    Payloads token(JSON Web Token).
+    Base class for immutable value objects (VO) in the domain.
+    - Defined by its attributes, which must also be immutable.
 
-    TODO: Дописать доку.
-
-    Parameters:
-    - sub (str): Users identificate.
-    - add_exp (int): How many time lives for token in seconds (exp).
-
+    For simple cases where immutability and additional behavior aren't required,
+    consider using `NewType` from `typing` as a lightweight alternative
+    to inheriting from this class.
     """
-
-    sub: str = field()
-    add_exp: int = field()
-    iat: int = field(
-        default_factory=lambda: int(
-            datetime.datetime.now(datetime.timezone.utc).timestamp()
-        )
-    )
-    exp: int = field(init=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "exp",
-            int(
-                (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    + datetime.timedelta(seconds=self.add_exp)
-                ).timestamp()
-            ),
-        )
+        if not fields(self):
+            raise DomainFieldExaption(f"{type(self).__name__}")
 
-    def is_expired(self) -> bool:
-        """Check if token has expired."""
-        return self.exp < int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+        self._validate()
 
-    def to_dict(
-        self,
-        include: Optional[Dict[str, Any]] = None,
-        exclude: Optional[Set] = None,
-    ) -> Dict[str, Any]:
-        """Convert to dictionary with field filtring"""
+    @abstractmethod
+    def _validate(self) -> None:
+        """
+        Check that a value is valid to create this value object.
+        """
+        raise NotImplementedError
 
-        data: Dict[str, Any] = vars(self).copy()
-
-        data.pop("add_exp", None)
-
-        if include:
-            data.update(include)
-
-        if exclude:
-            for key in exclude:
-                data.pop(key, None)
-
-        return data
-
-
-@dataclass(frozen=True)
-class RefreshTokenJti:
-    jti: str = field(default_factory=lambda: str(uuid4()))
-
-    def __post_init__(self):
-        try:
-            uuid.UUID(self.jti, version=4)
-        except ValueError:
-            raise ValueError("Invalid UUID format")
+    @abstractmethod
+    def __str__(self) -> str:
+        """
+        :return: returns a string representation of this value object.
+        """
+        raise NotImplementedError

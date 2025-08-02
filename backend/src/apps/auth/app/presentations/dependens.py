@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.infrastructure.database import session_factory
-from app.infrastructure.jwt import JWT
-from app.services.uow import SqlAlchemyUnitOfWork
+from app.infrastructure.security.jwt import JWT
+from app.infrastructure.adapters.transections import SqlAlchemyUnitOfWork
 
 
 def get_user_UoW():

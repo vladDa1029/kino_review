@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T", bound=Base)
 
-
+# TODO: Возможно стоит воспользоваться Protocol.
 class AbstractRepository(abc.ABC, Generic[T]):
     @abc.abstractmethod
     async def add(self, entity: T):
@@ -44,3 +44,6 @@ class UserSqlAlchemyRepository(AbstractRepository[entities.User]):
     async def list(self) -> Sequence[entities.User]:
         result = await self.session.execute(select(entities.User))
         return result.scalars().all()
+
+class TokenRepository(abc.ABC):
+    ...    

@@ -27,6 +27,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
+ipython = "^9.4.0"
 
 [tool.poetry]
 package-mode = false

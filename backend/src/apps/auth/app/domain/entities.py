@@ -5,7 +5,6 @@ import re
 from typing import  List
 from uuid import UUID
 
-from app.domain.values import RefreshTokenJti
 
 
 @dataclass
@@ -64,30 +63,30 @@ class User(Base):
         return f"User is : oid {self.oid} ; username {self.username}"
 
 
-# Aggregate
-@dataclass(eq=False)
-class UserTokensAggregate:
-    user: User  # корень агрегата
-    _ref_tokens: List[RefreshTokenJti] = field(default_factory=list)
+# # Aggregate
+# @dataclass(eq=False)
+# class UserTokensAggregate:
+#     user: User  # корень агрегата
+#     _ref_tokens: List[RefreshTokenJti] = field(default_factory=list)
 
-    def issue_new_token(self) -> RefreshTokenJti:
-        token = RefreshTokenJti()
-        if token in self._ref_tokens:
-            return self.issue_new_token()  
-        self._ref_tokens.append(token)
-        return token
+#     def issue_new_token(self) -> RefreshTokenJti:
+#         token = RefreshTokenJti()
+#         if token in self._ref_tokens:
+#             return self.issue_new_token()  
+#         self._ref_tokens.append(token)
+#         return token
 
-    def revoke_token(self, jti: RefreshTokenJti):
+#     def revoke_token(self, jti: RefreshTokenJti):
    
-        if jti not in self._ref_tokens:
-            raise ValueError("Token not found in active sessions")
-        self._ref_tokens.remove(jti)
+#         if jti not in self._ref_tokens:
+#             raise ValueError("Token not found in active sessions")
+#         self._ref_tokens.remove(jti)
 
-    def revoke_all(self):
-        self._ref_tokens = []
+#     def revoke_all(self):
+#         self._ref_tokens = []
 
-    def is_token_active(self, jti: RefreshTokenJti) -> bool:
-        return jti in self._ref_tokens
+#     def is_token_active(self, jti: RefreshTokenJti) -> bool:
+#         return jti in self._ref_tokens
 
-    def _get_active_tokens(self) -> List[RefreshTokenJti]:
-        return self._ref_tokens.copy()
+#     def _get_active_tokens(self) -> List[RefreshTokenJti]:
+#         return self._ref_tokens.copy()
