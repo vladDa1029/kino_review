@@ -4,11 +4,9 @@ from enum import Enum
 from typing import Any, Dict, Optional, Set
 from uuid import uuid4
 import uuid
-from app.config import get_settings
-from app.domain import values
-import jwt
+from app.config import Auth
 
-settings = get_settings()
+import jwt
 
 
 class TokenType(str, Enum):
@@ -89,19 +87,25 @@ class RefreshTokenJti:
 class JWTServices:
     """Class for encoding and decoding jwt"""
 
-    def create_token(self, sub: str, time: int) -> str:
+    def __init__(self, config: Auth):
+        self._config = config
+
+    def _create_token(self, sub: str, time: int) -> str:
         """Create a token by user ID."""
         return jwt.encode(
             payload=TokenPayload(sub, time).to_dict(),
-            key=settings.auth.PRIVATE_KEY,
-            algorithm=settings.auth.algoritm,
+            key=self._config.PRIVATE_KEY,
+            algorithm=self._config.algoritm,
         )
+
+    def create_access_token(self, sub: str):
+        return self._create_token(sub=sub, time=self._config.access_token_time)
 
     def decode_token(self, encode_token: str) -> dict[str, Any]:
         """Decoded token"""
         payload = jwt.decode(
             jwt=encode_token,
-            key=settings.auth.PUBLIC_KEY,
-            algorithms=[settings.auth.algoritm],
+            key=self._config.PUBLIC_KEY,
+            algorithms=[self._config.algoritm],
         )
         return payload

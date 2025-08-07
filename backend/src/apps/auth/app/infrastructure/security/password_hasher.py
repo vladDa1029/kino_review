@@ -3,6 +3,7 @@ from passlib.context import CryptContext
 crypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+# TODO: Требуется интерфейс
 class PasswordHasher:
     def __init__(self):
         self.pwd_context = crypt_context

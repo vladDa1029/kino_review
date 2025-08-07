@@ -1,10 +1,8 @@
-
-
 from abc import ABC
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
-from pydantic import Field
+from typing import Literal, Optional, Self
+from pydantic import Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,27 +36,45 @@ class Auth(ConfigABC):
     refresh_token_time: int = Field(alias="REFRESH_TOKEN_TIME_SECONDS", default=3600)
     algoritm: str = Field(alias="AUTH_ALGORITM", default="RS256")
 
-    @property
-    def PRIVATE_KEY(self) -> str | None:
-        with open(
-            file=Path(__file__).resolve().parent.parent
-            / "app"
-            / "key"
-            / "private_key.pem",
-            mode="rb",
-        ) as file:
-            return file.read()
+    # Приватные атрибуты для ключей
+    _private_key: Optional[bytes] = PrivateAttr(default=None)
+    _public_key: Optional[bytes] = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def load_keys_and_validate(self) -> Self:
+        """Валидация + загрузка ключей в одном методе (Pydantic v2.4)"""
+        # 1. Валидация логики токенов
+        if self.access_token_time <= 0:
+            raise ValueError("ACCESS_TOKEN_TIME_SECONDS должен быть > 0")
+        if self.refresh_token_time <= self.access_token_time:
+            raise ValueError(
+                "REFRESH_TOKEN_TIME_SECONDS должен быть ДОЛЬШЕ access токена"
+            )
+
+        # 2. Загрузка ключей
+        key_dir = Path(__file__).resolve().parent.parent / "app" / "key"
+
+        try:
+            self._private_key = (key_dir / "private_key.pem").read_bytes()
+            self._public_key = (key_dir / "public_key.pem").read_bytes()
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                f"Ключи не найдены: {e}. Убедитесь, что запустили generate_keys.sh"
+            ) from None
+
+        return self
 
     @property
-    def PUBLIC_KEY(self) -> str | None:
-        with open(
-            file=Path(__file__).resolve().parent.parent
-            / "app"
-            / "key"
-            / "public_key.pem",
-            mode="rb",
-        ) as file:
-            return file.read()
+    def PRIVATE_KEY(self) -> bytes:
+        if self._private_key is None:
+            raise RuntimeError("PRIVATE_KEY не загружен! Вызовите load_keys()")
+        return self._private_key
+
+    @property
+    def PUBLIC_KEY(self) -> bytes:
+        if self._public_key is None:
+            raise RuntimeError("PUBLIC_KEY не загружен! Вызовите load_keys()")
+        return self._public_key
 
 
 class DatabaseSettings(ConfigABC):
@@ -83,10 +99,26 @@ class DatabaseSettings(ConfigABC):
         return f"{self.dialect}+{self.driver}://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
 
 
+class SQLAlchemySettings(ConfigABC):
+    # Параметры подключения
+    echo: bool = True
+    echo_pool: bool = False
+    pool_size: int = 5
+    max_overflow: int = 10
+    pool_timeout: int = 30
+    pool_recycle: int = 1800
+    pool_pre_ping: bool = True
+
+    # Параметры поведения SQLAlchemy
+    auto_flush: bool = True
+    expire_on_commit: bool = False
+
+
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
     auth: Auth = Auth()
+    alchemy: SQLAlchemySettings = SQLAlchemySettings()
 
 
 @lru_cache(1)
