@@ -4,7 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
-from app.application.use_case.exaptions import InvalidCredentialsExaption
+from app.application.use_case.exaptions import (
+    InvalidCredentialsExaption,
+    UserAlreadyExistsExaption,
+)
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, get_settings
 from app.dependens import setup_providers
 from app.infrastructure.adapters.orm import start_mappers
@@ -40,20 +43,21 @@ async def lifespan(app: FastAPI):
 
 
 def setup_start_test_app():
-    config  = get_settings()
-    app = FastAPI(lifespan=lifespan, debug=True)
+    config = get_settings()
+    app = FastAPI(lifespan=lifespan, debug=True, title="Сервис авторизации.")
 
-    context={
-        Log:config.log,
+    context = {
+        Log: config.log,
         Auth: config.auth,
         DatabaseSettings: config.db,
-        SQLAlchemySettings: config.alchemy
-
-
+        SQLAlchemySettings: config.alchemy,
     }
-    container= make_async_container(*setup_providers(), context=context)
+    container = make_async_container(*setup_providers(), context=context)
     app.add_exception_handler(
         InvalidCredentialsExaption, handlers.invalid_credentials_exaption_handler
+    )
+    app.add_exception_handler(
+        UserAlreadyExistsExaption, handlers.user_already_exists_exaption_handler
     )
     setup_dishka(container=container, app=app)
     start_mappers()

@@ -1,7 +1,7 @@
 from typing import Optional
 
 
-from app.application.use_case.exaptions import InvalidCredentialsExaption
+from app.application.use_case.exaptions import InvalidCredentialsExaption, UserAlreadyExistsExaption
 from app.domain.entities import User
 from app.domain.infrastruct import TransactionManager
 from app.domain.use_case import AuthService
@@ -40,10 +40,10 @@ class JWTAuthServices(AuthService):
         )
         user_with_input_email = await self._users.get_by_email(str(user.email))
         if user_with_input_email:
-            raise ValueError("Tакой аккаунт уже существует.")
+            raise UserAlreadyExistsExaption()
         user_with_input_username = await self._users.get_by_username(str(user.username))
         if user_with_input_username:
-            raise ValueError("Tакой аккаунт уже существует.")
+            raise UserAlreadyExistsExaption()
         await self._users.add(user)
         await self._tm.commit()
         return user
