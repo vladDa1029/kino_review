@@ -5,7 +5,8 @@ from app.application.use_case.exaptions import InvalidCredentialsExaption
 from app.domain.entities import User
 from app.domain.infrastruct import TransactionManager
 from app.domain.use_case import AuthService
-from app.infrastructure.adapters.repository import UserSqlAlchemyRepository
+from app.infrastructure.adapters.repository import UserAbstractRepository
+from app.infrastructure.generation import AbstractGenerationID
 from app.infrastructure.security.jwt import JWTServices
 from app.infrastructure.security.password_hasher import PasswordHasher
 
@@ -17,21 +18,32 @@ class JWTAuthServices(AuthService):
         transaction_manager: TransactionManager,  # ← Протокол, не конкретная реализация
         password_hasher: PasswordHasher,  # ← Зависимость явно передаётся
         jwt_coder: JWTServices,  # ← Название лучше отражает суть
-        user_repository: UserSqlAlchemyRepository,  # ← Добавляем репозиторий
+        user_repository: UserAbstractRepository,  # ← Добавляем репозиторий
+        generation: AbstractGenerationID,
     ) -> None:
         self._tm = transaction_manager
         self._hasher = password_hasher
         self._jwt = jwt_coder
         self._users = user_repository
+        self.generation = generation
 
-    async def register(self, email: str, password: str, **data: dict) -> dict:
+    # TODO: требуются кастомные ошибки: "такой аккаунт уже создан."
+    async def register(self, email: str, password: str, **data: dict) -> User:
         if data.get("username", None) is None:
             raise ValueError("Не было переданно имя")
+
         user = User(
+            oid=self.generation(),
             username=data.get("username"),
             email=email,
             password=self._hasher.hash_password(password),
         )
+        user_with_input_email = await self._users.get_by_email(str(user.email))
+        if user_with_input_email:
+            raise ValueError("Tакой аккаунт уже существует.")
+        user_with_input_username = await self._users.get_by_username(str(user.username))
+        if user_with_input_username:
+            raise ValueError("Tакой аккаунт уже существует.")
         await self._users.add(user)
         await self._tm.commit()
         return user

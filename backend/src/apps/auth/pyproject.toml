@@ -17,7 +17,8 @@ dependencies = [
     "sqlalchemy (>=2.0.41,<3.0.0)",
     "alembic (>=1.16.4,<2.0.0)",
     "pydantic[email] (>=2.11.7,<3.0.0)",
-    "python-multipart (>=0.0.20,<0.0.21)"
+    "python-multipart (>=0.0.20,<0.0.21)",
+    "dishka[fastapi] (>=1.6.0,<2.0.0)"
 ]
 
 

@@ -1,47 +1,61 @@
 from contextlib import asynccontextmanager
+from typing import cast
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dishka import AsyncContainer, make_async_container
+from dishka.integrations.fastapi import setup_dishka
 from app.application.use_case.exaptions import InvalidCredentialsExaption
-from app.config import get_settings
+from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, get_settings
+from app.dependens import setup_providers
 from app.infrastructure.adapters.orm import start_mappers
-from app.infrastructure.security.jwt import JWTServices
 from app.presentations.api import router as auth_router
 from app.presentations import handlers
-from app.infrastructure import database as db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    config = get_settings()
-    # создаём подключение и настройку базы данных
-    engine = None
-    async for _engine in db.get_engine(config.db, config.alchemy):
-        engine = _engine
-        break
+    # config = get_settings()
+    # # создаём подключение и настройку базы данных
+    # engine = None
+    # async for _engine in db.get_engine(config.db, config.alchemy):
+    #     engine = _engine
+    #     break
 
-    if engine is None:
-        raise RuntimeError("Не удалось создать engine")
+    # if engine is None:
+    #     raise RuntimeError("Не удалось создать engine")
 
-    session_maker = await db.get_sessionmaker(engine, config.alchemy)
+    # session_maker = await db.get_sessionmaker(engine, config.alchemy)
 
-    # Создаём сервисы
-    jwt_service = JWTServices(config=config.auth)
+    # # Создаём сервисы
+    # jwt_service = JWTServices(config=config.auth)
 
-    # Кладём в состояние приложения
-    app.state.engine = engine
-    app.state.session_maker = session_maker
-    app.state.jwt_service = jwt_service
+    # # Кладём в состояние приложения
+    # app.state.engine = engine
+    # app.state.session_maker = session_maker
+    # app.state.jwt_service = jwt_service
 
     yield
 
+    await cast("AsyncContainer", app.state.dishka_container).close()
+
 
 def setup_start_test_app():
-
+    config  = get_settings()
     app = FastAPI(lifespan=lifespan, debug=True)
+
+    context={
+        Log:config.log,
+        Auth: config.auth,
+        DatabaseSettings: config.db,
+        SQLAlchemySettings: config.alchemy
+
+
+    }
+    container= make_async_container(*setup_providers(), context=context)
     app.add_exception_handler(
         InvalidCredentialsExaption, handlers.invalid_credentials_exaption_handler
     )
-
+    setup_dishka(container=container, app=app)
     start_mappers()
 
     # Настройка для разработки с React/Vue

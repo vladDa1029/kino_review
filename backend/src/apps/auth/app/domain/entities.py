@@ -2,14 +2,15 @@ from abc import ABC
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import re
-from typing import  List
+from typing import   NewType
 from uuid import UUID
 
 
+BaseUserId =NewType('BaseUserId', UUID) 
 
 @dataclass
 class Base(ABC):
-    oid: UUID
+    oid: BaseUserId
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Base):
