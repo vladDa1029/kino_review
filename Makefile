@@ -1,15 +1,24 @@
 .DEFAULT_GOAL := help
 
+.PHONY:
 help:
-	@echo list commands:
-	@echo help  -  show list commands.
-	@echo run -d   -  run docker-compose with flags -d.
-	@echo build --pull  -  pull last version and build and up docker-compose file with flags -d.
+	@echo "Available commands:"
+	@echo "  make help      - Show this help"
+	@echo "  make run       - Run docker-compose in background (with -d)"
+	@echo "  make run-dev   - Run docker-compose in foreground"
+	@echo "  make build     - Pull, rebuild and start containers"
 
-up -d:
+
+.PHONY:
+run:
 	docker-compose up -d
 
+.PHONY:
+run-dev:
+	docker-compose up
 
-build --pull:
+.PHONY:
+build:
 	git pull
+	docker-compose pull
 	docker-compose up --build -d

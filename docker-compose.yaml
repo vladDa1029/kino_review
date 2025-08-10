@@ -39,7 +39,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/src/apps/auth/app:/app/app
-    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn main:setup_start_test_app --host 0.0.0.0 --port 8000"]
     # TODO: изменить пути и вызовы
 volumes:
   pg_data:

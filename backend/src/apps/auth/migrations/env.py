@@ -4,10 +4,11 @@ from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from app.adapters.orm import metadata
+from app.infrastructure.adapters.orm import metadata
 from alembic import context
 
 from app.config import get_settings
+
 
 
 setting = get_settings()
