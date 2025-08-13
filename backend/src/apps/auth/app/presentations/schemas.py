@@ -7,8 +7,6 @@ class CreateUser(BaseModel):
     username: Annotated[
         str,
         Field(
-            min_length=3,
-            max_length=125,
             title="User Username",
             description="User username in system. Email must be unique in system.",
             examples=[

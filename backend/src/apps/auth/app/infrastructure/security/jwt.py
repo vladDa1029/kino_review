@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 import datetime
-from enum import Enum
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Literal, Optional, Set
 from uuid import uuid4
 import uuid
 from app.config import Auth
@@ -9,9 +8,6 @@ from app.config import Auth
 import jwt
 
 
-class TokenType(str, Enum):
-    ACCESS = "access"
-    REFRESH = "refresh"
 
 
 @dataclass(frozen=True)
@@ -29,6 +25,7 @@ class TokenPayload:
 
     sub: str = field()
     add_exp: int = field()
+    type: Literal["access", "refresh"] = field(default="access")
     iat: int = field(
         default_factory=lambda: int(
             datetime.datetime.now(datetime.timezone.utc).timestamp()
@@ -90,16 +87,21 @@ class JWTServices:
     def __init__(self, config: Auth):
         self._config = config
 
-    def _create_token(self, sub: str, time: int) -> str:
+    def _create_token(
+        self, sub: str, time: int, type: Literal["access", "refresh"] = "access"
+    ) -> str:
         """Create a token by user ID."""
         return jwt.encode(
-            payload=TokenPayload(sub, time).to_dict(),
+            payload=TokenPayload(sub, time, type=type).to_dict(),
             key=self._config.PRIVATE_KEY,
             algorithm=self._config.algoritm,
         )
 
-    def create_access_token(self, sub: str):
+    def create_access_token(self, sub: str) -> str:
         return self._create_token(sub=sub, time=self._config.access_token_time)
+
+    def create_refresh_token(self, sub) -> str:
+        return self._create_token(sub, self._config.refresh_token_time, type="refresh")
 
     def decode_token(self, encode_token: str) -> dict[str, Any]:
         """Decoded token"""

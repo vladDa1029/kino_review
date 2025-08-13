@@ -17,26 +17,6 @@ from app.presentations import handlers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # config = get_settings()
-    # # создаём подключение и настройку базы данных
-    # engine = None
-    # async for _engine in db.get_engine(config.db, config.alchemy):
-    #     engine = _engine
-    #     break
-
-    # if engine is None:
-    #     raise RuntimeError("Не удалось создать engine")
-
-    # session_maker = await db.get_sessionmaker(engine, config.alchemy)
-
-    # # Создаём сервисы
-    # jwt_service = JWTServices(config=config.auth)
-
-    # # Кладём в состояние приложения
-    # app.state.engine = engine
-    # app.state.session_maker = session_maker
-    # app.state.jwt_service = jwt_service
-
     yield
 
     await cast("AsyncContainer", app.state.dishka_container).close()
