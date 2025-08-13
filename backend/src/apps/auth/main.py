@@ -11,6 +11,7 @@ from app.application.use_case.exaptions import (
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, get_settings
 from app.dependens import setup_providers
 from app.infrastructure.adapters.orm import start_mappers
+from app.infrastructure.exaptions.coder import NoValidTokenExption
 from app.presentations.api import router as auth_router
 from app.presentations import handlers
 
@@ -35,6 +36,9 @@ def setup_start_test_app():
     container = make_async_container(*setup_providers(), context=context)
     app.add_exception_handler(
         InvalidCredentialsExaption, handlers.invalid_credentials_exaption_handler
+    )
+    app.add_exception_handler(
+        NoValidTokenExption, handlers.no_valid_token_exaption_handler
     )
     app.add_exception_handler(
         UserAlreadyExistsExaption, handlers.user_already_exists_exaption_handler

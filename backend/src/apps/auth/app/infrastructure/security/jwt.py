@@ -7,7 +7,7 @@ from app.config import Auth
 
 import jwt
 
-
+from app.infrastructure.exaptions.coder import NoValidTokenExption
 
 
 @dataclass(frozen=True)
@@ -105,9 +105,12 @@ class JWTServices:
 
     def decode_token(self, encode_token: str) -> dict[str, Any]:
         """Decoded token"""
-        payload = jwt.decode(
-            jwt=encode_token,
-            key=self._config.PUBLIC_KEY,
-            algorithms=[self._config.algoritm],
-        )
+        try:
+            payload = jwt.decode(
+                jwt=encode_token,
+                key=self._config.PUBLIC_KEY,
+                algorithms=[self._config.algoritm],
+            )
+        except (jwt.ExpiredSignatureError, jwt.InvalidSignatureError) as ex:
+            raise NoValidTokenExption(ex=ex)
         return payload
