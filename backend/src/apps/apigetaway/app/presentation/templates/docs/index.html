@@ -1,0 +1,87 @@
+<!-- app/presentation/templates/docs/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>API Gateway — Документация</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f6f9;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2980b9;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin: 15px 0;
+        }
+        a {
+            font-size: 1.2em;
+            color: #3498db;
+            text-decoration: none;
+            padding: 12px 20px;
+            display: block;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        a:hover {
+            background: #f8f9fa;
+            color: #2980b9;
+            transform: translateX(5px);
+            border-color: #3498db;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .tag {
+            font-size: 0.8em;
+            padding: 2px 8px;
+            background: #e1f5fe;
+            color: #0277bd;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 API Gateway</h1>
+        <p>Единая точка входа в систему. Все микросервисы доступны через этот шлюз.</p>
+
+        <ul>
+            <li><a href="/auth/docs">🔐 Авторизация <span class="tag">/auth</span></a></li>
+            <li><a href="/users/docs">👥 Пользователи <span class="tag">/users (не готово)</span></a></li>
+            <li><a href="/movies/docs">🎬 Фильмы <span class="tag">/movies (не готово)</span></a></li>
+
+        </ul>
+
+        <div class="footer">
+            <p><small>API Gateway • 2025</small></p>
+        </div>
+    </div>
+</body>
+</html>

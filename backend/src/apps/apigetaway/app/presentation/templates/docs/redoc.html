@@ -1,0 +1,50 @@
+<!-- app/presentation/templates/docs/service_docs.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ service|title }} API — Документация</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
+</head>
+<body>
+    <h1>📘 {{ service|title }} API</h1>
+    <div id="redoc-container"></div>
+
+    <!-- Redoc CDN -->
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const container = document.getElementById("redoc-container");
+            if (!container) {
+                console.error("Контейнер #redoc-container не найден");
+                return;
+            }
+
+            // Путь подставляется через Jinja2 (не через JS!)
+            const specUrl = "/{{ service }}/openapi.json";
+
+            Redoc.init(
+                specUrl,
+                {
+                    scrollYOffset: 60,
+                    hideDownloadButton: false
+                },
+                container,
+                function (err) {
+                    if (err) {
+                        console.error("Ошибка Redoc:", err);
+                        container.innerHTML = `
+                            <div style="padding: 40px; color: #e74c3c; text-align: center;">
+                                <h2>❌ Ошибка загрузки документации</h2>
+                                <p>${err.message}</p>
+                                <p><small>Проверьте, доступен ли сервис и его /openapi.json</small></p>
+                            </div>
+                        `;
+                    }
+                }
+            );
+        });
+    </script>
+</body>
+</html>

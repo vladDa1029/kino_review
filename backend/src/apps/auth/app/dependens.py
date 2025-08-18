@@ -1,6 +1,5 @@
 from typing import Iterable
 from dishka import Provider, Scope
-from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_case.autentificate import JWTAuthServices
