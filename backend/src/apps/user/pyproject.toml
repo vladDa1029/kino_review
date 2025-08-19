@@ -1,0 +1,22 @@
+[project]
+name = "user"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "vladislav1029",email = "vlad1090904@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi (>=0.116.1,<0.117.0)",
+    "uvicorn (>=0.35.0,<0.36.0)",
+    "sqlalchemy (>=2.0.43,<3.0.0)",
+    "asyncpg (>=0.30.0,<0.31.0)",
+    "dishka[fastapi] (>=1.6.0,<2.0.0)",
+    "alembic (>=1.16.4,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
