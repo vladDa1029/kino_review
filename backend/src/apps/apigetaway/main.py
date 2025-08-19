@@ -4,7 +4,7 @@ from dishka import AsyncContainer, make_async_container
 from fastapi import FastAPI
 
 from app.config import Services, get_settings
-from app.loc import setup_providers
+from app.ioc import setup_providers
 from app.setup import CORS_Middleware
 from app.presentation.api.v1.routes.auth import router as router_auth
 from app.presentation.api.v1.routes.docs import router as router_docs
@@ -24,8 +24,9 @@ def start_app_dev():
     app = FastAPI(
         lifespan=lifespan,
         debug=True,
+        title="API Getaway",
         summary="Api Getaway",
-        description="Сервис предаставляющий Api а также обрабатывает работу с токенами.",
+        description="Сервис предаставляющий прокси всех микросервисов в виде API а также обрабатывает работу с токенами.",
     )
 
     container = make_async_container(*setup_providers(), context={Services: get_settings().services})
