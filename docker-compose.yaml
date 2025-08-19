@@ -1,3 +1,4 @@
+# Требуется стандартизировать настройки и ограничить некоторые параметры
 services:
   pg:
     image: postgres:15
@@ -28,19 +29,34 @@ services:
         condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-  app:
+  # Требуется добавить healthcheck
+  auth:
     build:
       dockerfile: /Dockerfile
-      context: /backend/src/apps/auth
-    ports:
-      - "8000:8000"
+      context: ./backend/src/apps/auth
+    
+    # Порты для доступа если требуется
+    # ports:
+    #   - "8002:8001"
     depends_on:
       pg:
         condition: service_healthy
     volumes:
       - ./backend/src/apps/auth/app:/app/app
-    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn main:setup_start_test_app --host 0.0.0.0 --port 8000"]
-    # TODO: изменить пути и вызовы
+    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn main:setup_start_test_app --host 0.0.0.0 --port 8001"]
+  api-getaway:
+    build:
+      context: ./backend/src/apps/apigetaway
+      dockerfile: /Dockerfile
+    ports:
+     - "8000:8000"
+    volumes:
+      - ./backend/src/apps/apigetaway/app:/app/app
+    command: ["sh", "-c", "poetry run python -m uvicorn main:start_app_dev --port 8000 --host 0.0.0.0 --factory --reload"]
+
+networks:
+  default:
+    driver: bridge
 volumes:
   pg_data:
   pgadmin_data:
