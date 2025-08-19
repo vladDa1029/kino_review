@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.infrastruct import TransactionManager
 
-from app.infrastructure.exaptions.transactions import (
+from app.infrastructure.exceptions.transactions import (
     CommitExaption,
     RollbackExaption,
 )

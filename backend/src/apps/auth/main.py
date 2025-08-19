@@ -4,14 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
-from app.application.use_case.exaptions import (
+from app.application.use_case.exceptions import (
     InvalidCredentialsExaption,
     UserAlreadyExistsExaption,
 )
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, get_settings
 from app.dependens import setup_providers
 from app.infrastructure.adapters.orm import start_mappers
-from app.infrastructure.exaptions.coder import NoValidTokenExption
+from app.infrastructure.exceptions.coder import NoValidTokenExption
 from app.presentations.api import router as auth_router
 from app.presentations import handlers
 

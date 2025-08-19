@@ -7,7 +7,7 @@ from app.config import Auth
 
 import jwt
 
-from app.infrastructure.exaptions.coder import NoValidTokenExption
+from app.infrastructure.exceptions.coder import NoValidTokenExption
 
 
 @dataclass(frozen=True)

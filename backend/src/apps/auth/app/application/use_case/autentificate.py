@@ -1,12 +1,12 @@
 from typing import Literal, Optional
 
 
-from app.application.use_case.exaptions import (
+from app.application.use_case.exceptions import (
     InvalidCredentialsExaption,
     UserAlreadyExistsExaption,
 )
 from app.domain.entities import User
-from app.domain.exaptions.base import ApplicationExaption
+from app.domain.exceptions.base import ApplicationExaption
 from app.domain.infrastruct import TransactionManager
 from app.domain.use_case import AuthService
 from app.domain.values import Email

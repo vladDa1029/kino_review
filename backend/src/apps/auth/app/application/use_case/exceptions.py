@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from app.domain.exaptions.base import ApplicationExaption
+from app.domain.exceptions.base import ApplicationExaption
 
 
 @dataclass(

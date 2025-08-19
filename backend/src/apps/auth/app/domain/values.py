@@ -3,7 +3,7 @@ from dataclasses import dataclass, fields
 import re
 
 
-from app.domain.exaptions.values import DomainFieldExaption, EmailExaption
+from app.domain.exceptions.values import DomainFieldExaption, EmailExaption
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
