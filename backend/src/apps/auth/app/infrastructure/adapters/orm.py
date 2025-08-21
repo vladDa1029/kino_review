@@ -1,9 +1,10 @@
 from sqlalchemy import Table, MetaData, Column, String, Boolean, DateTime
 from datetime import datetime
-from sqlalchemy.orm import mapper, registry
+from sqlalchemy.orm import registry, synonym
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.domain import entities
+from app.domain.values import Email
 
 
 metadata = MetaData()
@@ -27,4 +28,14 @@ def start_mappers():
     mapper_registry.map_imperatively(
         entities.User,
         users,
+        properties={
+            "email": synonym(
+                "email_str",
+                descriptor=property(
+                    lambda obj: Email(obj.email_str),
+                    lambda obj, value: setattr(obj, "email_str", str(value)),
+                ),
+            ),
+            "email_str": users.c.email,
+        },
     )
