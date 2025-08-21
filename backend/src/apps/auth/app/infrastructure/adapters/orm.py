@@ -13,7 +13,6 @@ mapper_registry = registry(metadata=metadata)
 users = Table(
     "users",
     metadata,
-    Column("username", String(255), unique=True),
     Column("oid", UUID(as_uuid=True), primary_key=True),
     Column("email", String(255), unique=True, nullable=False),
     Column("password", String(255), nullable=False),

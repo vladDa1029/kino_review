@@ -26,7 +26,6 @@ class Base(ABC):
 
 @dataclass
 class User(Base):
-    username: str
     email: Email
     password: str  # не могу про валидировать здесь уже хеш пароля возможно стот в начале передавать пароль а потом хешировать
     is_active: bool = True

@@ -23,10 +23,10 @@ async def register_user(
     user_form: CreateUser, authser: FromDishka[JWTAuthServices]
 ) -> ResponseUser:
     data = await authser.register(
-        user_form.email, user_form.password, username=user_form.username
+        user_form.email,
+        user_form.password,
     )
     return ResponseUser(
-        username=data.username,
         email=str(data.email),
         is_active=data.is_active,
         is_superuser=data.is_superuser,

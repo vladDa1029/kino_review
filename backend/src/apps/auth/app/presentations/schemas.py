@@ -4,16 +4,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class CreateUser(BaseModel):
-    username: Annotated[
-        str,
-        Field(
-            title="User Username",
-            description="User username in system. Email must be unique in system.",
-            examples=[
-                "oleg4321dev",
-            ],
-        ),
-    ]
+
     email: Annotated[
         EmailStr,
         Field(
@@ -35,7 +26,6 @@ class CreateUser(BaseModel):
 
 
 class ResponseUser(BaseModel):
-    username: str
     email: str
     is_active: bool
     is_superuser: bool
