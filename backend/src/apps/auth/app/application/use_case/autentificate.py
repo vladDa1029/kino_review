@@ -35,14 +35,13 @@ class JWTAuthServices(AuthService):
 
     # TODO: требуются кастомные ошибки: "такой аккаунт уже создан."
     async def register(self, email: str, password: str, **data: dict) -> User:
-  
 
         user = User(
             oid=self.generation(),
             email=Email(email),
             password=self._hasher.hash_password(password),
         )
-        user_with_input_email = await self._users.get_by_email(str(user.email))
+        user_with_input_email = await self._users.get_by_email(user.email)
         if user_with_input_email:
             raise UserAlreadyExistsExaption()
         await self._users.add(user)
@@ -52,7 +51,8 @@ class JWTAuthServices(AuthService):
     async def login(
         self, email: str, password: str
     ) -> dict[Literal["access_token", "refresh_token"], str]:
-        user = await self._users.get_by_email(email=email)
+        new_email = Email(email)
+        user = await self._users.get_by_email(email=new_email)
         if not user:
             raise InvalidCredentialsExaption()
         if not self._hasher.verify_password(password, user.password):

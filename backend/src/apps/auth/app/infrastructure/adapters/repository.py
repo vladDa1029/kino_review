@@ -5,6 +5,8 @@ from app.domain import entities
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.values import Email
+
 T = TypeVar("T", bound=Base)
 
 
@@ -23,7 +25,7 @@ class UserAbstractRepository(Protocol, Generic[T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_by_email(self, email: str) -> T | None:
+    async def get_by_email(self, email) -> T | None:
         raise NotImplemented
 
     @abc.abstractmethod
@@ -44,7 +46,7 @@ class UserSqlAlchemyRepository(UserAbstractRepository[entities.User]):
         )
         return result.scalars().first()
 
-    async def get_by_email(self, email: str) -> entities.User | None:
+    async def get_by_email(self, email:Email) -> entities.User | None:
         result = await self.session.execute(
             select(entities.User).where(entities.User.email == email)
         )

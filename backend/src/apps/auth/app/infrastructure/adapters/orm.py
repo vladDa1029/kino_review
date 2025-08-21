@@ -1,6 +1,6 @@
 from sqlalchemy import Table, MetaData, Column, String, Boolean, DateTime
 from datetime import datetime
-from sqlalchemy.orm import registry, synonym
+from sqlalchemy.orm import registry, composite
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.domain import entities
@@ -28,13 +28,13 @@ def start_mappers():
         entities.User,
         users,
         properties={
-            "email": synonym(
-                "email_str",
-                descriptor=property(
-                    lambda obj: Email(obj.email_str),
-                    lambda obj, value: setattr(obj, "email_str", str(value)),
-                ),
-            ),
-            "email_str": users.c.email,
+            "oid": users.c.oid,
+            "email": composite(Email, users.c.email),
+            "password": users.c.password,
+            "is_active": users.c.is_active,
+            "is_superuser": users.c.is_superuser,
+            "is_verified": users.c.is_verified,
+            "create_at": users.c.create_at,
         },
+        column_prefix="_",
     )
