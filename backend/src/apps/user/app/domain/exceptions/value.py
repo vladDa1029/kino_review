@@ -18,3 +18,16 @@ class DomainFieldError(ApplicationError):
             "message",
             f"{self.name_class} должен содержвть хоть одно поле!",
         )
+
+@dataclass(eq=False)
+class EmailError(ApplicationError):
+    """Ошибка поча не валидна."""
+
+    value: str
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "message",
+            f"Пароль не валидный {self.value}!",
+        )
