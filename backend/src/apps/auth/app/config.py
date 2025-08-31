@@ -2,7 +2,7 @@ from abc import ABC
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional, Self
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, PrivateAttr, model_validator, AmqpDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,37 @@ class Log(ConfigABC):
         alias="LOG_FORMAT",
         default="%(levelname)-10s%(asctime)-25s %(name)s - %(funcName)-15s: %(lineno)-5d - %(message)3s",
     )
+
+
+class Rebbitmq(ConfigABC):
+    host: str = Field(
+        alias="RABBITMQ_HOST",
+        description="RabbitMQ host name or IP address.",
+    )
+    port: int = Field(
+        alias="RABBITMQ_PORT",
+        description="RabbitMQ server port.",
+    )
+    login: str = Field(
+        alias="RABBITMQ_DEFAULT_USER",
+        description="Default RabbitMQ username.",
+    )
+    password: str = Field(
+        alias="RABBITMQ_DEFAULT_PASS",
+        description="Default RabbitMQ password.",
+    )
+
+    @property
+    def url(self):
+        return str(
+            AmqpDsn.build(
+                scheme="amqp",
+                username=self.login,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+            )
+        )
 
 
 class Auth(ConfigABC):

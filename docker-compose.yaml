@@ -53,10 +53,22 @@ services:
     volumes:
       - ./backend/src/apps/apigetaway/app:/app/app
     command: ["sh", "-c", "poetry run python -m uvicorn main:start_app_dev --port 8000 --host 0.0.0.0 --factory --reload"]
-
+  broker:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+    volumes:
+      - broker-data:/var/lib/rabbitmq
+    
 networks:
   default:
     driver: bridge
+
 volumes:
   pg_data:
   pgadmin_data:
+  broker-data:
