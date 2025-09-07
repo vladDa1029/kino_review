@@ -1,6 +1,6 @@
+from datetime import datetime
 from typing import Annotated
 from pydantic import BaseModel, EmailStr, Field
-
 
 
 class CreateUser(BaseModel):
@@ -33,7 +33,23 @@ class ResponseUser(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: Annotated[str, Field(..., title="User Access Token.",
+    access_token: Annotated[
+        str,
+        Field(
+            ...,
+            title="User Access Token.",
             description="User Access Token in system.",
-            examples=['eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmN2UyN2YwNS1kMTNiLTRmYjItODE0ZC1jYWU4NWNjNDAwMjkiLCJpYXQiOjE3NTQ4NTM0MjksImV4cCI6MTc1NDg1NDAyOX0.Iy8-XKxu3-XzKus9QgJGaXHrhgd-y5YHoR-AO6wh_V1vp49RCXFIh_6Uq9TeTiHBqVnkUf9hKcoofsY8vjczO_vrlPrF7rAF-8jA0WlvVG-0qV5LylT89MIruR1wTl0pBVfWepmpiRivMuK95spfpkmzTPAxJZ4vUaRJRoAs0t7a1ZCwB2eCy6lrW_dFF4zkDfwOCoINhpKnocy0FVWR8wCVvF_Y2J7P_7XcTqALmXi_qqt8Cw834gjdfdhj7jJZ7YOTDrYXDtkxLB6olrY0mO_m9AMRd5Xh1j-e6fMq9s8K8EBo4kHI51maXzZcLEaKwY-SXtkS0pO16snFQGqGEw'],)]
+            examples=[
+                "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmN2UyN2YwNS1kMTNiLTRmYjItODE0ZC1jYWU4NWNjNDAwMjkiLCJpYXQiOjE3NTQ4NTM0MjksImV4cCI6MTc1NDg1NDAyOX0.Iy8-XKxu3-XzKus9QgJGaXHrhgd-y5YHoR-AO6wh_V1vp49RCXFIh_6Uq9TeTiHBqVnkUf9hKcoofsY8vjczO_vrlPrF7rAF-8jA0WlvVG-0qV5LylT89MIruR1wTl0pBVfWepmpiRivMuK95spfpkmzTPAxJZ4vUaRJRoAs0t7a1ZCwB2eCy6lrW_dFF4zkDfwOCoINhpKnocy0FVWR8wCVvF_Y2J7P_7XcTqALmXi_qqt8Cw834gjdfdhj7jJZ7YOTDrYXDtkxLB6olrY0mO_m9AMRd5Xh1j-e6fMq9s8K8EBo4kHI51maXzZcLEaKwY-SXtkS0pO16snFQGqGEw"
+            ],
+        ),
+    ]
     token_type: str = "Bearer"
+
+
+class BrokerUserRegistered(BaseModel):
+    email: str
+    is_active: bool
+    is_verified: bool
+    is_superuser: bool
+    create_at: datetime

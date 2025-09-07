@@ -27,7 +27,7 @@ class Log(ConfigABC):
     )
 
 
-class Rebbitmq(ConfigABC):
+class Rabbitmq(ConfigABC):
     host: str = Field(
         alias="RABBITMQ_HOST",
         description="RabbitMQ host name or IP address.",
@@ -150,6 +150,7 @@ class Settings(ConfigABC):
     db: DatabaseSettings = DatabaseSettings()
     auth: Auth = Auth()
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
+    rabbitmq :Rabbitmq = Rabbitmq()
 
 
 @lru_cache(1)

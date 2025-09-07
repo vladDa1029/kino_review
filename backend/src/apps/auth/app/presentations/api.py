@@ -2,13 +2,17 @@ from typing import Annotated
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Cookie, Depends, Response
-from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-
+from faststream.rabbit import RabbitBroker
 
 from app.application.use_case.autentificate import JWTAuthServices
-from app.presentations.schemas import CreateUser, ResponseUser, TokenResponse
-
+from app.presentations.schemas import (
+    BrokerUserRegistered,
+    CreateUser,
+    ResponseUser,
+    TokenResponse,
+)
+from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 
 router = APIRouter(tags=["auth"], route_class=DishkaRoute)
 
@@ -20,11 +24,23 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
     "/register", summary="Регистрация пользователя.", response_model=ResponseUser
 )
 async def register_user(
-    user_form: CreateUser, authser: FromDishka[JWTAuthServices]
+    user_form: CreateUser,
+    authser: FromDishka[JWTAuthServices],
+    broker: FromDishka[RabbitBroker],
 ) -> ResponseUser:
     data = await authser.register(
         user_form.email,
         user_form.password,
+    )
+    event = BrokerUserRegistered(
+        email=str(data.email),
+        is_active=data.is_active,
+        is_superuser=data.is_superuser,
+        is_verified=data.is_verified,
+        create_at=data.create_at,
+    )
+    await broker.publish(
+        event, exchange=USER_REGISTERED_EXCHANGE, routing_key="user.registered"
     )
     return ResponseUser(
         email=str(data.email),
@@ -57,7 +73,8 @@ async def login(
         samesite="strict",
         max_age=60 * 60 * 24 * 7,
     )
-    return TokenResponse(access_token=tokens.get("access_token"))
+    token_resp = TokenResponse(access_token=tokens.get("access_token"))
+    return token_resp
 
 
 @router.post(

@@ -8,7 +8,7 @@ from app.application.use_case.exceptions import (
     InvalidCredentialsExaption,
     UserAlreadyExistsExaption,
 )
-from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, get_settings
+from app.config import Auth, DatabaseSettings, Log, Rabbitmq, SQLAlchemySettings, get_settings
 from app.dependens import setup_providers
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.exceptions.coder import NoValidTokenExption
@@ -32,6 +32,7 @@ def setup_start_test_app():
         Auth: config.auth,
         DatabaseSettings: config.db,
         SQLAlchemySettings: config.alchemy,
+        Rabbitmq: config.rabbitmq,
     }
     container = make_async_container(*setup_providers(), context=context)
     app.add_exception_handler(
