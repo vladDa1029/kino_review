@@ -4,30 +4,35 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.application.use_case.exceptions import (
-    InvalidCredentialsExaption,
-    UserAlreadyExistsExaption,
+    InvalidCredentialsError,
+    UserAlreadyError,
 )
-from app.infrastructure.exceptions.coder import NoValidTokenExption
+from app.infrastructure.constants import (
+    TOKEN_INVALID,
+    TOKEN_SIGNATURE_INVALID,
+    USER_ALREADY_EXISTS,
+)
+from app.infrastructure.exceptions.coder import NoValidTokenError
 
 
 async def invalid_credentials_exaption_handler(
-    request: Request, exc: InvalidCredentialsExaption
+    request: Request, exc: InvalidCredentialsError
 ):
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"message": f"{exc.message}"},
-    )
-async def no_valid_token_exaption_handler(request: Request, exc: NoValidTokenExption
-):
-    return JSONResponse(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"message": f"Токен не валидный."},
+        content={"message": TOKEN_INVALID},
     )
 
-async def user_already_exists_exaption_handler(
-    request: Request, exc: UserAlreadyExistsExaption
-):
+
+async def no_valid_token_exaption_handler(request: Request, exc: NoValidTokenError):
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"message": TOKEN_SIGNATURE_INVALID},
+    )
+
+
+async def user_already_exists_exaption_handler(request: Request, exc: UserAlreadyError):
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content={"message": f"{exc.message}"},
+        content={"message": USER_ALREADY_EXISTS},
     )

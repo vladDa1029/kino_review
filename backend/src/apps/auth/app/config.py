@@ -150,7 +150,7 @@ class Settings(ConfigABC):
     db: DatabaseSettings = DatabaseSettings()
     auth: Auth = Auth()
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
-    rabbitmq :Rabbitmq = Rabbitmq()
+    rabbitmq: Rabbitmq = Rabbitmq()
 
 
 @lru_cache(1)

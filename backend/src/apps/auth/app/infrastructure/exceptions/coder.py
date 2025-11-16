@@ -1,12 +1,5 @@
-from dataclasses import dataclass
-from app.domain.exceptions.base import ApplicationExaption
+from app.domain.exceptions.base import ApplicationError
 
 
-@dataclass(eq=False)
-class NoValidTokenExption(ApplicationExaption):
-    ex: str
-
-    def __post_init__(
-        self,
-    ):
-        object.__setattr__(self, "message", f"Токен не валиден. {self.ex}")
+class NoValidTokenError(ApplicationError):
+    """No valid token"""

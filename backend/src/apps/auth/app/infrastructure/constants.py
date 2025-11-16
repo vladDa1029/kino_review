@@ -1,0 +1,27 @@
+from typing import Final
+
+TOKEN_INVALID: Final[str] = "Token is invalid."
+TOKEN_EXPIRED: Final[str] = "Token has expired."
+TOKEN_MISSING: Final[str] = "Token is missing."
+TOKEN_MALFORMED: Final[str] = "Token is malformed."
+TOKEN_SIGNATURE_INVALID: Final[str] = "Token signature is invalid."
+TOKEN_DECODE_ERROR: Final[str] = "Error decoding token."
+TOKEN_USER_NOT_FOUND: Final[str] = "User associated with token not found."
+TOKEN_PERMISSION_DENIED: Final[str] = "Insufficient permissions for this token."
+
+USER_ALREADY_EXISTS: Final[str] = "User already exists."
+
+DB_CONSTRAINT_VIOLATION: Final[str] = "Database constraint violation."
+DB_COMMIT_DONE: Final[str] = "Commit was done."
+DB_COMMIT_FAILED: Final[str] = "Commit failed."
+DB_FLUSH_DONE: Final[str] = "Flush was done."
+DB_FLUSH_FAILED: Final[str] = "Flush failed."
+DB_QUERY_FAILED: Final[str] = "Database query failed."
+DB_CONFLICT: Final[str] = "Conflict when adding an entity"
+DB_ROLLBACK_DONE: Final[str] = "Rollback was done."
+DB_ROLLBACK_FAILED: Final[str] = "Rollback failed."
+
+UPLOAD_FILE_FAILED: Final[str] = "upload for file was failed"
+DOWNLOAD_FILE_FAILED: Final[str] = "download for file was failed"
+DELETE_FILE_FAILED: Final[str] = "delete for file was failed"
+STREAM_FILE_FAILED: Final[str] = "stream file failed"

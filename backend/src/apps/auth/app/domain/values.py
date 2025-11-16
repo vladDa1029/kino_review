@@ -3,7 +3,7 @@ from dataclasses import dataclass, fields
 import re
 
 
-from app.domain.exceptions.values import DomainFieldExaption, EmailExaption
+from app.domain.exceptions.values import DomainFieldError, EmailError
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
@@ -19,7 +19,7 @@ class BaseValueObject(ABC):
 
     def __post_init__(self) -> None:
         if not fields(self):
-            raise DomainFieldExaption(f"{type(self).__name__}")
+            raise DomainFieldError(f"{type(self).__name__}")
 
         self._validate()
 
@@ -48,10 +48,10 @@ class Email(BaseValueObject):
     value: str
 
     def _validate(self):
-            email_validate_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        email_validate_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
-            if not re.match(email_validate_pattern, self.value):
-                raise EmailExaption(self.value)
+        if not re.match(email_validate_pattern, self.value):
+            raise EmailError(self.value)
 
     def __str__(self):
         return str(self.value)

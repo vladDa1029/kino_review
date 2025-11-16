@@ -1,12 +1,11 @@
 from typing import Iterable
 from dishka import Provider, Scope
-from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
+from faststream.rabbit import RabbitBroker
 
 from app.application.use_case.autentificate import JWTAuthServices
-from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings, Rabbitmq
+from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings
 from app.domain.infrastruct import TransactionManager
-from app.infrastructure.adapters.broker import get_rabbit_broker
 from app.infrastructure.adapters.repository import (
     UserAbstractRepository,
     UserSqlAlchemyRepository,
@@ -24,7 +23,6 @@ def settings_provider() -> Provider:
     provider.from_context(provides=Auth)
     provider.from_context(provides=DatabaseSettings)
     provider.from_context(provides=SQLAlchemySettings)
-    provider.from_context(provides=Rabbitmq)
     return provider
 
 
@@ -36,9 +34,9 @@ def db_provider() -> Provider:
     return provider
 
 
-def broker_provider() -> Provider:
+def get_broker() -> Provider:
     provider = Provider(scope=Scope.APP)
-    provider.provide(get_rabbit_broker, provides=RabbitBroker)
+    provider.from_context(provides=RabbitBroker)
     return provider
 
 
@@ -61,7 +59,7 @@ def auth_services_provider() -> Provider:
 def setup_providers() -> Iterable[Provider]:
     return (
         settings_provider(),
+        get_broker(),
         db_provider(),
         auth_services_provider(),
-        broker_provider(),
     )

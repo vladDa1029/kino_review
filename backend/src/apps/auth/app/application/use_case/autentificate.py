@@ -1,12 +1,12 @@
 from typing import Literal, Optional
-
+import structlog
 
 from app.application.use_case.exceptions import (
-    InvalidCredentialsExaption,
-    UserAlreadyExistsExaption,
+    InvalidCredentialsError,
+    UserAlreadyError,
 )
 from app.domain.entities import User
-from app.domain.exceptions.base import ApplicationExaption
+from app.domain.exceptions.base import ApplicationError
 from app.domain.infrastruct import TransactionManager
 from app.domain.use_case import AuthService
 from app.domain.values import Email
@@ -14,6 +14,8 @@ from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.infrastructure.generation import AbstractGenerationID
 from app.infrastructure.security.jwt import JWTServices
 from app.infrastructure.security.password_hasher import PasswordHasher
+
+log = structlog.get_logger(__file__)
 
 
 # Наследуемся от протокола и реализуем его
@@ -33,7 +35,6 @@ class JWTAuthServices(AuthService):
         self._users = user_repository
         self.generation = generation
 
-    # TODO: требуются кастомные ошибки: "такой аккаунт уже создан."
     async def register(self, email: str, password: str, **data: dict) -> User:
 
         user = User(
@@ -43,7 +44,9 @@ class JWTAuthServices(AuthService):
         )
         user_with_input_email = await self._users.get_by_email(user.email)
         if user_with_input_email:
-            raise UserAlreadyExistsExaption()
+            msg = f"User with email:{email} already exists"
+            log.debug(msg)
+            raise UserAlreadyError(msg)
         await self._users.add(user)
         await self._tm.commit()
         return user
@@ -51,12 +54,16 @@ class JWTAuthServices(AuthService):
     async def login(
         self, email: str, password: str
     ) -> dict[Literal["access_token", "refresh_token"], str]:
-        new_email = Email(email)
-        user = await self._users.get_by_email(email=new_email)
+        valid_email = Email(email)
+        user = await self._users.get_by_email(email=valid_email)
         if not user:
-            raise InvalidCredentialsExaption()
+            msg = f"User with email:{email} no exists!"
+            log.debug(msg)
+            raise InvalidCredentialsError(msg)
         if not self._hasher.verify_password(password, user.password):
-            raise InvalidCredentialsExaption()
+            msg = "Пароль должен совпадать."
+            log.debug(msg)
+            raise ApplicationError(msg)
         access_token = self._jwt.create_access_token(sub=str(user.oid))
         refresh_token = self._jwt.create_refresh_token(sub=str(user.oid))
         return {
@@ -69,9 +76,14 @@ class JWTAuthServices(AuthService):
     ) -> dict[Literal["access_token", "refresh_token"], str]:
         payload = self._jwt.decode_token(refresh_token)
         user_oid = payload.get("sub")
-        if await self._users.get(user_oid) is None or payload.get("type") != "refresh":
-            raise ApplicationExaption(
-                message=f"Токен не валиден. oid : {user_oid}",
+        if payload.get("type") != "refresh":
+            raise InvalidCredentialsError(
+                msg=f"Токен не валиден.",
+            )
+        if await self._users.get(user_oid) is None:
+            log.info(f"Подозрительный токен с user oid : {user_oid}")
+            raise InvalidCredentialsError(
+                msg=f"Токен не валиден.",
             )
         new_refresh_token = self._jwt.create_refresh_token(user_oid)
         access_token = self._jwt.create_access_token(user_oid)

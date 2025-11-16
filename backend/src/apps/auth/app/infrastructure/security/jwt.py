@@ -7,7 +7,7 @@ from app.config import Auth
 
 import jwt
 
-from app.infrastructure.exceptions.coder import NoValidTokenExption
+from app.infrastructure.exceptions.coder import NoValidTokenError
 
 
 @dataclass(frozen=True)
@@ -112,5 +112,5 @@ class JWTServices:
                 algorithms=[self._config.algoritm],
             )
         except (jwt.ExpiredSignatureError, jwt.InvalidSignatureError) as ex:
-            raise NoValidTokenExption(ex=ex)
+            raise NoValidTokenError(ex=ex)
         return payload

@@ -1,16 +1,15 @@
 import abc
 from typing import Generic, Protocol, Sequence, TypeVar
-from unittest.mock import Base
 from app.domain import entities
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.values import Email
 
-T = TypeVar("T", bound=Base)
+T = TypeVar("T", bound=entities.Base)
 
 
-# TODO: Возможно стоит воспользоваться Protocol.
+
 class UserAbstractRepository(Protocol, Generic[T]):
     @abc.abstractmethod
     async def add(self, entity: T):
