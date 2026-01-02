@@ -7,3 +7,7 @@ class InvalidCredentialsError(ApplicationError):
 
 class UserAlreadyError(ApplicationError):
     """Ошибка пользователь уже существует"""
+
+
+class PasswordOrLogInincorrectError(ApplicationError):
+    """Пароль или логин не верные"""

@@ -11,6 +11,7 @@ from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.presentations.schemas import (
     BrokerUserRegistered,
     UserCreateRequest,
+    UserGetForAdminResponse,
     UserGetResponse,
     TokenResponse,
     UsersGetResponse,
@@ -125,7 +126,7 @@ async def logout(response: Response, authser: FromDishka[JWTAuthServices]) -> st
 
 
 @router.get(
-    path="/all",
+    path="/users",
     summary="Получение всех пользователей.",
     description="Получение пользователей админом с пагинацией.",
     status_code=200,
@@ -144,7 +145,8 @@ async def get_users(
     total_page = math.ceil(total_count / pagination.page_size)
     response = UsersGetResponse(
         users=[
-            UserGetResponse(
+            UserGetForAdminResponse(
+                oid=str(user.oid),
                 email=user.email.value,
                 is_active=user.is_active,
                 is_superuser=user.is_superuser,

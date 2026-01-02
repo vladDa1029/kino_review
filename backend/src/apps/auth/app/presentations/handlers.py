@@ -5,9 +5,11 @@ from fastapi.responses import JSONResponse
 
 from app.application.errors.errors import (
     InvalidCredentialsError,
+    PasswordOrLogInincorrectError,
     UserAlreadyError,
 )
 from app.infrastructure.constants import (
+    PASSWORD_OR_LOGIN_INCORRECT,
     TOKEN_INVALID,
     TOKEN_SIGNATURE_INVALID,
     USER_ALREADY_EXISTS,
@@ -35,4 +37,13 @@ async def user_already_exists_exaption_handler(request: Request, exc: UserAlread
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"message": USER_ALREADY_EXISTS},
+    )
+
+
+async def password_or_login_incorrect_error_handler(
+    request: Request, exc: PasswordOrLogInincorrectError
+):
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"message": PASSWORD_OR_LOGIN_INCORRECT},
     )

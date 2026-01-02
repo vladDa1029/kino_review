@@ -3,10 +3,10 @@ import structlog
 
 from app.application.errors.errors import (
     InvalidCredentialsError,
+    PasswordOrLogInincorrectError,
     UserAlreadyError,
 )
 from app.domain.entities import User
-from app.domain.errors.base import ApplicationError
 from app.application.ports.transaction import TransactionManager
 from app.domain.values import Email
 from app.infrastructure.adapters.repository import UserAbstractRepository
@@ -62,7 +62,7 @@ class JWTAuthServices:
         if not self._hasher.verify_password(password, user.password):
             msg = "Пароль должен совпадать."
             log.debug(msg)
-            raise ApplicationError(msg)
+            raise PasswordOrLogInincorrectError(msg)
         access_token = self._jwt.create_access_token(sub=str(user.oid))
         refresh_token = self._jwt.create_refresh_token(sub=str(user.oid))
         return {

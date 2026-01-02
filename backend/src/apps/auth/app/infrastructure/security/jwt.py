@@ -4,10 +4,12 @@ from typing import Any, Dict, Literal, Optional, Set
 from uuid import uuid4
 import uuid
 from app.config import Auth
-
+import structlog
 import jwt
 
 from app.infrastructure.errors.coder import NoValidTokenError
+
+log = structlog.get_logger(__file__)
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,9 @@ class RefreshTokenJti:
         except ValueError:
             raise ValueError("Invalid UUID format")
 
+    def __str__(self) -> str:
+        return str(self.jti)
+
 
 class JWTServices:
     """Class for encoding and decoding jwt"""
@@ -91,6 +96,17 @@ class JWTServices:
         self, sub: str, time: int, type: Literal["access", "refresh"] = "access"
     ) -> str:
         """Create a token by user ID."""
+        if type == "refresh":
+            payload = TokenPayload(sub, time, type=type).to_dict(
+                include={"jti": str(RefreshTokenJti())}
+            )
+            log.debug(f"{payload=}")
+
+            return jwt.encode(
+                payload=payload,
+                key=self._config.PRIVATE_KEY,
+                algorithm=self._config.algoritm,
+            )
         return jwt.encode(
             payload=TokenPayload(sub, time, type=type).to_dict(),
             key=self._config.PRIVATE_KEY,

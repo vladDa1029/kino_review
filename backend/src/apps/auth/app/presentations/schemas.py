@@ -32,8 +32,16 @@ class UserGetResponse(BaseModel):
     is_verified: bool
 
 
+class UserGetForAdminResponse(BaseModel):
+    oid: str
+    email: str
+    is_active: bool
+    is_superuser: bool
+    is_verified: bool
+
+
 class UsersGetResponse(BaseModel):
-    users: List[UserGetResponse]
+    users: List[UserGetForAdminResponse]
     total_count: int
     pages: int
 

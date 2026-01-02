@@ -9,6 +9,7 @@ from faststream.rabbit import RabbitBroker
 
 from app.application.errors.errors import (
     InvalidCredentialsError,
+    PasswordOrLogInincorrectError,
     UserAlreadyError,
 )
 from app.config import (
@@ -71,13 +72,20 @@ def setup_start_test_app():
     setup_dishka(container=container, app=app)
 
     app.add_exception_handler(
-        InvalidCredentialsError, handlers.invalid_credentials_exaption_handler
+        InvalidCredentialsError,
+        handlers.invalid_credentials_exaption_handler,
     )
     app.add_exception_handler(
-        NoValidTokenError, handlers.no_valid_token_exaption_handler
+        NoValidTokenError,
+        handlers.no_valid_token_exaption_handler,
     )
     app.add_exception_handler(
-        UserAlreadyError, handlers.user_already_exists_exaption_handler
+        UserAlreadyError,
+        handlers.user_already_exists_exaption_handler,
+    )
+    app.add_exception_handler(
+        PasswordOrLogInincorrectError,
+        handlers.password_or_login_incorrect_error_handler,
     )
 
     start_mappers()

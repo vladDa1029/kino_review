@@ -10,6 +10,7 @@ TOKEN_USER_NOT_FOUND: Final[str] = "User associated with token not found."
 TOKEN_PERMISSION_DENIED: Final[str] = "Insufficient permissions for this token."
 
 USER_ALREADY_EXISTS: Final[str] = "User already exists."
+PASSWORD_OR_LOGIN_INCORRECT: Final[str] = "Invalid email or password."
 
 DB_CONSTRAINT_VIOLATION: Final[str] = "Database constraint violation."
 DB_COMMIT_DONE: Final[str] = "Commit was done."

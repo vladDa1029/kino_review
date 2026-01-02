@@ -10,6 +10,9 @@ from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 def configure_logging(settings: Log) -> None:
     # отключение шумов от других библиотек
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+    logging.getLogger("aiormq.connection").setLevel(logging.INFO)
+    logging.getLogger("aio_pika").setLevel(logging.INFO)
+
     # Общие процессоры — добавляются ко всем логам
     common_processors = [
         structlog.stdlib.add_log_level,
