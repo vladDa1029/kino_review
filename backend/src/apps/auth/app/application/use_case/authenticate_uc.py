@@ -1,14 +1,13 @@
 from typing import Literal, Optional
 import structlog
 
-from app.application.use_case.exceptions import (
+from app.application.errors.errors import (
     InvalidCredentialsError,
     UserAlreadyError,
 )
 from app.domain.entities import User
-from app.domain.exceptions.base import ApplicationError
-from app.domain.infrastruct import TransactionManager
-from app.domain.use_case import AuthService
+from app.domain.errors.base import ApplicationError
+from app.application.ports.transaction import TransactionManager
 from app.domain.values import Email
 from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.infrastructure.generation import AbstractGenerationID
@@ -20,7 +19,7 @@ log = structlog.get_logger(__file__)
 
 # Наследуемся от протокола и реализуем его
 # Нужен транспорт для токенов и рефреш токенов который стоит выделит в отдельную сущность или не выводить так как рано
-class JWTAuthServices(AuthService):
+class JWTAuthServices:
     def __init__(
         self,
         transaction_manager: TransactionManager,  # Протокол

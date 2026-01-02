@@ -1,16 +1,19 @@
+import math
 from typing import Annotated
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Cookie, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, Response, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from faststream.rabbit import RabbitBroker
-
-from app.application.use_case.autentificate import JWTAuthServices
+from app.application.common.pagination import Pagination
+from app.application.use_case.authenticate_uc import JWTAuthServices
+from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.presentations.schemas import (
     BrokerUserRegistered,
-    CreateUser,
-    ResponseUser,
+    UserCreateRequest,
+    UserGetResponse,
     TokenResponse,
+    UsersGetResponse,
 )
 from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 
@@ -21,13 +24,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
 @router.post(
-    "/register", summary="Регистрация пользователя.", response_model=ResponseUser
+    "/register", summary="Регистрация пользователя.", response_model=UserGetResponse
 )
 async def register_user(
-    user_form: CreateUser,
+    user_form: UserCreateRequest,
     authser: FromDishka[JWTAuthServices],
     broker: FromDishka[RabbitBroker],
-) -> ResponseUser:
+) -> UserGetResponse:
     data = await authser.register(
         user_form.email,
         user_form.password,
@@ -42,7 +45,7 @@ async def register_user(
     await broker.publish(
         event, exchange=USER_REGISTERED_EXCHANGE, routing_key="user.registered"
     )
-    return ResponseUser(
+    return UserGetResponse(
         email=str(data.email),
         is_active=data.is_active,
         is_superuser=data.is_superuser,
@@ -119,3 +122,37 @@ async def logout(response: Response, authser: FromDishka[JWTAuthServices]) -> st
     )
     # await authser.logout()# вроде надо вызвать чтобы на будущее не забыть, но это черезмерно
     return "succesfull"
+
+
+@router.get(
+    path="/all",
+    summary="Получение всех пользователей.",
+    description="Получение пользователей админом с пагинацией.",
+    status_code=200,
+)
+async def get_users(
+    user_repo: FromDishka[UserAbstractRepository],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(5, ge=1, le=100),
+) -> UsersGetResponse:
+    pagination = Pagination(
+        page=page,
+        page_size=page_size,
+    )
+    users = await user_repo.list(pagination)
+    total_count = await user_repo.count()
+    total_page = math.ceil(total_count / pagination.page_size)
+    response = UsersGetResponse(
+        users=[
+            UserGetResponse(
+                email=user.email.value,
+                is_active=user.is_active,
+                is_superuser=user.is_superuser,
+                is_verified=user.is_verified,
+            )
+            for user in users
+        ],
+        total_count=total_count,
+        pages=total_page,
+    )
+    return response

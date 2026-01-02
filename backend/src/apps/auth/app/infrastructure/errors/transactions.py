@@ -1,4 +1,4 @@
-from app.domain.exceptions.base import ApplicationError
+from app.domain.errors.base import ApplicationError
 
 
 class CommitError(ApplicationError):

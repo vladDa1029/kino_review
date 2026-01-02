@@ -4,10 +4,10 @@ from typing_extensions import override
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.infrastruct import TransactionManager
+from app.application.ports.transaction import TransactionManager
 
 from app.infrastructure.constants import DB_COMMIT_FAILED, DB_ROLLBACK_FAILED
-from app.infrastructure.exceptions.transactions import (
+from app.infrastructure.errors.transactions import (
     CommitError,
     RollbackError,
 )
@@ -62,5 +62,5 @@ class TransactionManagerAlchemy(TransactionManager):
         try:
             await self._session.rollback()
         except SQLAlchemyError as err:
-            
+
             raise RollbackError(DB_ROLLBACK_FAILED) from err

@@ -3,7 +3,7 @@
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from app.application.use_case.exceptions import (
+from app.application.errors.errors import (
     InvalidCredentialsError,
     UserAlreadyError,
 )
@@ -12,7 +12,7 @@ from app.infrastructure.constants import (
     TOKEN_SIGNATURE_INVALID,
     USER_ALREADY_EXISTS,
 )
-from app.infrastructure.exceptions.coder import NoValidTokenError
+from app.infrastructure.errors.coder import NoValidTokenError
 
 
 async def invalid_credentials_exaption_handler(

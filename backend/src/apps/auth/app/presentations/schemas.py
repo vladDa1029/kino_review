@@ -1,9 +1,9 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, List
 from pydantic import BaseModel, EmailStr, Field
 
 
-class CreateUser(BaseModel):
+class UserCreateRequest(BaseModel):
 
     email: Annotated[
         EmailStr,
@@ -25,11 +25,17 @@ class CreateUser(BaseModel):
     ]
 
 
-class ResponseUser(BaseModel):
+class UserGetResponse(BaseModel):
     email: str
     is_active: bool
     is_superuser: bool
     is_verified: bool
+
+
+class UsersGetResponse(BaseModel):
+    users: List[UserGetResponse]
+    total_count: int
+    pages: int
 
 
 class TokenResponse(BaseModel):
@@ -47,6 +53,7 @@ class TokenResponse(BaseModel):
     token_type: str = "Bearer"
 
 
+# no must be here
 class BrokerUserRegistered(BaseModel):
     email: str
     is_active: bool

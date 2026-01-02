@@ -3,9 +3,9 @@ from dishka import Provider, Scope
 from sqlalchemy.ext.asyncio import AsyncSession
 from faststream.rabbit import RabbitBroker
 
-from app.application.use_case.autentificate import JWTAuthServices
+from app.application.use_case.authenticate_uc import JWTAuthServices
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings
-from app.domain.infrastruct import TransactionManager
+from app.application.ports.transaction import TransactionManager
 from app.infrastructure.adapters.repository import (
     UserAbstractRepository,
     UserSqlAlchemyRepository,
@@ -14,7 +14,7 @@ from app.infrastructure.database import get_engine, get_session, get_sessionmake
 from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.security.jwt import JWTServices
 from app.infrastructure.security.password_hasher import PasswordHasher
-from app.infrastructure.transections import TransactionManagerAlchemy
+from app.infrastructure.transactions import TransactionManagerAlchemy
 
 
 def settings_provider() -> Provider:

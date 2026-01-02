@@ -7,7 +7,7 @@ from dishka.integrations.fastapi import setup_dishka
 import structlog
 from faststream.rabbit import RabbitBroker
 
-from app.application.use_case.exceptions import (
+from app.application.errors.errors import (
     InvalidCredentialsError,
     UserAlreadyError,
 )
@@ -18,10 +18,10 @@ from app.config import (
     SQLAlchemySettings,
     get_settings,
 )
-from app.dependens import setup_providers
+from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 from app.infrastructure.adapters.orm import start_mappers
-from app.infrastructure.exceptions.coder import NoValidTokenError
+from app.infrastructure.errors.coder import NoValidTokenError
 from app.presentations.api import router as auth_router
 from app.presentations import handlers
 from app.set_log import configure_logging

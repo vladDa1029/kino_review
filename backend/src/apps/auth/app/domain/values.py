@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
 import re
 
-
-from app.domain.exceptions.values import DomainFieldError, EmailError
+from app.domain.errors.values import DomainFieldError, EmailError
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
@@ -51,7 +50,7 @@ class Email(BaseValueObject):
         email_validate_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
         if not re.match(email_validate_pattern, self.value):
-            raise EmailError(self.value)
+            raise EmailError(f"Email is not valid : {self.value}.")
 
     def __str__(self):
         return str(self.value)
