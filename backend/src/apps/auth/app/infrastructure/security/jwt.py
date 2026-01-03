@@ -128,5 +128,6 @@ class JWTServices:
                 algorithms=[self._config.algoritm],
             )
         except (jwt.ExpiredSignatureError, jwt.InvalidSignatureError) as ex:
-            raise NoValidTokenError(ex=ex)
+            log.info(ex)
+            raise NoValidTokenError()
         return payload

@@ -2,13 +2,15 @@ from typing import Iterable
 from dishka import Provider, Scope
 from httpx import AsyncClient
 
-from app.config import Services
+from app.config import AuthGatewaySettings, ProtectedPathsSettings, Services
 from app.setup import get_aclient
 
 
 def settings_provider() -> Provider:
     provider = Provider(scope=Scope.APP)
     provider.from_context(provides=Services)
+    provider.from_context(provides=AuthGatewaySettings)
+    provider.from_context(provides=ProtectedPathsSettings)
     return provider
 
 

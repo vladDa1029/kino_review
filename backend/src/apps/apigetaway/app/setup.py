@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import httpx
 
+from app.config import AuthGatewaySettings, ProtectedPathsSettings
+from app.infrastructure.security.jwt_validator import JWTValidator
+from app.presentation.middleware.auth import AuthGatewayMiddleware
 
 # Настройку CORS
 def CORS_Middleware(app: FastAPI):
@@ -35,3 +38,24 @@ async def get_aclient() -> AsyncIterator[httpx.AsyncClient]:
     )
     yield client
     await client.aclose()
+
+
+def AuthGateway_Middleware(
+    app: FastAPI,
+    settings: AuthGatewaySettings,
+    protected_paths: ProtectedPathsSettings,
+) -> FastAPI:
+    validator = JWTValidator(
+        public_key=settings.public_key,
+        algorithm=settings.algorithm,
+    )
+    flattened_patterns = [
+        pattern for patterns in protected_paths.patterns.values() for pattern in patterns
+    ]
+    app.add_middleware(
+        AuthGatewayMiddleware,
+        settings=settings,
+        validator=validator,
+        protected_paths=flattened_patterns,
+    )
+    return app
