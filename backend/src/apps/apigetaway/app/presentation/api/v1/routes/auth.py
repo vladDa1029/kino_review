@@ -21,10 +21,12 @@ async def patched_openapi(
     ser: FromDishka[Services],
     protected_settings: FromDishka[ProtectedPathsSettings],
 ) -> JSONResponse:
+    service_prefix = "auth"
     spec = await fetch_and_patch_openapi(
         client=client,
         base_url=ser.auth,
-        protected_patterns=protected_settings.patterns.get("auth", []),
+        service_prefix=service_prefix,
+        protected_patterns=protected_settings.patterns.get(service_prefix, []),
     )
     return JSONResponse(spec)
 
@@ -78,6 +80,7 @@ async def proxy_request(
 async def fetch_and_patch_openapi(
     client: httpx.AsyncClient,
     base_url: str,
+    service_prefix: str,
     protected_patterns: list[str],
     schema: str = "http",
 ) -> dict:
@@ -88,6 +91,10 @@ async def fetch_and_patch_openapi(
         resp = await client.get(f"{schema}://{base_url}/openapi.json")
         resp.raise_for_status()
         spec = resp.json()
+
+        spec["paths"] = {
+            f"/{service_prefix}{path}": value for path, value in spec["paths"].items()
+        }
 
         spec["info"]["title"] = "[PROXY] " + spec["info"].get("title", "Auth Service")
 
