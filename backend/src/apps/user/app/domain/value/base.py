@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
 
-from app.domain.exceptions.value import DomainFieldError
+from app.domain.errors.value import DomainFieldError
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
