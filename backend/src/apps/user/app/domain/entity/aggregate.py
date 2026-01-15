@@ -2,14 +2,14 @@ from dataclasses import dataclass
 from typing import List
 import warnings
 
-from app.domain.entity.base import BaseId, Description, Spare_time, User
+from app.domain.entity.base import Description, Spare_time, User
 from app.domain.service.description_service import DescriptionService
 from app.domain.service.free_time_service import FreeTimeService
 
 
 @dataclass
 class FreeTimeAggregate:
-    user_id: BaseId
+    user: User
     spare_time_list: List[Spare_time]
 
     def addition_timing(self, new_timing: Spare_time) -> None:
@@ -17,7 +17,7 @@ class FreeTimeAggregate:
             "FreeTimeAggregate is deprecated; use FreeTimeService instead.",
             DeprecationWarning,
         )
-        FreeTimeService().add_timing(self.user_id, self.spare_time_list, new_timing)
+        FreeTimeService().add_timing(self.user, self.spare_time_list, new_timing)
 
 
 @dataclass

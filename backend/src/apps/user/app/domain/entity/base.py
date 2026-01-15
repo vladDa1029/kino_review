@@ -1,5 +1,5 @@
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import NewType
 from uuid import UUID
@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.domain.value.email import Email
 from app.domain.value.phone import Phone
+from app.domain.value.status import AvailabilityStatus
 
 
 BaseId = NewType("BaseId", UUID)
@@ -56,3 +57,83 @@ class Spare_time(BaseEntity):
     obj: BaseId
     start_time: datetime
     end_time: datetime
+    status: AvailabilityStatus = field(
+        default_factory=lambda: AvailabilityStatus("free")
+    )
+
+
+@dataclass(eq=False, kw_only=True)
+class Microfon(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class Camera(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class CameraTripod(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class Light(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class LightTripod(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class Sound(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class Requisite(BaseEntity):
+    users_id: BaseId
+    title: str
+    description: str
+    type: str
+    size: str
+    create_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
+class Image(BaseEntity):
+    requisite_id: BaseId
+    file: str
+    title: str
+    storage_key: str
+    bucket: str
+    mime_type: str
+    size: int
+    description: str
+    create_at: datetime
