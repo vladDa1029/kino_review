@@ -1,10 +1,84 @@
-from typing import Iterable
+from typing import Callable, Iterable
 
 from dishka import Provider, Scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.commands.add_image import AddImageHandler
+from app.application.commands.add_spare_time import AddSpareTimeHandler
+from app.application.commands.create_description import CreateDescriptionHandler
+from app.application.commands.create_equipment import (
+    CreateCameraHandler,
+    CreateCameraTripodHandler,
+    CreateLightHandler,
+    CreateLightTripodHandler,
+    CreateRequisiteHandler,
+    CreateSoundHandler,
+)
+from app.application.commands.create_microfon import CreateMicrofonHandler
+from app.application.commands.delete_equipment import (
+    DeleteCameraHandler,
+    DeleteCameraTripodHandler,
+    DeleteLightHandler,
+    DeleteLightTripodHandler,
+    DeleteMicrofonHandler,
+    DeleteRequisiteHandler,
+    DeleteSoundHandler,
+)
+from app.application.commands.remove_image import RemoveImageHandler
+from app.application.commands.reserve_availability import ReserveAvailabilityHandler
+from app.application.commands.update_description import UpdateDescriptionHandler
+from app.application.commands.update_equipment import (
+    UpdateCameraHandler,
+    UpdateCameraTripodHandler,
+    UpdateLightHandler,
+    UpdateLightTripodHandler,
+    UpdateMicrofonHandler,
+    UpdateRequisiteHandler,
+    UpdateSoundHandler,
+)
+from app.application.ports.repositories import (
+    CameraRepository,
+    CameraTripodRepository,
+    DescriptionRepository,
+    ImageRepository,
+    LightRepository,
+    LightTripodRepository,
+    MicrofonRepository,
+    RequisiteRepository,
+    SoundRepository,
+    SpareTimeRepository,
+    UserRepository,
+)
 from app.application.ports.transaction import TransactionManager
 from app.config import DatabaseSettings, Log, Rabbitmq, SQLAlchemySettings
+from app.domain.policy.active_user import ActiveUserPolicy
+from app.domain.policy.description import DescriptionOwnershipPolicy
+from app.domain.policy.image_ownership import ImageOwnershipPolicy
+from app.domain.policy.ownership import OwnershipPolicy
+from app.domain.policy.resource_lock import ResourceUnlockedPolicy
+from app.domain.policy.single_description import SingleDescriptionPolicy
+from app.domain.service.availability_service import AvailabilityService
+from app.domain.service.description_service import DescriptionService
+from app.domain.service.equipment_service import EquipmentService
+from app.domain.service.free_time_service import FreeTimeService
+from app.domain.service.image_service import ImageService
+from app.domain.specification.description_identity import DescriptionIdentitySpec
+from app.domain.specification.time_overlap import NonOverlappingTimeSpec
+from app.domain.specification.time_within import TimeWithinWindowSpec
+from app.domain.entity.base import BaseId
+from app.infrastructure.adapters.repository import (
+    CameraSqlAlchemyRepository,
+    CameraTripodSqlAlchemyRepository,
+    DescriptionSqlAlchemyRepository,
+    ImageSqlAlchemyRepository,
+    LightSqlAlchemyRepository,
+    LightTripodSqlAlchemyRepository,
+    MicrofonSqlAlchemyRepository,
+    RequisiteSqlAlchemyRepository,
+    SoundSqlAlchemyRepository,
+    SpareTimeSqlAlchemyRepository,
+    UserSqlAlchemyRepository,
+)
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.transactions import TransactionManagerAlchemy
@@ -19,6 +93,12 @@ def settings_provider() -> Provider:
     return provider
 
 
+def id_factory_provider(
+    id_generator: AbstractGenerationID,
+) -> Callable[[], BaseId]:
+    return id_generator
+
+
 def db_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(get_engine, scope=Scope.APP)
@@ -31,6 +111,77 @@ def services_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=TransactionManagerAlchemy, provides=TransactionManager)
     provider.provide(source=GenerationUUID, provides=AbstractGenerationID)
+    provider.provide(id_factory_provider, provides=Callable[[], BaseId])
+    provider.provide(source=ActiveUserPolicy)
+    provider.provide(source=OwnershipPolicy)
+    provider.provide(source=ResourceUnlockedPolicy)
+    provider.provide(source=DescriptionOwnershipPolicy)
+    provider.provide(source=SingleDescriptionPolicy)
+    provider.provide(source=ImageOwnershipPolicy)
+    provider.provide(source=NonOverlappingTimeSpec)
+    provider.provide(source=TimeWithinWindowSpec)
+    provider.provide(source=DescriptionIdentitySpec)
+    provider.provide(source=AvailabilityService)
+    provider.provide(source=DescriptionService)
+    provider.provide(source=EquipmentService)
+    provider.provide(source=FreeTimeService)
+    provider.provide(source=ImageService)
+    return provider
+
+
+def repository_provider() -> Provider:
+    provider = Provider(scope=Scope.REQUEST)
+    provider.provide(source=UserSqlAlchemyRepository, provides=UserRepository)
+    provider.provide(
+        source=DescriptionSqlAlchemyRepository, provides=DescriptionRepository
+    )
+    provider.provide(source=SpareTimeSqlAlchemyRepository, provides=SpareTimeRepository)
+    provider.provide(source=MicrofonSqlAlchemyRepository, provides=MicrofonRepository)
+    provider.provide(source=CameraSqlAlchemyRepository, provides=CameraRepository)
+    provider.provide(
+        source=CameraTripodSqlAlchemyRepository,
+        provides=CameraTripodRepository,
+    )
+    provider.provide(source=LightSqlAlchemyRepository, provides=LightRepository)
+    provider.provide(
+        source=LightTripodSqlAlchemyRepository,
+        provides=LightTripodRepository,
+    )
+    provider.provide(source=SoundSqlAlchemyRepository, provides=SoundRepository)
+    provider.provide(source=RequisiteSqlAlchemyRepository, provides=RequisiteRepository)
+    provider.provide(source=ImageSqlAlchemyRepository, provides=ImageRepository)
+    return provider
+
+
+def use_case_provider() -> Provider:
+    provider = Provider(scope=Scope.REQUEST)
+    provider.provide(source=AddImageHandler)
+    provider.provide(source=AddSpareTimeHandler)
+    provider.provide(source=CreateCameraHandler)
+    provider.provide(source=CreateCameraTripodHandler)
+    provider.provide(source=CreateDescriptionHandler)
+    provider.provide(source=CreateLightHandler)
+    provider.provide(source=CreateLightTripodHandler)
+    provider.provide(source=CreateMicrofonHandler)
+    provider.provide(source=CreateRequisiteHandler)
+    provider.provide(source=CreateSoundHandler)
+    provider.provide(source=DeleteCameraHandler)
+    provider.provide(source=DeleteCameraTripodHandler)
+    provider.provide(source=DeleteLightHandler)
+    provider.provide(source=DeleteLightTripodHandler)
+    provider.provide(source=DeleteMicrofonHandler)
+    provider.provide(source=DeleteRequisiteHandler)
+    provider.provide(source=DeleteSoundHandler)
+    provider.provide(source=RemoveImageHandler)
+    provider.provide(source=ReserveAvailabilityHandler)
+    provider.provide(source=UpdateCameraHandler)
+    provider.provide(source=UpdateCameraTripodHandler)
+    provider.provide(source=UpdateDescriptionHandler)
+    provider.provide(source=UpdateLightHandler)
+    provider.provide(source=UpdateLightTripodHandler)
+    provider.provide(source=UpdateMicrofonHandler)
+    provider.provide(source=UpdateRequisiteHandler)
+    provider.provide(source=UpdateSoundHandler)
     return provider
 
 
@@ -39,4 +190,6 @@ def setup_providers() -> Iterable[Provider]:
         settings_provider(),
         db_provider(),
         services_provider(),
+        repository_provider(),
+        use_case_provider(),
     )
