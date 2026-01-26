@@ -1,8 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, MetaData, String, Table
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    MetaData,
+    String,
+    Table,
+)
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import composite, registry
+from sqlalchemy.orm import composite, registry, relationship
 
 from app.domain.entity.base import (
     Camera,
@@ -21,7 +30,15 @@ from app.domain.value.email import Email
 from app.domain.value.phone import Phone
 from app.domain.value.status import AvailabilityStatus
 
-metadata = MetaData()
+NAMING_CONVENTION = {
+    "ix": "ix_%(table_name)s_%(column_0_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+metadata = MetaData(naming_convention=NAMING_CONVENTION)
 mapper_registry = registry(metadata=metadata)
 
 users = Table(
@@ -39,7 +56,13 @@ descriptions = Table(
     "descriptions",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("user_id", UUID(as_uuid=True), unique=True, nullable=False),
+    Column(
+        "user_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.oid"),
+        unique=True,
+        nullable=False,
+    ),
     Column("username", String(255), nullable=False),
     Column("phone", String(32), nullable=False),
 )
@@ -58,7 +81,7 @@ microfons = Table(
     "microfons",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -69,7 +92,7 @@ cameras = Table(
     "cameras",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -80,7 +103,7 @@ camera_tripods = Table(
     "camera_tripods",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -91,7 +114,7 @@ lights = Table(
     "lights",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -102,7 +125,7 @@ light_tripods = Table(
     "light_tripods",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -113,7 +136,7 @@ sounds = Table(
     "sounds",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -124,7 +147,7 @@ requisites = Table(
     "requisites",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("users_id", UUID(as_uuid=True), nullable=False),
+    Column("users_id", UUID(as_uuid=True), ForeignKey("users.oid"), nullable=False),
     Column("title", String(255), nullable=False),
     Column("description", String(255), nullable=False),
     Column("type", String(64), nullable=False),
@@ -136,7 +159,12 @@ images = Table(
     "images",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("requisite_id", UUID(as_uuid=True), nullable=False),
+    Column(
+        "requisite_id",
+        UUID(as_uuid=True),
+        ForeignKey("requisites.oid"),
+        nullable=False,
+    ),
     Column("file", String(255), nullable=False),
     Column("title", String(255), nullable=False),
     Column("storage_key", String(255), nullable=False),
@@ -159,6 +187,18 @@ def start_mappers() -> None:
             "is_superuser": users.c.is_superuser,
             "is_verified": users.c.is_verified,
             "create_at": users.c.create_at,
+            "description": relationship(
+                "Description",
+                back_populates="user",
+                uselist=False,
+            ),
+            "microfons": relationship("Microfon", back_populates="user"),
+            "cameras": relationship("Camera", back_populates="user"),
+            "camera_tripods": relationship("CameraTripod", back_populates="user"),
+            "lights": relationship("Light", back_populates="user"),
+            "light_tripods": relationship("LightTripod", back_populates="user"),
+            "sounds": relationship("Sound", back_populates="user"),
+            "requisites": relationship("Requisite", back_populates="user"),
         },
         column_prefix="_",
     )
@@ -170,6 +210,7 @@ def start_mappers() -> None:
             "user_id": descriptions.c.user_id,
             "username": descriptions.c.username,
             "phone": composite(Phone, descriptions.c.phone),
+            "user": relationship("User", back_populates="description"),
         },
         column_prefix="_",
     )
@@ -195,6 +236,7 @@ def start_mappers() -> None:
             "description": microfons.c.description,
             "type": microfons.c.type,
             "create_at": microfons.c.create_at,
+            "user": relationship("User", back_populates="microfons"),
         },
         column_prefix="_",
     )
@@ -208,6 +250,7 @@ def start_mappers() -> None:
             "description": cameras.c.description,
             "type": cameras.c.type,
             "create_at": cameras.c.create_at,
+            "user": relationship("User", back_populates="cameras"),
         },
         column_prefix="_",
     )
@@ -221,6 +264,7 @@ def start_mappers() -> None:
             "description": camera_tripods.c.description,
             "type": camera_tripods.c.type,
             "create_at": camera_tripods.c.create_at,
+            "user": relationship("User", back_populates="camera_tripods"),
         },
         column_prefix="_",
     )
@@ -234,6 +278,7 @@ def start_mappers() -> None:
             "description": lights.c.description,
             "type": lights.c.type,
             "create_at": lights.c.create_at,
+            "user": relationship("User", back_populates="lights"),
         },
         column_prefix="_",
     )
@@ -247,6 +292,7 @@ def start_mappers() -> None:
             "description": light_tripods.c.description,
             "type": light_tripods.c.type,
             "create_at": light_tripods.c.create_at,
+            "user": relationship("User", back_populates="light_tripods"),
         },
         column_prefix="_",
     )
@@ -260,6 +306,7 @@ def start_mappers() -> None:
             "description": sounds.c.description,
             "type": sounds.c.type,
             "create_at": sounds.c.create_at,
+            "user": relationship("User", back_populates="sounds"),
         },
         column_prefix="_",
     )
@@ -274,6 +321,8 @@ def start_mappers() -> None:
             "type": requisites.c.type,
             "size": requisites.c.size,
             "create_at": requisites.c.create_at,
+            "user": relationship("User", back_populates="requisites"),
+            "images": relationship("Image", back_populates="requisite"),
         },
         column_prefix="_",
     )
@@ -291,6 +340,7 @@ def start_mappers() -> None:
             "size": images.c.size,
             "description": images.c.description,
             "create_at": images.c.create_at,
+            "requisite": relationship("Requisite", back_populates="images"),
         },
         column_prefix="_",
     )
