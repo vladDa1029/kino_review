@@ -15,6 +15,6 @@ RUN poetry install
 COPY ./.env .
 
 COPY ./app ./app
-# COPY alembic.ini .
-# COPY ./migrations ./migrations
+COPY alembic.ini .
+COPY ./migrations ./migrations
 COPY main.py .
