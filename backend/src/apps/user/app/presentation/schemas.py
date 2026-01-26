@@ -60,3 +60,12 @@ class ImageCreateRequest(BaseModel):
     mime_type: str
     size: int
     description: str
+
+
+class BrokerUserRegistered(BaseModel):
+    user_id: UUID | None = None
+    email: str
+    is_active: bool
+    is_verified: bool
+    is_superuser: bool
+    create_at: datetime

@@ -5,19 +5,32 @@ from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from faststream.rabbit import RabbitBroker
 
 from app.config import DatabaseSettings, Log, Rabbitmq, SQLAlchemySettings, get_settings
 from app.domain.errors.base import ApplicationError
 from app.ioc import setup_providers
+from app.infrastructure.adapters.broker import (
+    USER_REGISTERED_EXCHANGE,
+    USER_REGISTERED_QUEUE,
+)
 from app.infrastructure.adapters.orm import start_mappers
 from app.presentation import handlers
 from app.presentation.api import router as web_router
+from app.presentation.broker import create_broker_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
-    await cast(AsyncContainer, app.state.dishka_container).close()
+    broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
+    await broker.start()
+    await broker.declare_exchange(USER_REGISTERED_EXCHANGE)
+    await broker.declare_queue(USER_REGISTERED_QUEUE)
+    try:
+        yield
+    finally:
+        await broker.stop()
+        await cast(AsyncContainer, app.state.dishka_container).close()
 
 
 def start_app_dev() -> FastAPI:
@@ -27,6 +40,8 @@ def start_app_dev() -> FastAPI:
         title="User service",
     )
     settings = get_settings()
+    broker = RabbitBroker(url=settings.rabbitmq.url)
+    app.state._broker = broker
     container: AsyncContainer = make_async_container(
         *setup_providers(),
         context={
@@ -34,8 +49,10 @@ def start_app_dev() -> FastAPI:
             DatabaseSettings: settings.db,
             SQLAlchemySettings: settings.alchemy,
             Rabbitmq: settings.rabbitmq,
+            RabbitBroker: broker,
         },
     )
+    broker.include_router(create_broker_router(container))
     setup_dishka(container=container, app=app)
 
     app.add_exception_handler(ApplicationError, handlers.application_error_handler)
@@ -55,4 +72,3 @@ def start_app_dev() -> FastAPI:
     )
     app.include_router(web_router)
     return app
-

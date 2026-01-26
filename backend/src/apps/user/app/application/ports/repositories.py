@@ -15,10 +15,14 @@ from app.domain.entity.base import (
     Spare_time,
     User,
 )
+from app.domain.value.email import Email
 
 
 class UserRepository(Repository[User], Protocol):
     """User repository port."""
+
+    async def get_by_email(self, email: Email) -> User | None:
+        raise NotImplementedError
 
 
 class DescriptionRepository(Repository[Description], Protocol):

@@ -1,6 +1,7 @@
 from typing import Callable, Iterable
 
 from dishka import Provider, Scope
+from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.commands.add_image import AddImageHandler
@@ -26,6 +27,7 @@ from app.application.commands.delete_equipment import (
 )
 from app.application.commands.remove_image import RemoveImageHandler
 from app.application.commands.reserve_availability import ReserveAvailabilityHandler
+from app.application.commands.user_registered import UserRegisteredHandler
 from app.application.commands.update_description import UpdateDescriptionHandler
 from app.application.commands.update_equipment import (
     UpdateCameraHandler,
@@ -90,6 +92,12 @@ def settings_provider() -> Provider:
     provider.from_context(provides=DatabaseSettings)
     provider.from_context(provides=SQLAlchemySettings)
     provider.from_context(provides=Rabbitmq)
+    return provider
+
+
+def broker_provider() -> Provider:
+    provider = Provider(scope=Scope.APP)
+    provider.from_context(provides=RabbitBroker)
     return provider
 
 
@@ -174,6 +182,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=DeleteSoundHandler)
     provider.provide(source=RemoveImageHandler)
     provider.provide(source=ReserveAvailabilityHandler)
+    provider.provide(source=UserRegisteredHandler)
     provider.provide(source=UpdateCameraHandler)
     provider.provide(source=UpdateCameraTripodHandler)
     provider.provide(source=UpdateDescriptionHandler)
@@ -188,6 +197,7 @@ def use_case_provider() -> Provider:
 def setup_providers() -> Iterable[Provider]:
     return (
         settings_provider(),
+        broker_provider(),
         db_provider(),
         services_provider(),
         repository_provider(),

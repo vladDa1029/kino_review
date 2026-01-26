@@ -18,6 +18,7 @@ from app.domain.entity.base import (
     Spare_time,
     User,
 )
+from app.domain.value.email import Email
 
 T = TypeVar("T")
 
@@ -47,6 +48,11 @@ class SqlAlchemyRepository(Repository[T], Generic[T]):
 class UserSqlAlchemyRepository(SqlAlchemyRepository[User]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, User)
+
+    async def get_by_email(self, email: Email) -> User | None:
+        stmt = select(User).where(User.email == email)
+        result = await self._session.execute(stmt)
+        return result.scalars().first()
 
 
 class DescriptionSqlAlchemyRepository(SqlAlchemyRepository[Description]):
