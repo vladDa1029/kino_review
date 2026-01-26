@@ -37,6 +37,7 @@ async def register_user(
         user_form.password,
     )
     event = BrokerUserRegistered(
+        user_id=str(data.oid),
         email=str(data.email),
         is_active=data.is_active,
         is_superuser=data.is_superuser,

@@ -3,6 +3,8 @@ from typing import Callable, Iterable
 from dishka import Provider, Scope
 from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
+from structlog.stdlib import BoundLogger
 
 from app.application.commands.add_image import AddImageHandler
 from app.application.commands.add_spare_time import AddSpareTimeHandler
@@ -98,6 +100,16 @@ def settings_provider() -> Provider:
 def broker_provider() -> Provider:
     provider = Provider(scope=Scope.APP)
     provider.from_context(provides=RabbitBroker)
+    return provider
+
+
+def get_logger(settings: Log) -> BoundLogger:
+    return structlog.get_logger(settings.logger_name)
+
+
+def logger_provider() -> Provider:
+    provider = Provider(scope=Scope.APP)
+    provider.provide(get_logger, provides=BoundLogger)
     return provider
 
 
@@ -198,6 +210,7 @@ def setup_providers() -> Iterable[Provider]:
     return (
         settings_provider(),
         broker_provider(),
+        logger_provider(),
         db_provider(),
         services_provider(),
         repository_provider(),

@@ -24,6 +24,10 @@ class Log(ConfigABC):
         alias="LOG_FORMAT",
         default="%(levelname)-10s%(asctime)-25s %(name)s - %(funcName)-15s: %(lineno)-5d - %(message)3s",
     )
+    logger_name: str = Field(
+        alias="LOG_NAME",
+        default="user",
+    )
 
 
 class Rabbitmq(ConfigABC):

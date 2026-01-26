@@ -63,6 +63,7 @@ class TokenResponse(BaseModel):
 
 # no must be here
 class BrokerUserRegistered(BaseModel):
+    user_id: str
     email: str
     is_active: bool
     is_verified: bool

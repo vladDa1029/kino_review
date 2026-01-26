@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import cast
 
+import structlog
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
@@ -18,6 +19,9 @@ from app.infrastructure.adapters.orm import start_mappers
 from app.presentation import handlers
 from app.presentation.api import router as web_router
 from app.presentation.broker import create_broker_router
+from app.set_log import configure_logging
+
+log = structlog.get_logger(__file__)
 
 
 @asynccontextmanager
@@ -40,6 +44,7 @@ def start_app_dev() -> FastAPI:
         title="User service",
     )
     settings = get_settings()
+    configure_logging(settings.log)
     broker = RabbitBroker(url=settings.rabbitmq.url)
     app.state._broker = broker
     container: AsyncContainer = make_async_container(
@@ -71,4 +76,5 @@ def start_app_dev() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Accept", "Cache-Control"],
     )
     app.include_router(web_router)
+    log.info("Start application user!!!")
     return app
