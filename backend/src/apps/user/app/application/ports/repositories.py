@@ -1,5 +1,8 @@
-from typing import Protocol
+from typing import Protocol, TypeVar
 
+from app.application.common.filters import EquipmentFilters
+from app.application.common.pagination import Pagination
+from app.application.common.sorting import EquipmentSorting
 from app.application.ports.repository import Repository
 from app.domain.entity.base import (
     BaseId,
@@ -16,6 +19,8 @@ from app.domain.entity.base import (
     User,
 )
 from app.domain.value.email import Email
+
+TEquipment = TypeVar("TEquipment")
 
 
 class UserRepository(Repository[User], Protocol):
@@ -39,31 +44,49 @@ class SpareTimeRepository(Repository[Spare_time], Protocol):
         raise NotImplementedError
 
 
-class MicrofonRepository(Repository[Microfon], Protocol):
+class EquipmentRepository(Repository[TEquipment], Protocol):
+    """Equipment repository port."""
+
+    async def list(
+        self,
+        filters: EquipmentFilters | None = None,
+        sorting: EquipmentSorting | None = None,
+        pagination: Pagination | None = None,
+    ) -> list[TEquipment]:
+        raise NotImplementedError
+
+    async def count(
+        self,
+        filters: EquipmentFilters | None = None,
+    ) -> int:
+        raise NotImplementedError
+
+
+class MicrofonRepository(EquipmentRepository[Microfon], Protocol):
     """Microfon repository port."""
 
 
-class CameraRepository(Repository[Camera], Protocol):
+class CameraRepository(EquipmentRepository[Camera], Protocol):
     """Camera repository port."""
 
 
-class CameraTripodRepository(Repository[CameraTripod], Protocol):
+class CameraTripodRepository(EquipmentRepository[CameraTripod], Protocol):
     """Camera tripod repository port."""
 
 
-class LightRepository(Repository[Light], Protocol):
+class LightRepository(EquipmentRepository[Light], Protocol):
     """Light repository port."""
 
 
-class LightTripodRepository(Repository[LightTripod], Protocol):
+class LightTripodRepository(EquipmentRepository[LightTripod], Protocol):
     """Light tripod repository port."""
 
 
-class SoundRepository(Repository[Sound], Protocol):
+class SoundRepository(EquipmentRepository[Sound], Protocol):
     """Sound repository port."""
 
 
-class RequisiteRepository(Repository[Requisite], Protocol):
+class RequisiteRepository(EquipmentRepository[Requisite], Protocol):
     """Requisite repository port."""
 
 

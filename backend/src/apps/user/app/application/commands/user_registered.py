@@ -7,6 +7,9 @@ from app.application.ports.transaction import TransactionManager
 from app.domain.entity.base import BaseId, User
 from app.domain.value.email import Email
 from app.infrastructure.generation import AbstractGenerationID
+from structlog import getLogger
+
+log = getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -16,7 +19,7 @@ class UserRegisteredCommand:
     is_superuser: bool
     is_verified: bool
     create_at: datetime
-    user_id: UUID | None = None
+    user_id: UUID
 
 
 class UserRegisteredHandler:
@@ -38,6 +41,9 @@ class UserRegisteredHandler:
                     BaseId(command.user_id)
                     if command.user_id is not None
                     else self._id_generator()
+                )
+                log.debug(
+                    f"Полученное id от другого сервиса/записанное: {command.user_id} / {oid} ."
                 )
                 user = User(
                     oid=oid,

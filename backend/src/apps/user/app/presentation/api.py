@@ -1,3 +1,4 @@
+import math
 from uuid import UUID
 
 from dishka import FromDishka
@@ -75,13 +76,30 @@ from app.application.commands.update_equipment import (
     UpdateSoundCommand,
     UpdateSoundHandler,
 )
+from app.application.common import EquipmentFilters, EquipmentSorting, Pagination
+from app.application.queries.list_equipment import (
+    ListCamerasHandler,
+    ListCameraTripodsHandler,
+    ListEquipmentQuery,
+    ListLightsHandler,
+    ListLightTripodsHandler,
+    ListMicrofonsHandler,
+    ListRequisitesHandler,
+    ListSoundsHandler,
+)
 from app.domain.entity.base import BaseId
 from app.presentation.schemas import (
     DescriptionCreateRequest,
     DescriptionUpdateRequest,
+    EquipmentItemResponse,
+    EquipmentListQuery,
+    EquipmentListResponse,
     EquipmentCreateRequest,
     EquipmentUpdateRequest,
     ImageCreateRequest,
+    RequisiteItemResponse,
+    RequisiteListQuery,
+    RequisiteListResponse,
     RequisiteCreateRequest,
     RequisiteUpdateRequest,
     ReserveAvailabilityRequest,
@@ -103,6 +121,73 @@ def user_id_from_header(
             detail="x-user-id does not match path user_id.",
         )
     return BaseId(x_user_id)
+
+
+def _build_pagination(page: int, page_size: int) -> Pagination:
+    return Pagination(page=page, page_size=page_size)
+
+
+def _build_pages(total_count: int, page_size: int) -> int:
+    return math.ceil(total_count / page_size)
+
+
+def _build_sorting(
+    sort_by: str | None,
+    sort_dir: str,
+) -> EquipmentSorting | None:
+    if sort_by is None:
+        return None
+    return EquipmentSorting(field=sort_by, direction=sort_dir)
+
+
+def _equipment_filters(
+    user_id: BaseId,
+    params: EquipmentListQuery,
+) -> EquipmentFilters:
+    return EquipmentFilters(
+        user_id=user_id,
+        type=params.type,
+        search=params.search,
+        created_from=params.created_from,
+        created_to=params.created_to,
+    )
+
+
+def _requisite_filters(
+    user_id: BaseId,
+    params: RequisiteListQuery,
+) -> EquipmentFilters:
+    return EquipmentFilters(
+        user_id=user_id,
+        type=params.type,
+        size=params.size,
+        search=params.search,
+        created_from=params.created_from,
+        created_to=params.created_to,
+    )
+
+
+def _equipment_response(item) -> EquipmentItemResponse:
+    return EquipmentItemResponse(
+        oid=item.oid,
+        user_id=item.users_id,
+        title=item.title,
+        description=item.description,
+        type=item.type,
+        create_at=item.create_at,
+    )
+
+
+def _requisite_response(item) -> RequisiteItemResponse:
+    return RequisiteItemResponse(
+        oid=item.oid,
+        user_id=item.users_id,
+        title=item.title,
+        description=item.description,
+        type=item.type,
+        size=item.size,
+        create_at=item.create_at,
+    )
 
 
 @router.post("/users/{user_id}/description", status_code=201)
@@ -519,3 +604,171 @@ async def remove_image(
         image_id=BaseId(image_id),
     )
     await handler(command)
+
+
+@router.get("/users/{user_id}/microfons", response_model=EquipmentListResponse)
+async def list_microfons(
+    handler: FromDishka[ListMicrofonsHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/cameras", response_model=EquipmentListResponse)
+async def list_cameras(
+    handler: FromDishka[ListCamerasHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/camera-tripods", response_model=EquipmentListResponse)
+async def list_camera_tripods(
+    handler: FromDishka[ListCameraTripodsHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/lights", response_model=EquipmentListResponse)
+async def list_lights(
+    handler: FromDishka[ListLightsHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/light-tripods", response_model=EquipmentListResponse)
+async def list_light_tripods(
+    handler: FromDishka[ListLightTripodsHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/sounds", response_model=EquipmentListResponse)
+async def list_sounds(
+    handler: FromDishka[ListSoundsHandler],
+    params: EquipmentListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> EquipmentListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _equipment_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return EquipmentListResponse(
+        items=[_equipment_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )
+
+
+@router.get("/users/{user_id}/requisites", response_model=RequisiteListResponse)
+async def list_requisites(
+    handler: FromDishka[ListRequisitesHandler],
+    params: RequisiteListQuery = Depends(),
+    user_id: BaseId = Depends(user_id_from_header),
+) -> RequisiteListResponse:
+    pagination = _build_pagination(params.page, params.page_size)
+    filters = _requisite_filters(user_id, params)
+    sorting = _build_sorting(params.sort_by, params.sort_dir)
+    query = ListEquipmentQuery(
+        filters=filters,
+        sorting=sorting,
+        pagination=pagination,
+    )
+    result = await handler(query)
+    return RequisiteListResponse(
+        items=[_requisite_response(item) for item in result.items],
+        page=params.page,
+        page_size=params.page_size,
+        total_count=result.total_count,
+        pages=_build_pages(result.total_count, params.page_size),
+    )

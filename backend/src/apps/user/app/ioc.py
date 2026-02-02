@@ -40,6 +40,15 @@ from app.application.commands.update_equipment import (
     UpdateRequisiteHandler,
     UpdateSoundHandler,
 )
+from app.application.queries.list_equipment import (
+    ListCamerasHandler,
+    ListCameraTripodsHandler,
+    ListLightsHandler,
+    ListLightTripodsHandler,
+    ListMicrofonsHandler,
+    ListRequisitesHandler,
+    ListSoundsHandler,
+)
 from app.application.ports.repositories import (
     CameraRepository,
     CameraTripodRepository,
@@ -195,6 +204,13 @@ def use_case_provider() -> Provider:
     provider.provide(source=RemoveImageHandler)
     provider.provide(source=ReserveAvailabilityHandler)
     provider.provide(source=UserRegisteredHandler)
+    provider.provide(source=ListMicrofonsHandler)
+    provider.provide(source=ListCamerasHandler)
+    provider.provide(source=ListCameraTripodsHandler)
+    provider.provide(source=ListLightsHandler)
+    provider.provide(source=ListLightTripodsHandler)
+    provider.provide(source=ListSoundsHandler)
+    provider.provide(source=ListRequisitesHandler)
     provider.provide(source=UpdateCameraHandler)
     provider.provide(source=UpdateCameraTripodHandler)
     provider.provide(source=UpdateDescriptionHandler)

@@ -1,8 +1,12 @@
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.common.filters import EquipmentFilters
+from app.application.common.pagination import Pagination
+from app.application.common.sorting import EquipmentSorting
+from app.application.errors.query_param import FilterError, SortingError
 from app.application.ports.repository import Repository
 from app.domain.entity.base import (
     BaseId,
@@ -45,6 +49,72 @@ class SqlAlchemyRepository(Repository[T], Generic[T]):
         await self._session.delete(entity)
 
 
+def _apply_equipment_filters(stmt, model: type[T], filters: EquipmentFilters | None):
+    if filters is None:
+        return stmt
+    if filters.user_id is not None:
+        stmt = stmt.where(model.users_id == filters.user_id)
+    if filters.type is not None:
+        stmt = stmt.where(model.type == filters.type)
+    if filters.size is not None:
+        if not hasattr(model, "size"):
+            raise FilterError("size filter is not supported for this resource.")
+        stmt = stmt.where(model.size == filters.size)
+    if filters.created_from is not None:
+        stmt = stmt.where(model.create_at >= filters.created_from)
+    if filters.created_to is not None:
+        stmt = stmt.where(model.create_at <= filters.created_to)
+    if filters.search is not None:
+        pattern = f"%{filters.search}%"
+        stmt = stmt.where(
+            or_(model.title.ilike(pattern), model.description.ilike(pattern))
+        )
+    return stmt
+
+
+def _apply_equipment_sorting(
+    stmt, model: type[T], sorting: EquipmentSorting | None
+):
+    if sorting is None:
+        return stmt
+    column = getattr(model, sorting.field, None)
+    if column is None:
+        raise SortingError(f"sort field '{sorting.field}' is not supported.")
+    if sorting.direction == "desc":
+        return stmt.order_by(column.desc())
+    return stmt.order_by(column.asc())
+
+
+def _apply_pagination(stmt, pagination: Pagination | None):
+    if pagination is None:
+        return stmt
+    return stmt.limit(pagination.limit).offset(pagination.offset)
+
+
+class SqlAlchemyEquipmentRepository(SqlAlchemyRepository[T], Generic[T]):
+    async def list(
+        self,
+        filters: EquipmentFilters | None = None,
+        sorting: EquipmentSorting | None = None,
+        pagination: Pagination | None = None,
+    ) -> list[T]:
+        stmt = select(self._model)
+        stmt = _apply_equipment_filters(stmt, self._model, filters)
+        stmt = _apply_equipment_sorting(stmt, self._model, sorting)
+        stmt = _apply_pagination(stmt, pagination)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def count(
+        self,
+        filters: EquipmentFilters | None = None,
+    ) -> int:
+        stmt = select(func.count(self._model.oid)).select_from(self._model)
+        stmt = _apply_equipment_filters(stmt, self._model, filters)
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
+
+
 class UserSqlAlchemyRepository(SqlAlchemyRepository[User]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, User)
@@ -75,37 +145,37 @@ class SpareTimeSqlAlchemyRepository(SqlAlchemyRepository[Spare_time]):
         return list(result.scalars().all())
 
 
-class MicrofonSqlAlchemyRepository(SqlAlchemyRepository[Microfon]):
+class MicrofonSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Microfon]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Microfon)
 
 
-class CameraSqlAlchemyRepository(SqlAlchemyRepository[Camera]):
+class CameraSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Camera]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Camera)
 
 
-class CameraTripodSqlAlchemyRepository(SqlAlchemyRepository[CameraTripod]):
+class CameraTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[CameraTripod]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, CameraTripod)
 
 
-class LightSqlAlchemyRepository(SqlAlchemyRepository[Light]):
+class LightSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Light]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Light)
 
 
-class LightTripodSqlAlchemyRepository(SqlAlchemyRepository[LightTripod]):
+class LightTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[LightTripod]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, LightTripod)
 
 
-class SoundSqlAlchemyRepository(SqlAlchemyRepository[Sound]):
+class SoundSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Sound]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Sound)
 
 
-class RequisiteSqlAlchemyRepository(SqlAlchemyRepository[Requisite]):
+class RequisiteSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Requisite]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Requisite)
 
