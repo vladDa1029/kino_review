@@ -1,82 +1,74 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import authService from '../services/api/authService';
+import * as authService from '../services/authService';
+import { shouldRefreshToken } from '../utils/tokenUtils';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(localStorage.getItem('access_token') || null);
   const [userData, setUserData] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      fetchUserData();
+    // Проверяем возможность обновления токена при загрузке приложения
+    // Только если токен был сохранен ранее и возможно его обновление
+    if (token && shouldRefreshToken(token, 300)) { // Обновляем, если токен истекает в течение 5 минут
+      handleRefreshToken();
     }
   }, [token]);
 
-  const fetchUserData = async () => {
+  const handleRefreshToken = async () => {
     try {
-      const data = await authService.getUserData(token);
-      setUserData(data);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      if (token) {
-        handleLogout();
+      const response = await authService.refreshToken();
+      if (response.access_token) {
+        setToken(response.access_token);
+        localStorage.setItem('access_token', response.access_token);
       }
+    } catch (error) {
+      console.log('Could not refresh token, user not logged in');
     }
   };
 
-  const handleLogin = async () => {
+  const handleLogin = async (email, password) => {
     try {
-      const { access_token } = await authService.login(formData.email, formData.password);
-      setToken(access_token);
-      localStorage.setItem('token', access_token);
-      toast.success('Successfully logged in!');
-      setIsAuthModalOpen(false);
+      const response = await authService.login(email, password);
+      if (response.access_token) {
+        setToken(response.access_token);
+        localStorage.setItem('access_token', response.access_token);
+        toast.success('Successfully logged in!');
+        setIsAuthModalOpen(false);
+        return response;
+      }
     } catch (error) {
       toast.error(error.message || 'Login failed');
       throw error;
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegister = async (email, password) => {
     try {
-      await authService.register(formData.email, formData.password);
+      const response = await authService.register(email, password);
       toast.success('Registration successful! Please login.');
-      setIsLogin(true);
-      setFormData({ ...formData, password: '', confirmPassword: '' });
+      return response;
     } catch (error) {
       toast.error(error.message || 'Registration failed');
       throw error;
     }
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    setUserData(null);
-    localStorage.removeItem('token');
-    toast.info('Logged out successfully');
-    setIsAuthModalOpen(false);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      toast.warning('Passwords do not match');
-      return;
-    }
-    if (isLogin) {
-      await handleLogin();
-    } else {
-      await handleRegister();
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setToken(null);
+      setUserData(null);
+      localStorage.removeItem('access_token');
+      toast.info('Logged out successfully');
+      setIsAuthModalOpen(false);
     }
   };
 
@@ -88,17 +80,11 @@ export const AuthProvider = ({ children }) => {
       setIsAuthModalOpen,
       isLogin,
       setIsLogin,
-      formData,
-      setFormData,
-      showPassword,
-      setShowPassword,
-      handleSubmit,
+      setUserData,
+      handleLogin,
+      handleRegister,
       handleLogout,
-      handleInputChange: (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-      },
-      togglePasswordVisibility: () => setShowPassword(!showPassword)
+      handleRefreshToken
     }}>
       {children}
     </AuthContext.Provider>

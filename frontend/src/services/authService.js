@@ -1,33 +1,42 @@
+// src/services/authService.js
+
 import apiClient from './api';
 
 export const login = async (email, password) => {
-  const formData = new URLSearchParams({
-    grant_type: 'password',
-    username: email,
-    password,
-  });
-
-  return apiClient('/login', {
+  const formData = new FormData();
+  formData.append('username', email);
+  formData.append('password', password);
+  
+  return apiClient('/auth/login', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
     body: formData,
   });
 };
 
 export const register = async (email, password) => {
-  return apiClient('/user', {
+  return apiClient('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 };
 
-export const fetchUserData = async (token) => {
-  return apiClient('/user', {
+export const refreshToken = async () => {
+  // Refresh токен передается через куки, поэтому нам не нужно явно передавать его
+  return apiClient('/auth/refresh', {
+    method: 'POST',
+  });
+};
+
+export const logout = async () => {
+  return apiClient('/auth/logout', {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  });
+};
+
+// Добавляем функцию для получения всех пользователей (для администратора)
+export const getUsers = async (page = 1, pageSize = 5) => {
+  const params = new URLSearchParams({ page, page_size: pageSize });
+  return apiClient(`/auth/users?${params.toString()}`, {
+    method: 'GET',
   });
 };

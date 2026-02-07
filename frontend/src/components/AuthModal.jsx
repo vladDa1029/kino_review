@@ -1,19 +1,13 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
 
-const AuthModal = ({
-  isLogin,
-  setIsLogin,
-  showAuth,
-  setShowAuth,
-  onLogin,
-  onRegister,
-}) => {
+const AuthModal = ({ showAuth, setShowAuth }) => {
+  const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [passwordRequirements, setPasswordRequirements] = useState({
@@ -35,26 +29,25 @@ const AuthModal = ({
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isLogin) {
       if (passwordStrength < 3) {
-        alert('Password is too weak');
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        alert('Passwords do not match');
         return;
       }
     }
 
-    if (isLogin) {
-      onLogin(formData.email, formData.password);
-    } else {
-      onRegister(formData.email, formData.password);
+    try {
+      if (isLogin) {
+        await handleLogin(formData.email, formData.password);
+      } else {
+        await handleRegister(formData.email, formData.password);
+        setIsLogin(true); // Переключаемся на форму входа после регистрации
+      }
+      setFormData({ email: '', password: '' });
+    } catch (error) {
+      // Обработка ошибок уже осуществляется в соответствующих функциях
     }
-
-    setFormData({ email: '', password: '', confirmPassword: '' });
   };
 
   return (
@@ -98,11 +91,7 @@ const AuthModal = ({
                     className="password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? (
-                      <svg>...</svg>
-                    ) : (
-                      <svg>...</svg>
-                    )}
+                    {showPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
                 {!isLogin && (
@@ -114,52 +103,18 @@ const AuthModal = ({
                 )}
               </div>
 
-              {!isLogin && (
-                <div className="form-group password-input-container">
-                  <div className="password-input-wrapper">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="confirmPassword"
-                      placeholder="Confirm Password"
-                      className="form-input"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <svg>...</svg> : <svg>...</svg>}
-                    </button>
-                  </div>
-                  {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                    <p className="password-error">Passwords don't match</p>
-                  )}
-                </div>
-              )}
-
               <button
                 type="submit"
                 className="auth-submit-btn"
-                disabled={!isLogin && (passwordStrength < 3 || formData.password !== formData.confirmPassword)}
+                disabled={!isLogin && passwordStrength < 3}
               >
                 {isLogin ? 'Sign In' : 'Sign Up'}
               </button>
 
-              <div className="auth-divider"><span>or</span></div>
-
-              <button className="social-auth-btn google-btn">Continue with Google</button>
-              <button className="social-auth-btn github-btn">Continue with GitHub</button>
-
               <p className="auth-switch">
                 {isLogin ? "Don't have an account? " : "Already have an account? "}
                 <span
-                  onClick={() => {
-                    setIsLogin(!isLogin);
-                    setFormData({ ...formData, password: '', confirmPassword: '' });
-                  }}
+                  onClick={() => setIsLogin(!isLogin)}
                   className="switch-link"
                 >
                   {isLogin ? 'Sign up' : 'Sign in'}

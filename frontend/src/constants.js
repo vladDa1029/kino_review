@@ -1,1 +1,3 @@
-export const API_BASE_URL = 'http://127.0.0.1:8000';
+// Используем переменную окружения, если доступна, иначе локальный адрес
+export const API_BASE_URL = 'http://localhost:8000'; 
+

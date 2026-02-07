@@ -1,9 +1,12 @@
+// src/hooks/useAuth.js
+
 import { useState, useEffect, useCallback } from 'react';
-import { login, register, fetchUserData } from '../services/authService';
+import { login, register, refreshToken, logout as apiLogout } from '../services/authService';
 import { toast } from 'react-toastify';
+import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
 
 export const useAuth = () => {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(localStorage.getItem('access_token') || null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -12,15 +15,16 @@ export const useAuth = () => {
     try {
       const data = await login(email, password);
       const accessToken = data.access_token;
+
       setToken(accessToken);
-      localStorage.setItem('token', accessToken);
+      localStorage.setItem('access_token', accessToken);
+
+      const decoded = decodeToken(accessToken);
+      setUserData(decoded || { email });
+
       toast.success('Successfully logged in!');
     } catch (error) {
-      if (error.message.includes('Failed to fetch')) {
-        toast.error('Network error: Could not connect to the server.');
-      } else {
-        toast.error(error.message || 'Login failed');
-      }
+      toast.error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -38,39 +42,52 @@ export const useAuth = () => {
     }
   }, []);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try {
+      await apiLogout();
+    } catch (error) {
+      console.warn('Logout API failed, proceeding with local logout');
+    }
     setToken(null);
     setUserData(null);
-    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
     toast.info('Logged out successfully');
   }, []);
 
-  const refreshUserData = useCallback(async () => {
-    if (!token) return;
+  const handleRefreshToken = useCallback(async () => {
     try {
-      const data = await fetchUserData(token);
-      if (data.is_active === false) {
-        toast.error('Your account has been deactivated.');
-        handleLogout();
-        return;
-      }
-      setUserData(data);
+      const data = await refreshToken();
+      const newAccessToken = data.access_token;
+      setToken(newAccessToken);
+      localStorage.setItem('access_token', newAccessToken);
+      return newAccessToken;
     } catch (error) {
-      if (error.status === 401) {
-        handleLogout();
-        toast.error('Session expired. Please log in again.');
-      } else {
-        toast.error('Failed to load user data.');
-        console.error('Fetch user data error:', error);
-      }
+      console.error('Token refresh failed:', error);
+      handleLogout();
+      return null;
     }
-  }, [token, handleLogout]);
+  }, [handleLogout]);
 
+  // Автоматически обновляем токен за 1 минуту до истечения
+  useEffect(() => {
+    if (!token) return;
+
+    if (shouldRefreshToken(token, 60)) { // Обновляем за 1 минуту до истечения
+      handleRefreshToken();
+    }
+  }, [token, handleRefreshToken]);
+
+  // Загружаем данные пользователя при изменении токена
   useEffect(() => {
     if (token) {
-      refreshUserData();
+      if (shouldRefreshToken(token)) {
+        handleRefreshToken();
+      } else {
+        const decoded = decodeToken(token);
+        setUserData(decoded || { email: 'user@example.com' });
+      }
     }
-  }, [token, refreshUserData]);
+  }, [token, handleRefreshToken]);
 
   return {
     token,
@@ -79,6 +96,6 @@ export const useAuth = () => {
     handleLogin,
     handleRegister,
     handleLogout,
-    refreshUserData,
+    refreshToken: handleRefreshToken,
   };
 };

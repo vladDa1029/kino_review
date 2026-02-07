@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from './hooks/useAuth';
+import { useNavigate, Routes, Route } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import HomePage from './pages/HomePage';
+import Projects from './pages/Projects';
 import AuthModal from './components/AuthModal';
+import ProtectedRoute from './components/ProtectedRoute';
 import ThemeToggle from './components/ThemeToggle';
 import AppToastContainer from './components/ToastContainer';
+import UserList from './components/UserList';
 import './App.css';
 
 function App() {
+  const navigate = useNavigate();
+  const { token, handleLogin, handleRegister, handleLogout, isAuthModalOpen, setIsAuthModalOpen } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
-
-  const { token, userData, handleLogin, handleRegister, handleLogout } = useAuth();
 
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -48,10 +50,7 @@ function App() {
           ) : (
             <button
               className="auth-btn"
-              onClick={() => {
-                setShowAuth(true);
-                setIsLogin(true);
-              }}
+              onClick={() => setIsAuthModalOpen(true)}
             >
               Sign In
             </button>
@@ -59,15 +58,15 @@ function App() {
         </div>
       </header>
 
-      <HomePage />
+      <Routes>
+        <Route path="/" element={<HomePage onOpenAuth={() => setIsAuthModalOpen(true)} />} />
+        <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute><UserList /></ProtectedRoute>} />
+      </Routes>
 
       <AuthModal
-        isLogin={isLogin}
-        setIsLogin={setIsLogin}
-        showAuth={showAuth}
-        setShowAuth={setShowAuth}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
+        showAuth={isAuthModalOpen}
+        setShowAuth={setIsAuthModalOpen}
       />
     </div>
   );
