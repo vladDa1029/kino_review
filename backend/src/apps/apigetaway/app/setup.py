@@ -9,11 +9,13 @@ from app.config import AuthGatewaySettings, ProtectedPathsSettings
 from app.infrastructure.security.jwt_validator import JWTValidator
 from app.presentation.middleware.auth import AuthGatewayMiddleware
 
+
 # Настройку CORS
 def CORS_Middleware(app: FastAPI):
     context = [
         "http://localhost:3000",  # React default
         "http://localhost:5173",  # Vite default
+        "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",  # Alternative
     ]
 
@@ -50,7 +52,9 @@ def AuthGateway_Middleware(
         algorithm=settings.algorithm,
     )
     flattened_patterns = [
-        pattern for patterns in protected_paths.patterns.values() for pattern in patterns
+        pattern
+        for patterns in protected_paths.patterns.values()
+        for pattern in patterns
     ]
     app.add_middleware(
         AuthGatewayMiddleware,

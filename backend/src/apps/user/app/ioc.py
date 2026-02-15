@@ -7,6 +7,15 @@ import structlog
 from structlog.stdlib import BoundLogger
 
 from app.application.commands.add_image import AddImageHandler
+from app.application.commands.add_equipment_free_time import (
+    AddCameraFreeTimeHandler,
+    AddCameraTripodFreeTimeHandler,
+    AddLightFreeTimeHandler,
+    AddLightTripodFreeTimeHandler,
+    AddMicrofonFreeTimeHandler,
+    AddRequisiteFreeTimeHandler,
+    AddSoundFreeTimeHandler,
+)
 from app.application.commands.add_spare_time import AddSpareTimeHandler
 from app.application.commands.create_description import CreateDescriptionHandler
 from app.application.commands.create_equipment import (
@@ -50,20 +59,34 @@ from app.application.queries.list_equipment import (
     ListSoundsHandler,
 )
 from app.application.ports.repositories import (
+    CameraFreeTimeRepository,
     CameraRepository,
     CameraTripodRepository,
+    CameraTripodFreeTimeRepository,
     DescriptionRepository,
     ImageRepository,
+    LightFreeTimeRepository,
     LightRepository,
+    LightTripodFreeTimeRepository,
     LightTripodRepository,
+    MicrofonFreeTimeRepository,
     MicrofonRepository,
+    RequisiteFreeTimeRepository,
     RequisiteRepository,
+    SoundFreeTimeRepository,
     SoundRepository,
     SpareTimeRepository,
     UserRepository,
 )
+from app.application.ports.storage import FileStorage
 from app.application.ports.transaction import TransactionManager
-from app.config import DatabaseSettings, Log, Rabbitmq, SQLAlchemySettings
+from app.config import (
+    DatabaseSettings,
+    Log,
+    Rabbitmq,
+    SQLAlchemySettings,
+    StorageSettings,
+)
 from app.domain.policy.active_user import ActiveUserPolicy
 from app.domain.policy.description import DescriptionOwnershipPolicy
 from app.domain.policy.image_ownership import ImageOwnershipPolicy
@@ -72,6 +95,7 @@ from app.domain.policy.resource_lock import ResourceUnlockedPolicy
 from app.domain.policy.single_description import SingleDescriptionPolicy
 from app.domain.service.availability_service import AvailabilityService
 from app.domain.service.description_service import DescriptionService
+from app.domain.service.equipment_free_time_service import EquipmentFreeTimeService
 from app.domain.service.equipment_service import EquipmentService
 from app.domain.service.free_time_service import FreeTimeService
 from app.domain.service.image_service import ImageService
@@ -80,18 +104,26 @@ from app.domain.specification.time_overlap import NonOverlappingTimeSpec
 from app.domain.specification.time_within import TimeWithinWindowSpec
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.repository import (
+    CameraFreeTimeSqlAlchemyRepository,
     CameraSqlAlchemyRepository,
     CameraTripodSqlAlchemyRepository,
+    CameraTripodFreeTimeSqlAlchemyRepository,
     DescriptionSqlAlchemyRepository,
     ImageSqlAlchemyRepository,
+    LightFreeTimeSqlAlchemyRepository,
     LightSqlAlchemyRepository,
+    LightTripodFreeTimeSqlAlchemyRepository,
     LightTripodSqlAlchemyRepository,
+    MicrofonFreeTimeSqlAlchemyRepository,
     MicrofonSqlAlchemyRepository,
+    RequisiteFreeTimeSqlAlchemyRepository,
     RequisiteSqlAlchemyRepository,
+    SoundFreeTimeSqlAlchemyRepository,
     SoundSqlAlchemyRepository,
     SpareTimeSqlAlchemyRepository,
     UserSqlAlchemyRepository,
 )
+from app.infrastructure.adapters.storage import create_file_storage
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.transactions import TransactionManagerAlchemy
@@ -103,6 +135,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=DatabaseSettings)
     provider.from_context(provides=SQLAlchemySettings)
     provider.from_context(provides=Rabbitmq)
+    provider.from_context(provides=StorageSettings)
     return provider
 
 
@@ -152,9 +185,16 @@ def services_provider() -> Provider:
     provider.provide(source=DescriptionIdentitySpec)
     provider.provide(source=AvailabilityService)
     provider.provide(source=DescriptionService)
+    provider.provide(source=EquipmentFreeTimeService)
     provider.provide(source=EquipmentService)
     provider.provide(source=FreeTimeService)
     provider.provide(source=ImageService)
+    return provider
+
+
+def storage_provider() -> Provider:
+    provider = Provider(scope=Scope.REQUEST)
+    provider.provide(create_file_storage, provides=FileStorage)
     return provider
 
 
@@ -165,6 +205,34 @@ def repository_provider() -> Provider:
         source=DescriptionSqlAlchemyRepository, provides=DescriptionRepository
     )
     provider.provide(source=SpareTimeSqlAlchemyRepository, provides=SpareTimeRepository)
+    provider.provide(
+        source=MicrofonFreeTimeSqlAlchemyRepository,
+        provides=MicrofonFreeTimeRepository,
+    )
+    provider.provide(
+        source=CameraFreeTimeSqlAlchemyRepository,
+        provides=CameraFreeTimeRepository,
+    )
+    provider.provide(
+        source=CameraTripodFreeTimeSqlAlchemyRepository,
+        provides=CameraTripodFreeTimeRepository,
+    )
+    provider.provide(
+        source=LightFreeTimeSqlAlchemyRepository,
+        provides=LightFreeTimeRepository,
+    )
+    provider.provide(
+        source=LightTripodFreeTimeSqlAlchemyRepository,
+        provides=LightTripodFreeTimeRepository,
+    )
+    provider.provide(
+        source=SoundFreeTimeSqlAlchemyRepository,
+        provides=SoundFreeTimeRepository,
+    )
+    provider.provide(
+        source=RequisiteFreeTimeSqlAlchemyRepository,
+        provides=RequisiteFreeTimeRepository,
+    )
     provider.provide(source=MicrofonSqlAlchemyRepository, provides=MicrofonRepository)
     provider.provide(source=CameraSqlAlchemyRepository, provides=CameraRepository)
     provider.provide(
@@ -185,6 +253,13 @@ def repository_provider() -> Provider:
 def use_case_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=AddImageHandler)
+    provider.provide(source=AddMicrofonFreeTimeHandler)
+    provider.provide(source=AddCameraFreeTimeHandler)
+    provider.provide(source=AddCameraTripodFreeTimeHandler)
+    provider.provide(source=AddLightFreeTimeHandler)
+    provider.provide(source=AddLightTripodFreeTimeHandler)
+    provider.provide(source=AddSoundFreeTimeHandler)
+    provider.provide(source=AddRequisiteFreeTimeHandler)
     provider.provide(source=AddSpareTimeHandler)
     provider.provide(source=CreateCameraHandler)
     provider.provide(source=CreateCameraTripodHandler)
@@ -229,6 +304,7 @@ def setup_providers() -> Iterable[Provider]:
         logger_provider(),
         db_provider(),
         services_provider(),
+        storage_provider(),
         repository_provider(),
         use_case_provider(),
     )

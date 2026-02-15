@@ -1,6 +1,6 @@
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Column, Table, delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.common.filters import EquipmentFilters
@@ -23,6 +23,16 @@ from app.domain.entity.base import (
     User,
 )
 from app.domain.value.email import Email
+from app.domain.value.status import AvailabilityStatus
+from app.infrastructure.adapters.orm import (
+    camera_free_times,
+    camera_tripod_free_times,
+    light_free_times,
+    light_tripod_free_times,
+    microfon_free_times,
+    requisite_free_times,
+    sound_free_times,
+)
 
 T = TypeVar("T")
 
@@ -47,6 +57,63 @@ class SqlAlchemyRepository(Repository[T], Generic[T]):
 
     async def delete(self, entity: T) -> None:
         await self._session.delete(entity)
+
+
+class SqlAlchemyFreeTimeRepository(Repository[Spare_time]):
+    def __init__(self, session: AsyncSession, table: Table, obj_column: Column) -> None:
+        self._session = session
+        self._table = table
+        self._obj_column = obj_column
+
+    def _row_to_entity(self, row) -> Spare_time:
+        return Spare_time(
+            oid=BaseId(row["oid"]),
+            obj=BaseId(row[self._obj_column.name]),
+            start_time=row["start_time"],
+            end_time=row["end_time"],
+            status=AvailabilityStatus(row["status"]),
+        )
+
+    async def add(self, entity: Spare_time) -> None:
+        values = {
+            "oid": entity.oid,
+            self._obj_column.name: entity.obj,
+            "start_time": entity.start_time,
+            "end_time": entity.end_time,
+            "status": str(entity.status),
+        }
+        await self._session.execute(insert(self._table).values(**values))
+
+    async def get(self, reference: Any) -> Spare_time | None:
+        stmt = select(self._table).where(self._table.c.oid == reference)
+        result = await self._session.execute(stmt)
+        row = result.mappings().first()
+        if row is None:
+            return None
+        return self._row_to_entity(row)
+
+    async def update(self, entity: Spare_time) -> None:
+        values = {
+            self._obj_column.name: entity.obj,
+            "start_time": entity.start_time,
+            "end_time": entity.end_time,
+            "status": str(entity.status),
+        }
+        stmt = (
+            update(self._table)
+            .where(self._table.c.oid == entity.oid)
+            .values(**values)
+        )
+        await self._session.execute(stmt)
+
+    async def delete(self, entity: Spare_time) -> None:
+        stmt = delete(self._table).where(self._table.c.oid == entity.oid)
+        await self._session.execute(stmt)
+
+    async def list_by_obj_id(self, obj_id: BaseId) -> list[Spare_time]:
+        stmt = select(self._table).where(self._obj_column == obj_id)
+        result = await self._session.execute(stmt)
+        return [self._row_to_entity(row) for row in result.mappings().all()]
 
 
 def _apply_equipment_filters(stmt, model: type[T], filters: EquipmentFilters | None):
@@ -150,9 +217,19 @@ class MicrofonSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Microfon]):
         super().__init__(session, Microfon)
 
 
+class MicrofonFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, microfon_free_times, microfon_free_times.c.microfon_id)
+
+
 class CameraSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Camera]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Camera)
+
+
+class CameraFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, camera_free_times, camera_free_times.c.camera_id)
 
 
 class CameraTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[CameraTripod]):
@@ -160,9 +237,23 @@ class CameraTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[CameraTripo
         super().__init__(session, CameraTripod)
 
 
+class CameraTripodFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(
+            session,
+            camera_tripod_free_times,
+            camera_tripod_free_times.c.camera_tripod_id,
+        )
+
+
 class LightSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Light]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Light)
+
+
+class LightFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, light_free_times, light_free_times.c.light_id)
 
 
 class LightTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[LightTripod]):
@@ -170,14 +261,37 @@ class LightTripodSqlAlchemyRepository(SqlAlchemyEquipmentRepository[LightTripod]
         super().__init__(session, LightTripod)
 
 
+class LightTripodFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(
+            session,
+            light_tripod_free_times,
+            light_tripod_free_times.c.light_tripod_id,
+        )
+
+
 class SoundSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Sound]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Sound)
 
 
+class SoundFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, sound_free_times, sound_free_times.c.sound_id)
+
+
 class RequisiteSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Requisite]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Requisite)
+
+
+class RequisiteFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(
+            session,
+            requisite_free_times,
+            requisite_free_times.c.requisite_id,
+        )
 
 
 class ImageSqlAlchemyRepository(SqlAlchemyRepository[Image]):

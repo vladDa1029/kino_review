@@ -82,11 +82,26 @@ class SQLAlchemySettings(ConfigABC):
     expire_on_commit: bool = False
 
 
+class StorageSettings(ConfigABC):
+    backend: Literal["local", "s3", "minio"] = Field(
+        alias="STORAGE_BACKEND",
+        default="local",
+    )
+    bucket: str = Field(alias="STORAGE_BUCKET", default="user")
+    local_root: Path = Field(alias="STORAGE_LOCAL_ROOT", default=Path("storage"))
+    s3_endpoint_url: str | None = Field(alias="STORAGE_S3_ENDPOINT", default=None)
+    s3_region: str | None = Field(alias="STORAGE_S3_REGION", default=None)
+    s3_access_key: str | None = Field(alias="STORAGE_S3_ACCESS_KEY", default=None)
+    s3_secret_key: str | None = Field(alias="STORAGE_S3_SECRET_KEY", default=None)
+    s3_use_ssl: bool = Field(alias="STORAGE_S3_USE_SSL", default=True)
+
+
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
     rabbitmq: Rabbitmq = Rabbitmq()
+    storage: StorageSettings = StorageSettings()
 
 
 @lru_cache(1)

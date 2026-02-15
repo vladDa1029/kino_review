@@ -3,9 +3,25 @@ from uuid import UUID
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 
 from app.application.commands.add_image import AddImageCommand, AddImageHandler
+from app.application.commands.add_equipment_free_time import (
+    AddCameraFreeTimeCommand,
+    AddCameraFreeTimeHandler,
+    AddCameraTripodFreeTimeCommand,
+    AddCameraTripodFreeTimeHandler,
+    AddLightFreeTimeCommand,
+    AddLightFreeTimeHandler,
+    AddLightTripodFreeTimeCommand,
+    AddLightTripodFreeTimeHandler,
+    AddMicrofonFreeTimeCommand,
+    AddMicrofonFreeTimeHandler,
+    AddRequisiteFreeTimeCommand,
+    AddRequisiteFreeTimeHandler,
+    AddSoundFreeTimeCommand,
+    AddSoundFreeTimeHandler,
+)
 from app.application.commands.add_spare_time import (
     AddSpareTimeCommand,
     AddSpareTimeHandler,
@@ -88,6 +104,7 @@ from app.application.queries.list_equipment import (
     ListSoundsHandler,
 )
 from app.domain.entity.base import BaseId
+from app.application.ports.storage import FileStorage
 from app.presentation.schemas import (
     DescriptionCreateRequest,
     DescriptionUpdateRequest,
@@ -190,7 +207,12 @@ def _requisite_response(item) -> RequisiteItemResponse:
     )
 
 
-@router.post("/users/{user_id}/description", status_code=201)
+@router.post(
+    "/users/{user_id}/description",
+    status_code=201,
+    summary="Create user description",
+    description="Creates a single description record for the user.",
+)
 async def create_description(
     payload: DescriptionCreateRequest,
     handler: FromDishka[CreateDescriptionHandler],
@@ -204,7 +226,12 @@ async def create_description(
     await handler(command)
 
 
-@router.put("/users/{user_id}/description/{description_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/description/{description_id}",
+    status_code=204,
+    summary="Update user description",
+    description="Updates the existing user description.",
+)
 async def update_description(
     description_id: UUID,
     payload: DescriptionUpdateRequest,
@@ -220,7 +247,12 @@ async def update_description(
     await handler(command)
 
 
-@router.post("/users/{user_id}/spare-times", status_code=201)
+@router.post(
+    "/users/{user_id}/spare-times",
+    status_code=201,
+    summary="Add user free time window",
+    description="Adds a free time window for the user.",
+)
 async def add_spare_time(
     payload: SpareTimeCreateRequest,
     handler: FromDishka[AddSpareTimeHandler],
@@ -234,7 +266,159 @@ async def add_spare_time(
     await handler(command)
 
 
-@router.post("/users/{user_id}/availability/reserve", status_code=200)
+@router.post(
+    "/users/{user_id}/microfons/{microfon_id}/free-times",
+    status_code=201,
+    summary="Add microfon free time",
+    description="Adds a free time window for the specified microfon.",
+)
+async def add_microfon_free_time(
+    microfon_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddMicrofonFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddMicrofonFreeTimeCommand(
+        user_id=user_id,
+        microfon_id=BaseId(microfon_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/cameras/{camera_id}/free-times",
+    status_code=201,
+    summary="Add camera free time",
+    description="Adds a free time window for the specified camera.",
+)
+async def add_camera_free_time(
+    camera_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddCameraFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddCameraFreeTimeCommand(
+        user_id=user_id,
+        camera_id=BaseId(camera_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/camera-tripods/{camera_tripod_id}/free-times",
+    status_code=201,
+    summary="Add camera tripod free time",
+    description="Adds a free time window for the specified camera tripod.",
+)
+async def add_camera_tripod_free_time(
+    camera_tripod_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddCameraTripodFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddCameraTripodFreeTimeCommand(
+        user_id=user_id,
+        camera_tripod_id=BaseId(camera_tripod_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/lights/{light_id}/free-times",
+    status_code=201,
+    summary="Add light free time",
+    description="Adds a free time window for the specified light.",
+)
+async def add_light_free_time(
+    light_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddLightFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddLightFreeTimeCommand(
+        user_id=user_id,
+        light_id=BaseId(light_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/light-tripods/{light_tripod_id}/free-times",
+    status_code=201,
+    summary="Add light tripod free time",
+    description="Adds a free time window for the specified light tripod.",
+)
+async def add_light_tripod_free_time(
+    light_tripod_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddLightTripodFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddLightTripodFreeTimeCommand(
+        user_id=user_id,
+        light_tripod_id=BaseId(light_tripod_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/sounds/{sound_id}/free-times",
+    status_code=201,
+    summary="Add sound free time",
+    description="Adds a free time window for the specified sound.",
+)
+async def add_sound_free_time(
+    sound_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddSoundFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddSoundFreeTimeCommand(
+        user_id=user_id,
+        sound_id=BaseId(sound_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/requisites/{requisite_id}/free-times",
+    status_code=201,
+    summary="Add requisite free time",
+    description="Adds a free time window for the specified requisite.",
+)
+async def add_requisite_free_time(
+    requisite_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[AddRequisiteFreeTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = AddRequisiteFreeTimeCommand(
+        user_id=user_id,
+        requisite_id=BaseId(requisite_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.post(
+    "/users/{user_id}/availability/reserve",
+    status_code=200,
+    summary="Reserve availability window",
+    description="Reserves a time window within existing availability.",
+)
 async def reserve_availability(
     payload: ReserveAvailabilityRequest,
     handler: FromDishka[ReserveAvailabilityHandler],
@@ -250,7 +434,12 @@ async def reserve_availability(
     await handler(command)
 
 
-@router.post("/users/{user_id}/microfons", status_code=201)
+@router.post(
+    "/users/{user_id}/microfons",
+    status_code=201,
+    summary="Create microfon",
+    description="Creates a new microfon owned by the user.",
+)
 async def create_microfon(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateMicrofonHandler],
@@ -265,7 +454,12 @@ async def create_microfon(
     await handler(command)
 
 
-@router.put("/users/{user_id}/microfons/{microfon_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/microfons/{microfon_id}",
+    status_code=204,
+    summary="Update microfon",
+    description="Updates the specified microfon.",
+)
 async def update_microfon(
     microfon_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -282,7 +476,12 @@ async def update_microfon(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/microfons/{microfon_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/microfons/{microfon_id}",
+    status_code=204,
+    summary="Delete microfon",
+    description="Deletes the specified microfon.",
+)
 async def delete_microfon(
     microfon_id: UUID,
     handler: FromDishka[DeleteMicrofonHandler],
@@ -295,7 +494,12 @@ async def delete_microfon(
     await handler(command)
 
 
-@router.post("/users/{user_id}/cameras", status_code=201)
+@router.post(
+    "/users/{user_id}/cameras",
+    status_code=201,
+    summary="Create camera",
+    description="Creates a new camera owned by the user.",
+)
 async def create_camera(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateCameraHandler],
@@ -310,7 +514,12 @@ async def create_camera(
     await handler(command)
 
 
-@router.put("/users/{user_id}/cameras/{camera_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/cameras/{camera_id}",
+    status_code=204,
+    summary="Update camera",
+    description="Updates the specified camera.",
+)
 async def update_camera(
     camera_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -327,7 +536,12 @@ async def update_camera(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/cameras/{camera_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/cameras/{camera_id}",
+    status_code=204,
+    summary="Delete camera",
+    description="Deletes the specified camera.",
+)
 async def delete_camera(
     camera_id: UUID,
     handler: FromDishka[DeleteCameraHandler],
@@ -340,7 +554,12 @@ async def delete_camera(
     await handler(command)
 
 
-@router.post("/users/{user_id}/camera-tripods", status_code=201)
+@router.post(
+    "/users/{user_id}/camera-tripods",
+    status_code=201,
+    summary="Create camera tripod",
+    description="Creates a new camera tripod owned by the user.",
+)
 async def create_camera_tripod(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateCameraTripodHandler],
@@ -355,7 +574,12 @@ async def create_camera_tripod(
     await handler(command)
 
 
-@router.put("/users/{user_id}/camera-tripods/{camera_tripod_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/camera-tripods/{camera_tripod_id}",
+    status_code=204,
+    summary="Update camera tripod",
+    description="Updates the specified camera tripod.",
+)
 async def update_camera_tripod(
     camera_tripod_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -372,7 +596,12 @@ async def update_camera_tripod(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/camera-tripods/{camera_tripod_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/camera-tripods/{camera_tripod_id}",
+    status_code=204,
+    summary="Delete camera tripod",
+    description="Deletes the specified camera tripod.",
+)
 async def delete_camera_tripod(
     camera_tripod_id: UUID,
     handler: FromDishka[DeleteCameraTripodHandler],
@@ -385,7 +614,12 @@ async def delete_camera_tripod(
     await handler(command)
 
 
-@router.post("/users/{user_id}/lights", status_code=201)
+@router.post(
+    "/users/{user_id}/lights",
+    status_code=201,
+    summary="Create light",
+    description="Creates a new light owned by the user.",
+)
 async def create_light(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateLightHandler],
@@ -400,7 +634,12 @@ async def create_light(
     await handler(command)
 
 
-@router.put("/users/{user_id}/lights/{light_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/lights/{light_id}",
+    status_code=204,
+    summary="Update light",
+    description="Updates the specified light.",
+)
 async def update_light(
     light_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -417,7 +656,12 @@ async def update_light(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/lights/{light_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/lights/{light_id}",
+    status_code=204,
+    summary="Delete light",
+    description="Deletes the specified light.",
+)
 async def delete_light(
     light_id: UUID,
     handler: FromDishka[DeleteLightHandler],
@@ -430,7 +674,12 @@ async def delete_light(
     await handler(command)
 
 
-@router.post("/users/{user_id}/light-tripods", status_code=201)
+@router.post(
+    "/users/{user_id}/light-tripods",
+    status_code=201,
+    summary="Create light tripod",
+    description="Creates a new light tripod owned by the user.",
+)
 async def create_light_tripod(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateLightTripodHandler],
@@ -445,7 +694,12 @@ async def create_light_tripod(
     await handler(command)
 
 
-@router.put("/users/{user_id}/light-tripods/{light_tripod_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/light-tripods/{light_tripod_id}",
+    status_code=204,
+    summary="Update light tripod",
+    description="Updates the specified light tripod.",
+)
 async def update_light_tripod(
     light_tripod_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -462,7 +716,12 @@ async def update_light_tripod(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/light-tripods/{light_tripod_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/light-tripods/{light_tripod_id}",
+    status_code=204,
+    summary="Delete light tripod",
+    description="Deletes the specified light tripod.",
+)
 async def delete_light_tripod(
     light_tripod_id: UUID,
     handler: FromDishka[DeleteLightTripodHandler],
@@ -475,7 +734,12 @@ async def delete_light_tripod(
     await handler(command)
 
 
-@router.post("/users/{user_id}/sounds", status_code=201)
+@router.post(
+    "/users/{user_id}/sounds",
+    status_code=201,
+    summary="Create sound",
+    description="Creates a new sound owned by the user.",
+)
 async def create_sound(
     payload: EquipmentCreateRequest,
     handler: FromDishka[CreateSoundHandler],
@@ -490,7 +754,12 @@ async def create_sound(
     await handler(command)
 
 
-@router.put("/users/{user_id}/sounds/{sound_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/sounds/{sound_id}",
+    status_code=204,
+    summary="Update sound",
+    description="Updates the specified sound.",
+)
 async def update_sound(
     sound_id: UUID,
     payload: EquipmentUpdateRequest,
@@ -507,7 +776,12 @@ async def update_sound(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/sounds/{sound_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/sounds/{sound_id}",
+    status_code=204,
+    summary="Delete sound",
+    description="Deletes the specified sound.",
+)
 async def delete_sound(
     sound_id: UUID,
     handler: FromDishka[DeleteSoundHandler],
@@ -520,7 +794,12 @@ async def delete_sound(
     await handler(command)
 
 
-@router.post("/users/{user_id}/requisites", status_code=201)
+@router.post(
+    "/users/{user_id}/requisites",
+    status_code=201,
+    summary="Create requisite",
+    description="Creates a new requisite owned by the user.",
+)
 async def create_requisite(
     payload: RequisiteCreateRequest,
     handler: FromDishka[CreateRequisiteHandler],
@@ -536,7 +815,12 @@ async def create_requisite(
     await handler(command)
 
 
-@router.put("/users/{user_id}/requisites/{requisite_id}", status_code=204)
+@router.put(
+    "/users/{user_id}/requisites/{requisite_id}",
+    status_code=204,
+    summary="Update requisite",
+    description="Updates the specified requisite.",
+)
 async def update_requisite(
     requisite_id: UUID,
     payload: RequisiteUpdateRequest,
@@ -554,7 +838,12 @@ async def update_requisite(
     await handler(command)
 
 
-@router.delete("/users/{user_id}/requisites/{requisite_id}", status_code=204)
+@router.delete(
+    "/users/{user_id}/requisites/{requisite_id}",
+    status_code=204,
+    summary="Delete requisite",
+    description="Deletes the specified requisite.",
+)
 async def delete_requisite(
     requisite_id: UUID,
     handler: FromDishka[DeleteRequisiteHandler],
@@ -567,23 +856,37 @@ async def delete_requisite(
     await handler(command)
 
 
-@router.post("/users/{user_id}/requisites/{requisite_id}/images", status_code=201)
+@router.post(
+    "/users/{user_id}/requisites/{requisite_id}/images",
+    status_code=201,
+    summary="Add image",
+    description="Adds an image to the specified requisite.",
+)
 async def add_image(
     requisite_id: UUID,
-    payload: ImageCreateRequest,
     handler: FromDishka[AddImageHandler],
+    storage: FromDishka[FileStorage],
     user_id: BaseId = Depends(user_id_from_header),
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    description: str = Form(...),
 ) -> None:
+    data = await file.read()
+    stored = await storage.upload(
+        data=data,
+        key=f"{requisite_id}/{file.filename}",
+        content_type=file.content_type,
+    )
     command = AddImageCommand(
         user_id=user_id,
         requisite_id=BaseId(requisite_id),
-        file=payload.file,
-        title=payload.title,
-        storage_key=payload.storage_key,
-        bucket=payload.bucket,
-        mime_type=payload.mime_type,
-        size=payload.size,
-        description=payload.description,
+        file=file.filename,
+        title=title,
+        storage_key=stored.key,
+        bucket=stored.bucket,
+        mime_type=file.content_type or "application/octet-stream",
+        size=len(data),
+        description=description,
     )
     await handler(command)
 
@@ -591,6 +894,8 @@ async def add_image(
 @router.delete(
     "/users/{user_id}/requisites/{requisite_id}/images/{image_id}",
     status_code=204,
+    summary="Remove image",
+    description="Removes an image from the specified requisite.",
 )
 async def remove_image(
     requisite_id: UUID,
@@ -606,7 +911,12 @@ async def remove_image(
     await handler(command)
 
 
-@router.get("/users/{user_id}/microfons", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/microfons",
+    response_model=EquipmentListResponse,
+    summary="List microfons",
+    description="Returns a paginated list of microfons.",
+)
 async def list_microfons(
     handler: FromDishka[ListMicrofonsHandler],
     params: EquipmentListQuery = Depends(),
@@ -630,7 +940,12 @@ async def list_microfons(
     )
 
 
-@router.get("/users/{user_id}/cameras", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/cameras",
+    response_model=EquipmentListResponse,
+    summary="List cameras",
+    description="Returns a paginated list of cameras.",
+)
 async def list_cameras(
     handler: FromDishka[ListCamerasHandler],
     params: EquipmentListQuery = Depends(),
@@ -654,7 +969,12 @@ async def list_cameras(
     )
 
 
-@router.get("/users/{user_id}/camera-tripods", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/camera-tripods",
+    response_model=EquipmentListResponse,
+    summary="List camera tripods",
+    description="Returns a paginated list of camera tripods.",
+)
 async def list_camera_tripods(
     handler: FromDishka[ListCameraTripodsHandler],
     params: EquipmentListQuery = Depends(),
@@ -678,7 +998,12 @@ async def list_camera_tripods(
     )
 
 
-@router.get("/users/{user_id}/lights", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/lights",
+    response_model=EquipmentListResponse,
+    summary="List lights",
+    description="Returns a paginated list of lights.",
+)
 async def list_lights(
     handler: FromDishka[ListLightsHandler],
     params: EquipmentListQuery = Depends(),
@@ -702,7 +1027,12 @@ async def list_lights(
     )
 
 
-@router.get("/users/{user_id}/light-tripods", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/light-tripods",
+    response_model=EquipmentListResponse,
+    summary="List light tripods",
+    description="Returns a paginated list of light tripods.",
+)
 async def list_light_tripods(
     handler: FromDishka[ListLightTripodsHandler],
     params: EquipmentListQuery = Depends(),
@@ -726,7 +1056,12 @@ async def list_light_tripods(
     )
 
 
-@router.get("/users/{user_id}/sounds", response_model=EquipmentListResponse)
+@router.get(
+    "/users/{user_id}/sounds",
+    response_model=EquipmentListResponse,
+    summary="List sounds",
+    description="Returns a paginated list of sounds.",
+)
 async def list_sounds(
     handler: FromDishka[ListSoundsHandler],
     params: EquipmentListQuery = Depends(),
@@ -750,7 +1085,12 @@ async def list_sounds(
     )
 
 
-@router.get("/users/{user_id}/requisites", response_model=RequisiteListResponse)
+@router.get(
+    "/users/{user_id}/requisites",
+    response_model=RequisiteListResponse,
+    summary="List requisites",
+    description="Returns a paginated list of requisites.",
+)
 async def list_requisites(
     handler: FromDishka[ListRequisitesHandler],
     params: RequisiteListQuery = Depends(),

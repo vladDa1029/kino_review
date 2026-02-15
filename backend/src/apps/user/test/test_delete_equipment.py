@@ -44,6 +44,7 @@ DELETE_CASES = [
         DeleteMicrofonHandler,
         DeleteMicrofonCommand,
         "microfon_repository",
+        "microfon_free_time_repository",
         "microfon_id",
         Microfon,
     ),
@@ -51,6 +52,7 @@ DELETE_CASES = [
         DeleteCameraHandler,
         DeleteCameraCommand,
         "camera_repository",
+        "camera_free_time_repository",
         "camera_id",
         Camera,
     ),
@@ -58,6 +60,7 @@ DELETE_CASES = [
         DeleteCameraTripodHandler,
         DeleteCameraTripodCommand,
         "camera_tripod_repository",
+        "camera_tripod_free_time_repository",
         "camera_tripod_id",
         CameraTripod,
     ),
@@ -65,6 +68,7 @@ DELETE_CASES = [
         DeleteLightHandler,
         DeleteLightCommand,
         "light_repository",
+        "light_free_time_repository",
         "light_id",
         Light,
     ),
@@ -72,6 +76,7 @@ DELETE_CASES = [
         DeleteLightTripodHandler,
         DeleteLightTripodCommand,
         "light_tripod_repository",
+        "light_tripod_free_time_repository",
         "light_tripod_id",
         LightTripod,
     ),
@@ -79,6 +84,7 @@ DELETE_CASES = [
         DeleteSoundHandler,
         DeleteSoundCommand,
         "sound_repository",
+        "sound_free_time_repository",
         "sound_id",
         Sound,
     ),
@@ -86,6 +92,7 @@ DELETE_CASES = [
         DeleteRequisiteHandler,
         DeleteRequisiteCommand,
         "requisite_repository",
+        "requisite_free_time_repository",
         "requisite_id",
         Requisite,
     ),
@@ -93,13 +100,21 @@ DELETE_CASES = [
 
 
 @pytest.mark.parametrize(
-    ("handler_cls", "command_cls", "repo_param", "id_field", "entity_cls"),
+    (
+        "handler_cls",
+        "command_cls",
+        "repo_param",
+        "free_time_repo_param",
+        "id_field",
+        "entity_cls",
+    ),
     DELETE_CASES,
 )
 def test_delete_equipment_handlers(
     handler_cls,
     command_cls,
     repo_param,
+    free_time_repo_param,
     id_field,
     entity_cls,
 ) -> None:
@@ -124,10 +139,9 @@ def test_delete_equipment_handlers(
 
     handler = handler_cls(
         user_repository=user_repo,
-        spare_time_repository=spare_time_repo,
         transaction=tx,
         service=EquipmentService(),
-        **{repo_param: equipment_repo},
+        **{repo_param: equipment_repo, free_time_repo_param: spare_time_repo},
     )
 
     command_kwargs = dict(user_id=user_id)

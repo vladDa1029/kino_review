@@ -2,14 +2,20 @@ from dataclasses import dataclass
 
 from app.application.errors.errors import EntityNotFoundError, UserNotFoundError
 from app.application.ports.repositories import (
+    CameraFreeTimeRepository,
     CameraRepository,
     CameraTripodRepository,
+    CameraTripodFreeTimeRepository,
     LightRepository,
+    LightFreeTimeRepository,
+    LightTripodFreeTimeRepository,
     LightTripodRepository,
+    MicrofonFreeTimeRepository,
     MicrofonRepository,
+    RequisiteFreeTimeRepository,
     RequisiteRepository,
+    SoundFreeTimeRepository,
     SoundRepository,
-    SpareTimeRepository,
     UserRepository,
 )
 from app.application.ports.transaction import TransactionManager
@@ -64,13 +70,13 @@ class DeleteMicrofonHandler:
         self,
         user_repository: UserRepository,
         microfon_repository: MicrofonRepository,
-        spare_time_repository: SpareTimeRepository,
+        microfon_free_time_repository: MicrofonFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._microfon_repository = microfon_repository
-        self._spare_time_repository = spare_time_repository
+        self._microfon_free_time_repository = microfon_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -83,7 +89,7 @@ class DeleteMicrofonHandler:
         if microfon is None:
             raise EntityNotFoundError("Microfon")
 
-        windows = await self._spare_time_repository.list_by_obj_id(microfon.oid)
+        windows = await self._microfon_free_time_repository.list_by_obj_id(microfon.oid)
 
         try:
             self._service.delete(user, microfon, windows)
@@ -99,13 +105,13 @@ class DeleteCameraHandler:
         self,
         user_repository: UserRepository,
         camera_repository: CameraRepository,
-        spare_time_repository: SpareTimeRepository,
+        camera_free_time_repository: CameraFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._camera_repository = camera_repository
-        self._spare_time_repository = spare_time_repository
+        self._camera_free_time_repository = camera_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -118,7 +124,7 @@ class DeleteCameraHandler:
         if camera is None:
             raise EntityNotFoundError("Camera")
 
-        windows = await self._spare_time_repository.list_by_obj_id(camera.oid)
+        windows = await self._camera_free_time_repository.list_by_obj_id(camera.oid)
 
         try:
             self._service.delete(user, camera, windows)
@@ -134,13 +140,15 @@ class DeleteCameraTripodHandler:
         self,
         user_repository: UserRepository,
         camera_tripod_repository: CameraTripodRepository,
-        spare_time_repository: SpareTimeRepository,
+        camera_tripod_free_time_repository: CameraTripodFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._camera_tripod_repository = camera_tripod_repository
-        self._spare_time_repository = spare_time_repository
+        self._camera_tripod_free_time_repository = (
+            camera_tripod_free_time_repository
+        )
         self._transaction = transaction
         self._service = service
 
@@ -155,7 +163,9 @@ class DeleteCameraTripodHandler:
         if camera_tripod is None:
             raise EntityNotFoundError("CameraTripod")
 
-        windows = await self._spare_time_repository.list_by_obj_id(camera_tripod.oid)
+        windows = await self._camera_tripod_free_time_repository.list_by_obj_id(
+            camera_tripod.oid
+        )
 
         try:
             self._service.delete(user, camera_tripod, windows)
@@ -171,13 +181,13 @@ class DeleteLightHandler:
         self,
         user_repository: UserRepository,
         light_repository: LightRepository,
-        spare_time_repository: SpareTimeRepository,
+        light_free_time_repository: LightFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._light_repository = light_repository
-        self._spare_time_repository = spare_time_repository
+        self._light_free_time_repository = light_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -190,7 +200,7 @@ class DeleteLightHandler:
         if light is None:
             raise EntityNotFoundError("Light")
 
-        windows = await self._spare_time_repository.list_by_obj_id(light.oid)
+        windows = await self._light_free_time_repository.list_by_obj_id(light.oid)
 
         try:
             self._service.delete(user, light, windows)
@@ -206,13 +216,13 @@ class DeleteLightTripodHandler:
         self,
         user_repository: UserRepository,
         light_tripod_repository: LightTripodRepository,
-        spare_time_repository: SpareTimeRepository,
+        light_tripod_free_time_repository: LightTripodFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._light_tripod_repository = light_tripod_repository
-        self._spare_time_repository = spare_time_repository
+        self._light_tripod_free_time_repository = light_tripod_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -225,7 +235,9 @@ class DeleteLightTripodHandler:
         if light_tripod is None:
             raise EntityNotFoundError("LightTripod")
 
-        windows = await self._spare_time_repository.list_by_obj_id(light_tripod.oid)
+        windows = await self._light_tripod_free_time_repository.list_by_obj_id(
+            light_tripod.oid
+        )
 
         try:
             self._service.delete(user, light_tripod, windows)
@@ -241,13 +253,13 @@ class DeleteSoundHandler:
         self,
         user_repository: UserRepository,
         sound_repository: SoundRepository,
-        spare_time_repository: SpareTimeRepository,
+        sound_free_time_repository: SoundFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._sound_repository = sound_repository
-        self._spare_time_repository = spare_time_repository
+        self._sound_free_time_repository = sound_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -260,7 +272,7 @@ class DeleteSoundHandler:
         if sound is None:
             raise EntityNotFoundError("Sound")
 
-        windows = await self._spare_time_repository.list_by_obj_id(sound.oid)
+        windows = await self._sound_free_time_repository.list_by_obj_id(sound.oid)
 
         try:
             self._service.delete(user, sound, windows)
@@ -276,13 +288,13 @@ class DeleteRequisiteHandler:
         self,
         user_repository: UserRepository,
         requisite_repository: RequisiteRepository,
-        spare_time_repository: SpareTimeRepository,
+        requisite_free_time_repository: RequisiteFreeTimeRepository,
         transaction: TransactionManager,
         service: EquipmentService,
     ) -> None:
         self._user_repository = user_repository
         self._requisite_repository = requisite_repository
-        self._spare_time_repository = spare_time_repository
+        self._requisite_free_time_repository = requisite_free_time_repository
         self._transaction = transaction
         self._service = service
 
@@ -295,7 +307,9 @@ class DeleteRequisiteHandler:
         if requisite is None:
             raise EntityNotFoundError("Requisite")
 
-        windows = await self._spare_time_repository.list_by_obj_id(requisite.oid)
+        windows = await self._requisite_free_time_repository.list_by_obj_id(
+            requisite.oid
+        )
 
         try:
             self._service.delete(user, requisite, windows)

@@ -37,11 +37,43 @@ class DescriptionRepository(Repository[Description], Protocol):
         raise NotImplementedError
 
 
-class SpareTimeRepository(Repository[Spare_time], Protocol):
-    """Spare time repository port."""
+class FreeTimeRepository(Repository[Spare_time], Protocol):
+    """Base free time repository port."""
 
     async def list_by_obj_id(self, obj_id: BaseId) -> list[Spare_time]:
         raise NotImplementedError
+
+
+class SpareTimeRepository(FreeTimeRepository, Protocol):
+    """User free time repository port."""
+
+
+class MicrofonFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Microfon free time repository port."""
+
+
+class CameraFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Camera free time repository port."""
+
+
+class CameraTripodFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Camera tripod free time repository port."""
+
+
+class LightFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Light free time repository port."""
+
+
+class LightTripodFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Light tripod free time repository port."""
+
+
+class SoundFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Sound free time repository port."""
+
+
+class RequisiteFreeTimeRepository(FreeTimeRepository, Protocol):
+    """Requisite free time repository port."""
 
 
 class EquipmentRepository(Repository[TEquipment], Protocol):

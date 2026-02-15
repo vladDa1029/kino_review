@@ -67,11 +67,121 @@ descriptions = Table(
     Column("phone", String(32), nullable=False),
 )
 
-spare_times = Table(
-    "spare_times",
+free_users_timing = Table(
+    "free_users_timing",
     metadata,
     Column("oid", UUID(as_uuid=True), primary_key=True),
-    Column("obj", UUID(as_uuid=True), nullable=False),
+    Column(
+        "user_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+microfon_free_times = Table(
+    "microfon_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "microfon_id",
+        UUID(as_uuid=True),
+        ForeignKey("microfons.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+camera_free_times = Table(
+    "camera_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "camera_id",
+        UUID(as_uuid=True),
+        ForeignKey("cameras.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+camera_tripod_free_times = Table(
+    "camera_tripod_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "camera_tripod_id",
+        UUID(as_uuid=True),
+        ForeignKey("camera_tripods.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+light_free_times = Table(
+    "light_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "light_id",
+        UUID(as_uuid=True),
+        ForeignKey("lights.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+light_tripod_free_times = Table(
+    "light_tripod_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "light_tripod_id",
+        UUID(as_uuid=True),
+        ForeignKey("light_tripods.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+sound_free_times = Table(
+    "sound_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "sound_id",
+        UUID(as_uuid=True),
+        ForeignKey("sounds.oid"),
+        nullable=False,
+    ),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+)
+
+requisite_free_times = Table(
+    "requisite_free_times",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "requisite_id",
+        UUID(as_uuid=True),
+        ForeignKey("requisites.oid"),
+        nullable=False,
+    ),
     Column("start_time", DateTime(timezone=True), nullable=False),
     Column("end_time", DateTime(timezone=True), nullable=False),
     Column("status", String(32), nullable=False),
@@ -216,13 +326,13 @@ def start_mappers() -> None:
     )
     mapper_registry.map_imperatively(
         Spare_time,
-        spare_times,
+        free_users_timing,
         properties={
-            "oid": spare_times.c.oid,
-            "obj": spare_times.c.obj,
-            "start_time": spare_times.c.start_time,
-            "end_time": spare_times.c.end_time,
-            "status": composite(AvailabilityStatus, spare_times.c.status),
+            "oid": free_users_timing.c.oid,
+            "obj": free_users_timing.c.user_id,
+            "start_time": free_users_timing.c.start_time,
+            "end_time": free_users_timing.c.end_time,
+            "status": composite(AvailabilityStatus, free_users_timing.c.status),
         },
         column_prefix="_",
     )
