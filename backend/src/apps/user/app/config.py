@@ -96,12 +96,24 @@ class StorageSettings(ConfigABC):
     s3_use_ssl: bool = Field(alias="STORAGE_S3_USE_SSL", default=True)
 
 
+class ImageSettings(ConfigABC):
+    allowed_mime_types: list[str] = Field(
+        alias="IMAGE_ALLOWED_MIME_TYPES",
+        default=["image/jpeg", "image/png", "image/webp"],
+    )
+    max_size_bytes: int = Field(
+        alias="IMAGE_MAX_SIZE_BYTES",
+        default=10 * 1024 * 1024,
+    )
+
+
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
     rabbitmq: Rabbitmq = Rabbitmq()
     storage: StorageSettings = StorageSettings()
+    image: ImageSettings = ImageSettings()
 
 
 @lru_cache(1)

@@ -65,6 +65,23 @@ class ImageCreateRequest(BaseModel):
     description: str = Field(examples=["Front view"])
 
 
+class ImageResponse(BaseModel):
+    oid: UUID
+    requisite_id: UUID
+    file: str
+    title: str
+    storage_key: str
+    bucket: str
+    mime_type: str
+    size: int
+    description: str
+    create_at: datetime
+
+
+class ImageListResponse(BaseModel):
+    items: list[ImageResponse]
+
+
 class BrokerUserRegistered(BaseModel):
     user_id: UUID = Field(examples=["0b8cf2c2-2a44-4fb8-aad8-9c37f2b6d8d4"])
     email: str = Field(examples=["user@example.com"])

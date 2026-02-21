@@ -93,6 +93,12 @@ from app.application.commands.update_equipment import (
     UpdateSoundHandler,
 )
 from app.application.common import EquipmentFilters, EquipmentSorting, Pagination
+from app.application.queries.images import (
+    GetRequisiteImageHandler,
+    GetRequisiteImageQuery,
+    ListRequisiteImagesHandler,
+    ListRequisiteImagesQuery,
+)
 from app.application.queries.list_equipment import (
     ListCamerasHandler,
     ListCameraTripodsHandler,
@@ -105,6 +111,7 @@ from app.application.queries.list_equipment import (
 )
 from app.domain.entity.base import BaseId
 from app.application.ports.storage import FileStorage
+from app.config import ImageSettings
 from app.presentation.schemas import (
     DescriptionCreateRequest,
     DescriptionUpdateRequest,
@@ -113,7 +120,8 @@ from app.presentation.schemas import (
     EquipmentListResponse,
     EquipmentCreateRequest,
     EquipmentUpdateRequest,
-    ImageCreateRequest,
+    ImageListResponse,
+    ImageResponse,
     RequisiteItemResponse,
     RequisiteListQuery,
     RequisiteListResponse,
@@ -205,6 +213,43 @@ def _requisite_response(item) -> RequisiteItemResponse:
         size=item.size,
         create_at=item.create_at,
     )
+
+
+def _image_response(item) -> ImageResponse:
+    return ImageResponse(
+        oid=item.oid,
+        requisite_id=item.requisite_id,
+        file=item.file,
+        title=item.title,
+        storage_key=item.storage_key,
+        bucket=item.bucket,
+        mime_type=item.mime_type,
+        size=item.size,
+        description=item.description,
+        create_at=item.create_at,
+    )
+
+
+def _validate_image_upload(
+    file: UploadFile,
+    data: bytes,
+    settings: ImageSettings,
+) -> None:
+    if file.content_type is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing content type.",
+        )
+    if file.content_type not in settings.allowed_mime_types:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported image type.",
+        )
+    if len(data) > settings.max_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image size exceeds limit.",
+        )
 
 
 @router.post(
@@ -866,12 +911,14 @@ async def add_image(
     requisite_id: UUID,
     handler: FromDishka[AddImageHandler],
     storage: FromDishka[FileStorage],
+    image_settings: FromDishka[ImageSettings],
     user_id: BaseId = Depends(user_id_from_header),
     file: UploadFile = File(...),
     title: str = Form(...),
     description: str = Form(...),
 ) -> None:
     data = await file.read()
+    _validate_image_upload(file, data, image_settings)
     stored = await storage.upload(
         data=data,
         key=f"{requisite_id}/{file.filename}",
@@ -889,6 +936,46 @@ async def add_image(
         description=description,
     )
     await handler(command)
+
+
+@router.get(
+    "/users/{user_id}/requisites/{requisite_id}/images",
+    response_model=ImageListResponse,
+    summary="List images",
+    description="Returns all images for the specified requisite.",
+)
+async def list_requisite_images(
+    requisite_id: UUID,
+    handler: FromDishka[ListRequisiteImagesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> ImageListResponse:
+    query = ListRequisiteImagesQuery(
+        user_id=user_id,
+        requisite_id=BaseId(requisite_id),
+    )
+    items = await handler(query)
+    return ImageListResponse(items=[_image_response(item) for item in items])
+
+
+@router.get(
+    "/users/{user_id}/requisites/{requisite_id}/images/{image_id}",
+    response_model=ImageResponse,
+    summary="Get image",
+    description="Returns an image metadata for the specified requisite.",
+)
+async def get_requisite_image(
+    requisite_id: UUID,
+    image_id: UUID,
+    handler: FromDishka[GetRequisiteImageHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> ImageResponse:
+    query = GetRequisiteImageQuery(
+        user_id=user_id,
+        requisite_id=BaseId(requisite_id),
+        image_id=BaseId(image_id),
+    )
+    item = await handler(query)
+    return _image_response(item)
 
 
 @router.delete(

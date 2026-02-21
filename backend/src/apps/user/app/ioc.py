@@ -58,6 +58,10 @@ from app.application.queries.list_equipment import (
     ListRequisitesHandler,
     ListSoundsHandler,
 )
+from app.application.queries.images import (
+    GetRequisiteImageHandler,
+    ListRequisiteImagesHandler,
+)
 from app.application.ports.repositories import (
     CameraFreeTimeRepository,
     CameraRepository,
@@ -82,6 +86,7 @@ from app.application.ports.storage import FileStorage
 from app.application.ports.transaction import TransactionManager
 from app.config import (
     DatabaseSettings,
+    ImageSettings,
     Log,
     Rabbitmq,
     SQLAlchemySettings,
@@ -136,6 +141,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=SQLAlchemySettings)
     provider.from_context(provides=Rabbitmq)
     provider.from_context(provides=StorageSettings)
+    provider.from_context(provides=ImageSettings)
     return provider
 
 
@@ -286,6 +292,8 @@ def use_case_provider() -> Provider:
     provider.provide(source=ListLightTripodsHandler)
     provider.provide(source=ListSoundsHandler)
     provider.provide(source=ListRequisitesHandler)
+    provider.provide(source=ListRequisiteImagesHandler)
+    provider.provide(source=GetRequisiteImageHandler)
     provider.provide(source=UpdateCameraHandler)
     provider.provide(source=UpdateCameraTripodHandler)
     provider.provide(source=UpdateDescriptionHandler)

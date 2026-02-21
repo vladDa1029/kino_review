@@ -10,6 +10,7 @@ from faststream.rabbit import RabbitBroker
 
 from app.config import (
     DatabaseSettings,
+    ImageSettings,
     Log,
     Rabbitmq,
     SQLAlchemySettings,
@@ -62,6 +63,7 @@ def start_app_dev() -> FastAPI:
             SQLAlchemySettings: settings.alchemy,
             Rabbitmq: settings.rabbitmq,
             StorageSettings: settings.storage,
+            ImageSettings: settings.image,
             RabbitBroker: broker,
         },
     )
