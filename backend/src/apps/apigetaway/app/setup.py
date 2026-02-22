@@ -1,5 +1,5 @@
 # Функции для настройки main фабрик.
-from typing import Any, AsyncIterator, Generator
+from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

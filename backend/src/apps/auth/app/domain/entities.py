@@ -1,7 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-import re
 from typing import NewType
 from uuid import UUID
 

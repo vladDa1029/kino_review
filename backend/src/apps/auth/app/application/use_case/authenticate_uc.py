@@ -77,12 +77,12 @@ class JWTAuthServices:
         user_oid = payload.get("sub")
         if payload.get("type") != "refresh":
             raise InvalidCredentialsError(
-                msg=f"Токен не валиден.",
+                msg="Токен не валиден.",
             )
         if await self._users.get(user_oid) is None:
             log.info(f"Подозрительный токен с user oid : {user_oid}")
             raise InvalidCredentialsError(
-                msg=f"Токен не валиден.",
+                msg="Токен не валиден.",
             )
         new_refresh_token = self._jwt.create_refresh_token(user_oid)
         access_token = self._jwt.create_access_token(user_oid)
