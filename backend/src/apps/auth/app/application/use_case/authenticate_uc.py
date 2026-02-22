@@ -63,7 +63,10 @@ class JWTAuthServices:
             msg = "Пароль должен совпадать."
             log.debug(msg)
             raise PasswordOrLogInincorrectError(msg)
-        access_token = self._jwt.create_access_token(sub=str(user.oid))
+        access_token = self._jwt.create_access_token(
+            sub=str(user.oid),
+            is_superuser=user.is_superuser,
+        )
         refresh_token = self._jwt.create_refresh_token(sub=str(user.oid))
         return {
             "access_token": access_token,
@@ -79,13 +82,17 @@ class JWTAuthServices:
             raise InvalidCredentialsError(
                 msg="Токен не валиден.",
             )
-        if await self._users.get(user_oid) is None:
+        user = await self._users.get(user_oid)
+        if user is None:
             log.info(f"Подозрительный токен с user oid : {user_oid}")
             raise InvalidCredentialsError(
                 msg="Токен не валиден.",
             )
         new_refresh_token = self._jwt.create_refresh_token(user_oid)
-        access_token = self._jwt.create_access_token(user_oid)
+        access_token = self._jwt.create_access_token(
+            user_oid,
+            is_superuser=user.is_superuser,
+        )
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,

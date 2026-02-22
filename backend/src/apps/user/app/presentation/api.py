@@ -26,6 +26,10 @@ from app.application.commands.add_spare_time import (
     AddSpareTimeCommand,
     AddSpareTimeHandler,
 )
+from app.application.commands.delete_spare_time import (
+    DeleteSpareTimeCommand,
+    DeleteSpareTimeHandler,
+)
 from app.application.commands.create_description import (
     CreateDescriptionCommand,
     CreateDescriptionHandler,
@@ -76,6 +80,10 @@ from app.application.commands.update_description import (
     UpdateDescriptionCommand,
     UpdateDescriptionHandler,
 )
+from app.application.commands.update_spare_time import (
+    UpdateSpareTimeCommand,
+    UpdateSpareTimeHandler,
+)
 from app.application.commands.update_equipment import (
     UpdateCameraCommand,
     UpdateCameraHandler,
@@ -99,6 +107,16 @@ from app.application.queries.images import (
     ListRequisiteImagesHandler,
     ListRequisiteImagesQuery,
 )
+from app.application.queries.spare_times import (
+    GetUserSpareTimeHandler,
+    GetUserSpareTimeQuery,
+    ListUserSpareTimesHandler,
+    ListUserSpareTimesQuery,
+)
+from app.application.queries.description import (
+    GetDescriptionHandler,
+    GetDescriptionQuery,
+)
 from app.application.queries.list_equipment import (
     ListCamerasHandler,
     ListCameraTripodsHandler,
@@ -114,6 +132,7 @@ from app.application.ports.storage import FileStorage
 from app.config import ImageSettings
 from app.presentation.schemas import (
     DescriptionCreateRequest,
+    DescriptionResponse,
     DescriptionUpdateRequest,
     EquipmentItemResponse,
     EquipmentListQuery,
@@ -129,6 +148,8 @@ from app.presentation.schemas import (
     RequisiteUpdateRequest,
     ReserveAvailabilityRequest,
     SpareTimeCreateRequest,
+    SpareTimeListResponse,
+    SpareTimeResponse,
 )
 
 router = APIRouter(tags=["web"], route_class=DishkaRoute)
@@ -230,6 +251,25 @@ def _image_response(item) -> ImageResponse:
     )
 
 
+def _spare_time_response(item) -> SpareTimeResponse:
+    return SpareTimeResponse(
+        oid=item.oid,
+        user_id=item.obj,
+        start_time=item.start_time,
+        end_time=item.end_time,
+        status=str(item.status),
+    )
+
+
+def _description_response(item) -> DescriptionResponse:
+    return DescriptionResponse(
+        oid=item.oid,
+        user_id=item.user_id,
+        username=item.username,
+        phone=str(item.phone),
+    )
+
+
 def _validate_image_upload(
     file: UploadFile,
     data: bytes,
@@ -292,6 +332,21 @@ async def update_description(
     await handler(command)
 
 
+@router.get(
+    "/users/{user_id}/description",
+    response_model=DescriptionResponse,
+    summary="Get user description",
+    description="Returns the description record for the user.",
+)
+async def get_description(
+    handler: FromDishka[GetDescriptionHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> DescriptionResponse:
+    query = GetDescriptionQuery(user_id=user_id)
+    item = await handler(query)
+    return _description_response(item)
+
+
 @router.post(
     "/users/{user_id}/spare-times",
     status_code=201,
@@ -307,6 +362,79 @@ async def add_spare_time(
         user_id=user_id,
         start_time=payload.start_time,
         end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.get(
+    "/users/{user_id}/spare-times",
+    response_model=SpareTimeListResponse,
+    summary="List user free time windows",
+    description="Returns all free time windows for the user.",
+)
+async def list_spare_times(
+    handler: FromDishka[ListUserSpareTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListUserSpareTimesQuery(user_id=user_id)
+    items = await handler(query)
+    return SpareTimeListResponse(items=[_spare_time_response(item) for item in items])
+
+
+@router.get(
+    "/users/{user_id}/spare-times/{spare_time_id}",
+    response_model=SpareTimeResponse,
+    summary="Get user free time window",
+    description="Returns the specified free time window for the user.",
+)
+async def get_spare_time(
+    spare_time_id: UUID,
+    handler: FromDishka[GetUserSpareTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeResponse:
+    query = GetUserSpareTimeQuery(
+        user_id=user_id,
+        spare_time_id=BaseId(spare_time_id),
+    )
+    item = await handler(query)
+    return _spare_time_response(item)
+
+
+@router.put(
+    "/users/{user_id}/spare-times/{spare_time_id}",
+    status_code=204,
+    summary="Update user free time window",
+    description="Updates a free time window for the user.",
+)
+async def update_spare_time(
+    spare_time_id: UUID,
+    payload: SpareTimeCreateRequest,
+    handler: FromDishka[UpdateSpareTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = UpdateSpareTimeCommand(
+        user_id=user_id,
+        spare_time_id=BaseId(spare_time_id),
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    await handler(command)
+
+
+@router.delete(
+    "/users/{user_id}/spare-times/{spare_time_id}",
+    status_code=204,
+    summary="Delete user free time window",
+    description="Deletes a free time window for the user.",
+)
+async def delete_spare_time(
+    spare_time_id: UUID,
+    handler: FromDishka[DeleteSpareTimeHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> None:
+    command = DeleteSpareTimeCommand(
+        user_id=user_id,
+        spare_time_id=BaseId(spare_time_id),
     )
     await handler(command)
 

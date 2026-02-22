@@ -93,7 +93,11 @@ class JWTServices:
         self._config = config
 
     def _create_token(
-        self, sub: str, time: int, type: Literal["access", "refresh"] = "access"
+        self,
+        sub: str,
+        time: int,
+        type: Literal["access", "refresh"] = "access",
+        include: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Create a token by user ID."""
         if type == "refresh":
@@ -107,14 +111,27 @@ class JWTServices:
                 key=self._config.PRIVATE_KEY,
                 algorithm=self._config.algoritm,
             )
+        payload = TokenPayload(sub, time, type=type).to_dict(include=include)
         return jwt.encode(
-            payload=TokenPayload(sub, time, type=type).to_dict(),
+            payload=payload,
             key=self._config.PRIVATE_KEY,
             algorithm=self._config.algoritm,
         )
 
-    def create_access_token(self, sub: str) -> str:
-        return self._create_token(sub=sub, time=self._config.access_token_time)
+    def create_access_token(
+        self,
+        sub: str,
+        is_superuser: bool | None = None,
+    ) -> str:
+        extra_claims: Dict[str, Any] = {}
+        if is_superuser is not None:
+            extra_claims["is_superuser"] = is_superuser
+        include = extra_claims if extra_claims else None
+        return self._create_token(
+            sub=sub,
+            time=self._config.access_token_time,
+            include=include,
+        )
 
     def create_refresh_token(self, sub) -> str:
         return self._create_token(sub, self._config.refresh_token_time, type="refresh")

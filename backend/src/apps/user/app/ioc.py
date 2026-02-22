@@ -17,6 +17,7 @@ from app.application.commands.add_equipment_free_time import (
     AddSoundFreeTimeHandler,
 )
 from app.application.commands.add_spare_time import AddSpareTimeHandler
+from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.create_description import CreateDescriptionHandler
 from app.application.commands.create_equipment import (
     CreateCameraHandler,
@@ -40,6 +41,7 @@ from app.application.commands.remove_image import RemoveImageHandler
 from app.application.commands.reserve_availability import ReserveAvailabilityHandler
 from app.application.commands.user_registered import UserRegisteredHandler
 from app.application.commands.update_description import UpdateDescriptionHandler
+from app.application.commands.update_spare_time import UpdateSpareTimeHandler
 from app.application.commands.update_equipment import (
     UpdateCameraHandler,
     UpdateCameraTripodHandler,
@@ -61,6 +63,11 @@ from app.application.queries.list_equipment import (
 from app.application.queries.images import (
     GetRequisiteImageHandler,
     ListRequisiteImagesHandler,
+)
+from app.application.queries.description import GetDescriptionHandler
+from app.application.queries.spare_times import (
+    GetUserSpareTimeHandler,
+    ListUserSpareTimesHandler,
 )
 from app.application.ports.repositories import (
     CameraFreeTimeRepository,
@@ -267,6 +274,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=AddSoundFreeTimeHandler)
     provider.provide(source=AddRequisiteFreeTimeHandler)
     provider.provide(source=AddSpareTimeHandler)
+    provider.provide(source=DeleteSpareTimeHandler)
     provider.provide(source=CreateCameraHandler)
     provider.provide(source=CreateCameraTripodHandler)
     provider.provide(source=CreateDescriptionHandler)
@@ -294,9 +302,13 @@ def use_case_provider() -> Provider:
     provider.provide(source=ListRequisitesHandler)
     provider.provide(source=ListRequisiteImagesHandler)
     provider.provide(source=GetRequisiteImageHandler)
+    provider.provide(source=GetDescriptionHandler)
+    provider.provide(source=ListUserSpareTimesHandler)
+    provider.provide(source=GetUserSpareTimeHandler)
     provider.provide(source=UpdateCameraHandler)
     provider.provide(source=UpdateCameraTripodHandler)
     provider.provide(source=UpdateDescriptionHandler)
+    provider.provide(source=UpdateSpareTimeHandler)
     provider.provide(source=UpdateLightHandler)
     provider.provide(source=UpdateLightTripodHandler)
     provider.provide(source=UpdateMicrofonHandler)

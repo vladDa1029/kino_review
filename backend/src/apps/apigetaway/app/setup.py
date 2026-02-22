@@ -56,10 +56,18 @@ def AuthGateway_Middleware(
         for patterns in protected_paths.patterns.values()
         for pattern in patterns
     ]
+    if "/admin/user*" not in flattened_patterns:
+        flattened_patterns.append("/admin/user*")
+    public_patterns = [
+        "/admin/user/openapi.json",
+        "/admin/user/docs",
+        "/admin/user/redoc",
+    ]
     app.add_middleware(
         AuthGatewayMiddleware,
         settings=settings,
         validator=validator,
         protected_paths=flattened_patterns,
+        public_paths=public_patterns,
     )
     return app

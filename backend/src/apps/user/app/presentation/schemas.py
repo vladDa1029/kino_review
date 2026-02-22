@@ -17,9 +17,28 @@ class DescriptionUpdateRequest(BaseModel):
     phone: str = Field(examples=["+79991234567"])
 
 
+class DescriptionResponse(BaseModel):
+    oid: UUID
+    user_id: UUID
+    username: str
+    phone: str
+
+
 class SpareTimeCreateRequest(BaseModel):
     start_time: datetime = Field(examples=["2026-01-15T10:00:00Z"])
     end_time: datetime = Field(examples=["2026-01-15T18:00:00Z"])
+
+
+class SpareTimeResponse(BaseModel):
+    oid: UUID
+    user_id: UUID
+    start_time: datetime
+    end_time: datetime
+    status: str
+
+
+class SpareTimeListResponse(BaseModel):
+    items: list[SpareTimeResponse]
 
 
 class ReserveAvailabilityRequest(BaseModel):

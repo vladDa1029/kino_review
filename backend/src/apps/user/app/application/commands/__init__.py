@@ -15,6 +15,14 @@ from app.application.commands.add_spare_time import (
     AddSpareTimeCommand,
     AddSpareTimeHandler,
 )
+from app.application.commands.delete_spare_time import (
+    DeleteSpareTimeCommand,
+    DeleteSpareTimeHandler,
+)
+from app.application.commands.update_spare_time import (
+    UpdateSpareTimeCommand,
+    UpdateSpareTimeHandler,
+)
 from app.application.commands.add_equipment_free_time import (
     AddCameraFreeTimeCommand,
     AddCameraFreeTimeHandler,
@@ -105,6 +113,8 @@ __all__ = [
     "AddSoundFreeTimeHandler",
     "AddSpareTimeCommand",
     "AddSpareTimeHandler",
+    "DeleteSpareTimeCommand",
+    "DeleteSpareTimeHandler",
     "CreateCameraCommand",
     "CreateCameraHandler",
     "CreateCameraTripodCommand",
@@ -145,6 +155,8 @@ __all__ = [
     "UpdateCameraTripodHandler",
     "UpdateDescriptionCommand",
     "UpdateDescriptionHandler",
+    "UpdateSpareTimeCommand",
+    "UpdateSpareTimeHandler",
     "UpdateLightCommand",
     "UpdateLightHandler",
     "UpdateLightTripodCommand",

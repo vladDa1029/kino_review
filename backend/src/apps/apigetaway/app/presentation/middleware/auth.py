@@ -16,14 +16,18 @@ class AuthGatewayMiddleware(BaseHTTPMiddleware):
         settings: AuthGatewaySettings,
         validator: JWTValidator,
         protected_paths: list[str] | None = None,
+        public_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)
         self._settings = settings
         self._validator = validator
         self._protected_paths = protected_paths or []
+        self._public_paths = public_paths or []
 
     async def dispatch(self, request: Request, call_next: Callable):
-        if request.method == "OPTIONS" or not self._is_protected_path(request.url.path):
+        if request.method == "OPTIONS" or self._is_public_path(
+            request.url.path
+        ) or not self._is_protected_path(request.url.path):
             return await call_next(request)
 
         token = _extract_bearer_token(request)
@@ -52,6 +56,11 @@ class AuthGatewayMiddleware(BaseHTTPMiddleware):
         if not self._protected_paths:
             return False
         return any(fnmatch(path, pattern) for pattern in self._protected_paths)
+
+    def _is_public_path(self, path: str) -> bool:
+        if not self._public_paths:
+            return False
+        return any(fnmatch(path, pattern) for pattern in self._public_paths)
 
 
 def _extract_bearer_token(request: Request) -> str | None:
