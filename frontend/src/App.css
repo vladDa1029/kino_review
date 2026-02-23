@@ -937,6 +937,11 @@ body {
   align-items: center;
 }
 
+.auth-content form {
+  width: 100%;
+  max-width: 300px;
+}
+
 .auth-container h2 {
   margin-top: 0;
   margin-bottom: 1.8rem;
@@ -952,6 +957,7 @@ body {
 
 .form-group {
   margin-bottom: 1.5rem;
+  width: 100%;
 }
 
 .password-input-container {
@@ -960,6 +966,7 @@ body {
 
 .password-input-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .password-toggle {
@@ -992,7 +999,6 @@ body {
 
 .form-input {
   width: 100%;
-  max-width: 300px;
   padding: 1rem;
   padding-right: 3rem;
   border: 1px solid #e2e8f0;
@@ -1002,6 +1008,8 @@ body {
   background-color: #ffffff;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
   text-align: center;
+  height: 52px;
+  box-sizing: border-box;
 }
 
 .dark-theme .form-input {
@@ -1116,7 +1124,6 @@ body {
 
 .auth-submit-btn {
   width: 100%;
-  max-width: 300px;
   padding: 1rem;
   border: 1px solid transparent;
   border-radius: 10px;
@@ -1127,7 +1134,9 @@ body {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
-  height: auto;
+  height: 52px;
+  box-sizing: border-box;
+  display: block;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
