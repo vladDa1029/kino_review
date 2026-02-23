@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from typing import Protocol
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from app.domain.entities import BaseUserId
 
@@ -10,7 +10,7 @@ class AbstractGenerationID(Protocol):
 
     @abstractmethod
     def __call__(self) -> BaseUserId:
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class GenerationUUID(AbstractGenerationID):

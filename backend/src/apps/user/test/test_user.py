@@ -46,6 +46,7 @@ from app.domain.policy.resource_lock import ResourceUnlockedPolicy
 from app.domain.policy.single_description import SingleDescriptionPolicy
 from app.domain.service.availability_service import AvailabilityService
 from app.domain.service.description_service import DescriptionService
+from app.domain.service.equipment_free_time_service import EquipmentFreeTimeService
 from app.domain.service.equipment_service import EquipmentService
 from app.domain.service.free_time_service import FreeTimeService
 from app.domain.service.image_service import ImageService
@@ -411,6 +412,66 @@ def test_free_time_service(is_active, owner_matches, overlap, expected_exception
 
 
 @pytest.mark.parametrize(
+    ("is_active", "owner_matches", "timing_matches", "overlap", "expected_exception"),
+    [
+        (True, True, True, False, None),
+        (False, True, True, False, UserInactiveError),
+        (True, False, True, False, OwnershipError),
+        (True, True, False, False, OwnershipError),
+        (True, True, True, True, CrossingTimingError),
+    ],
+)
+def test_equipment_free_time_service(
+    is_active, owner_matches, timing_matches, overlap, expected_exception
+):
+    service = EquipmentFreeTimeService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=is_active)
+    equipment_owner_id = user_id if owner_matches else BaseId(uuid4())
+    equipment = Microfon(
+        oid=BaseId(uuid4()),
+        users_id=equipment_owner_id,
+        title="mic",
+        description="desc",
+        type="shotgun",
+        create_at=datetime(2024, 1, 1, 10, 0, 0),
+    )
+
+    timings = [
+        make_spare_time(
+            BaseId(uuid4()),
+            BaseId(uuid4()),
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+        )
+    ]
+    if overlap:
+        timings.append(
+            make_spare_time(
+                BaseId(uuid4()),
+                equipment.oid,
+                datetime(2024, 1, 1, 10, 0, 0),
+                datetime(2024, 1, 1, 12, 0, 0),
+            )
+        )
+
+    new_obj_id = equipment.oid if timing_matches else BaseId(uuid4())
+    new_timing = make_spare_time(
+        BaseId(uuid4()),
+        new_obj_id,
+        datetime(2024, 1, 1, 11, 0, 0),
+        datetime(2024, 1, 1, 13, 0, 0),
+    )
+
+    if expected_exception:
+        with pytest.raises(expected_exception):
+            service.add_timing(user, equipment, timings, new_timing)
+    else:
+        result = service.add_timing(user, equipment, timings, new_timing)
+        assert new_timing in result
+
+
+@pytest.mark.parametrize(
     ("is_active", "wrong_owner", "wrong_identity", "expected_exception"),
     [
         (False, False, False, UserInactiveError),
@@ -611,6 +672,225 @@ def test_availability_service_reserve_splits_window():
             "free",
         ),
     ]
+
+
+def test_availability_service_cancel_reservation_merges_free_windows():
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=True)
+    obj_id = BaseId(uuid4())
+    windows = [
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 9, 0, 0),
+            datetime(2024, 1, 1, 11, 0, 0),
+            status="free",
+        ),
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 11, 0, 0),
+            datetime(2024, 1, 1, 13, 0, 0),
+            status="reserved",
+        ),
+    ]
+
+    result = service.cancel_reservation(
+        user,
+        windows,
+        user_id,
+        obj_id,
+        datetime(2024, 1, 1, 11, 0, 0),
+        datetime(2024, 1, 1, 12, 0, 0),
+    )
+
+    segments = sorted(result, key=lambda window: window.start_time)
+    assert [(seg.start_time, seg.end_time, str(seg.status)) for seg in segments] == [
+        (
+            datetime(2024, 1, 1, 9, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+            "free",
+        ),
+        (
+            datetime(2024, 1, 1, 12, 0, 0),
+            datetime(2024, 1, 1, 13, 0, 0),
+            "reserved",
+        ),
+    ]
+
+
+def test_availability_service_unblock_merges_right_window():
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=True)
+    obj_id = BaseId(uuid4())
+    windows = [
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+            status="blocked",
+        ),
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 12, 0, 0),
+            datetime(2024, 1, 1, 14, 0, 0),
+            status="free",
+        ),
+    ]
+
+    result = service.unblock(
+        user,
+        windows,
+        user_id,
+        obj_id,
+        datetime(2024, 1, 1, 11, 0, 0),
+        datetime(2024, 1, 1, 12, 0, 0),
+    )
+
+    segments = sorted(result, key=lambda window: window.start_time)
+    assert [(seg.start_time, seg.end_time, str(seg.status)) for seg in segments] == [
+        (
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 11, 0, 0),
+            "blocked",
+        ),
+        (
+            datetime(2024, 1, 1, 11, 0, 0),
+            datetime(2024, 1, 1, 14, 0, 0),
+            "free",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("method_name", "status", "is_active", "owner_matches", "expected_exception"),
+    [
+        ("cancel_reservation", "reserved", False, True, UserInactiveError),
+        ("cancel_reservation", "reserved", True, False, OwnershipError),
+        ("unblock", "blocked", False, True, UserInactiveError),
+        ("unblock", "blocked", True, False, OwnershipError),
+    ],
+)
+def test_availability_service_release_invariants(
+    method_name, status, is_active, owner_matches, expected_exception
+):
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=is_active)
+    owner_id = user_id if owner_matches else BaseId(uuid4())
+    obj_id = BaseId(uuid4())
+    windows = [
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+            status=status,
+        )
+    ]
+
+    action = getattr(service, method_name)
+    with pytest.raises(expected_exception):
+        action(
+            user,
+            windows,
+            owner_id,
+            obj_id,
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 11, 0, 0),
+        )
+
+
+@pytest.mark.parametrize(
+    ("method_name", "wrong_status"),
+    [
+        ("cancel_reservation", "free"),
+        ("unblock", "reserved"),
+    ],
+)
+def test_availability_service_release_status_error(method_name, wrong_status):
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=True)
+    obj_id = BaseId(uuid4())
+    windows = [
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 14, 0, 0),
+            status=wrong_status,
+        )
+    ]
+
+    action = getattr(service, method_name)
+    with pytest.raises(WindowStatusError):
+        action(
+            user,
+            windows,
+            user_id,
+            obj_id,
+            datetime(2024, 1, 1, 11, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+        )
+
+
+@pytest.mark.parametrize("method_name", ["cancel_reservation", "unblock"])
+def test_availability_service_release_not_found(method_name):
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=True)
+    obj_id = BaseId(uuid4())
+    windows = []
+
+    action = getattr(service, method_name)
+    with pytest.raises(AvailabilityNotFoundError):
+        action(
+            user,
+            windows,
+            user_id,
+            obj_id,
+            datetime(2024, 1, 1, 11, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+        )
+
+
+@pytest.mark.parametrize(
+    ("method_name", "status"),
+    [
+        ("cancel_reservation", "reserved"),
+        ("unblock", "blocked"),
+    ],
+)
+def test_availability_service_release_invalid_time(method_name, status):
+    service = AvailabilityService()
+    user_id = BaseId(uuid4())
+    user = make_user(user_id, is_active=True)
+    obj_id = BaseId(uuid4())
+    windows = [
+        make_spare_time(
+            BaseId(uuid4()),
+            obj_id,
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 12, 0, 0),
+            status=status,
+        )
+    ]
+
+    action = getattr(service, method_name)
+    with pytest.raises(TimeRangeError):
+        action(
+            user,
+            windows,
+            user_id,
+            obj_id,
+            datetime(2024, 1, 1, 12, 0, 0),
+            datetime(2024, 1, 1, 11, 0, 0),
+        )
 
 
 @pytest.mark.parametrize(

@@ -44,6 +44,7 @@ UPDATE_CASES = [
         UpdateMicrofonHandler,
         UpdateMicrofonCommand,
         "microfon_repository",
+        "microfon_free_time_repository",
         "microfon_id",
         Microfon,
         {"title": "mic", "description": "desc", "type": "shotgun"},
@@ -52,6 +53,7 @@ UPDATE_CASES = [
         UpdateCameraHandler,
         UpdateCameraCommand,
         "camera_repository",
+        "camera_free_time_repository",
         "camera_id",
         Camera,
         {"title": "cam", "description": "desc", "type": "dslr"},
@@ -60,6 +62,7 @@ UPDATE_CASES = [
         UpdateCameraTripodHandler,
         UpdateCameraTripodCommand,
         "camera_tripod_repository",
+        "camera_tripod_free_time_repository",
         "camera_tripod_id",
         CameraTripod,
         {"title": "tripod", "description": "desc", "type": "fluid"},
@@ -68,6 +71,7 @@ UPDATE_CASES = [
         UpdateLightHandler,
         UpdateLightCommand,
         "light_repository",
+        "light_free_time_repository",
         "light_id",
         Light,
         {"title": "light", "description": "desc", "type": "led"},
@@ -76,6 +80,7 @@ UPDATE_CASES = [
         UpdateLightTripodHandler,
         UpdateLightTripodCommand,
         "light_tripod_repository",
+        "light_tripod_free_time_repository",
         "light_tripod_id",
         LightTripod,
         {"title": "stand", "description": "desc", "type": "c-stand"},
@@ -84,6 +89,7 @@ UPDATE_CASES = [
         UpdateSoundHandler,
         UpdateSoundCommand,
         "sound_repository",
+        "sound_free_time_repository",
         "sound_id",
         Sound,
         {"title": "recorder", "description": "desc", "type": "field"},
@@ -92,6 +98,7 @@ UPDATE_CASES = [
         UpdateRequisiteHandler,
         UpdateRequisiteCommand,
         "requisite_repository",
+        "requisite_free_time_repository",
         "requisite_id",
         Requisite,
         {"title": "prop", "description": "desc", "type": "decor", "size": "m"},
@@ -100,13 +107,22 @@ UPDATE_CASES = [
 
 
 @pytest.mark.parametrize(
-    ("handler_cls", "command_cls", "repo_param", "id_field", "entity_cls", "payload"),
+    (
+        "handler_cls",
+        "command_cls",
+        "repo_param",
+        "free_time_repo_param",
+        "id_field",
+        "entity_cls",
+        "payload",
+    ),
     UPDATE_CASES,
 )
 def test_update_equipment_handlers(
     handler_cls,
     command_cls,
     repo_param,
+    free_time_repo_param,
     id_field,
     entity_cls,
     payload,
@@ -132,10 +148,9 @@ def test_update_equipment_handlers(
 
     handler = handler_cls(
         user_repository=user_repo,
-        spare_time_repository=spare_time_repo,
         transaction=tx,
         service=EquipmentService(),
-        **{repo_param: equipment_repo},
+        **{repo_param: equipment_repo, free_time_repo_param: spare_time_repo},
     )
 
     command_kwargs = dict(user_id=user_id, **payload)

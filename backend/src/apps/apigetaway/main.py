@@ -8,7 +8,10 @@ from app.ioc import setup_providers
 from app.setup import AuthGateway_Middleware, CORS_Middleware
 from app.presentation.api.v1.routes.auth import router as router_auth
 from app.presentation.api.v1.routes.docs import router as router_docs
-from app.presentation.api.v1.routes.users import router as router_users
+from app.presentation.api.v1.routes.users import (
+    admin_router as router_admin_users,
+    router as router_users,
+)
 from dishka.integrations.fastapi import setup_dishka
 
 
@@ -45,4 +48,5 @@ def start_app_dev():
     app.include_router(router_docs)
     app.include_router(router_auth)
     app.include_router(router_users)
+    app.include_router(router_admin_users)
     return app

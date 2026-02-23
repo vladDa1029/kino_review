@@ -14,6 +14,12 @@ router = APIRouter(
     route_class=DishkaRoute,
 )
 
+admin_router = APIRouter(
+    prefix="/admin/user",
+    tags=["admin-user"],
+    route_class=DishkaRoute,
+)
+
 
 @router.get("/openapi.json", include_in_schema=False, response_model=None)
 async def patched_openapi(
@@ -28,6 +34,23 @@ async def patched_openapi(
         service_prefix=service_prefix,
         protected_patterns=protected_settings.patterns.get(service_prefix, []),
     )
+    return JSONResponse(spec)
+
+
+@admin_router.get("/openapi.json", include_in_schema=False, response_model=None)
+async def patched_admin_openapi(
+    client: FromDishka[httpx.AsyncClient],
+    ser: FromDishka[Services],
+) -> JSONResponse:
+    service_prefix = "admin/user"
+    spec = await fetch_and_patch_openapi(
+        client=client,
+        base_url=ser.user,
+        service_prefix=service_prefix,
+        protected_patterns=["*"],
+        replace_user_id_paths=False,
+    )
+    _strip_users_prefix(spec)
     return JSONResponse(spec)
 
 
@@ -48,6 +71,26 @@ async def proxy_users(
         path = _rewrite_user_path(path, request)
         url = f"{url}/{path}"
     return await proxy_request(request, url, client=client)
+
+
+@admin_router.api_route(
+    "/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    response_model=None,
+)
+async def proxy_admin_users(
+    request: Request,
+    path: str,
+    ser: FromDishka[Services],
+    client: FromDishka[httpx.AsyncClient],
+    schema: str = "http",
+):
+    _ensure_admin(request)
+    url = f"{schema}://{ser.user}"
+    if path:
+        path = _rewrite_admin_path(path, request)
+        url = f"{url}/{path}"
+    return await proxy_request_admin(request, url, client=client, path=path)
 
 
 async def proxy_request(
@@ -83,12 +126,60 @@ async def proxy_request(
         raise HTTPException(status_code=502, detail=f"Service unreachable: {e}")
 
 
+async def proxy_request_admin(
+    request: Request,
+    url: str,
+    client: httpx.AsyncClient,
+    path: str,
+):
+    req_body = await request.body()
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    _apply_admin_headers(headers, request, path)
+
+    try:
+        resp = await client.request(
+            method=request.method,
+            url=url,
+            content=req_body,
+            headers=headers,
+            params=request.query_params,
+            follow_redirects=False,
+        )
+
+        response = Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers=dict(resp.headers),
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+
+        return response
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Service unreachable: {e}")
+
+
 def _apply_user_headers(headers: dict[str, str], request: Request) -> None:
     headers.pop("x-user-id", None)
     headers.pop("x-user-token-type", None)
     user_headers = getattr(request.state, "user_headers", None)
     if user_headers:
         headers.update(user_headers)
+
+
+def _apply_admin_headers(headers: dict[str, str], request: Request, path: str) -> None:
+    headers.pop("x-user-id", None)
+    headers.pop("x-user-token-type", None)
+    user_headers = getattr(request.state, "user_headers", None)
+    if not user_headers:
+        return
+    target_user_id = _extract_target_user_id(path, user_headers)
+    if target_user_id:
+        headers["x-user-id"] = str(target_user_id)
+    token_type = user_headers.get("x-user-token-type")
+    if token_type:
+        headers["x-user-token-type"] = str(token_type)
 
 
 def _rewrite_user_path(path: str, request: Request) -> str:
@@ -105,11 +196,49 @@ def _rewrite_user_path(path: str, request: Request) -> str:
     return path
 
 
+def _extract_target_user_id(
+    path: str,
+    user_headers: dict[str, str],
+) -> str | None:
+    segments = path.lstrip("/").split("/")
+    if not segments:
+        return None
+    if segments[0] == "users":
+        if len(segments) < 2:
+            return None
+        candidate = segments[1]
+    else:
+        candidate = segments[0]
+    if candidate == "me":
+        return user_headers.get("x-user-id")
+    return candidate
+
+
+def _rewrite_admin_path(path: str, request: Request) -> str:
+    normalized = path.lstrip("/")
+    if not normalized:
+        return path
+    if normalized.startswith("users/"):
+        return _rewrite_user_path(normalized, request)
+    return f"users/{normalized}"
+
+
+def _ensure_admin(request: Request) -> None:
+    payload = getattr(request.state, "user_payload", None)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    is_superuser = payload.get("is_superuser")
+    if is_superuser is True:
+        return
+    raise HTTPException(status_code=403, detail="Admin access required")
+
+
 async def fetch_and_patch_openapi(
     client: httpx.AsyncClient,
     base_url: str,
     service_prefix: str,
     protected_patterns: list[str],
+    replace_user_id_paths: bool = True,
     schema: str = "http",
 ) -> dict:
     """
@@ -131,7 +260,8 @@ async def fetch_and_patch_openapi(
             spec["servers"] = [{"url": "/"}]
 
         _mark_protected_endpoints_with_security(spec, protected_patterns)
-        _replace_user_id_paths(spec)
+        if replace_user_id_paths:
+            _replace_user_id_paths(spec)
         _strip_header_parameter(spec, "x-user-id")
 
         return spec
@@ -186,6 +316,21 @@ def _replace_user_id_paths(spec: dict) -> None:
                     name="user_id",
                     location="path",
                 )
+            rewritten[new_path] = path_item
+        else:
+            rewritten[path] = path_item
+    spec["paths"] = rewritten
+
+
+def _strip_users_prefix(spec: dict) -> None:
+    paths = spec.get("paths")
+    if not isinstance(paths, dict):
+        return
+    rewritten = {}
+    for path, path_item in paths.items():
+        marker = "/admin/user/users"
+        if path.startswith(marker):
+            new_path = path.replace(marker, "/admin/user", 1)
             rewritten[new_path] = path_item
         else:
             rewritten[path] = path_item

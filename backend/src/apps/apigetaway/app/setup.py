@@ -1,5 +1,5 @@
 # Функции для настройки main фабрик.
-from typing import Any, AsyncIterator, Generator
+from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,11 +9,13 @@ from app.config import AuthGatewaySettings, ProtectedPathsSettings
 from app.infrastructure.security.jwt_validator import JWTValidator
 from app.presentation.middleware.auth import AuthGatewayMiddleware
 
+
 # Настройку CORS
 def CORS_Middleware(app: FastAPI):
     context = [
         "http://localhost:3000",  # React default
         "http://localhost:5173",  # Vite default
+        "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",  # Alternative
     ]
 
@@ -50,12 +52,22 @@ def AuthGateway_Middleware(
         algorithm=settings.algorithm,
     )
     flattened_patterns = [
-        pattern for patterns in protected_paths.patterns.values() for pattern in patterns
+        pattern
+        for patterns in protected_paths.patterns.values()
+        for pattern in patterns
+    ]
+    if "/admin/user*" not in flattened_patterns:
+        flattened_patterns.append("/admin/user*")
+    public_patterns = [
+        "/admin/user/openapi.json",
+        "/admin/user/docs",
+        "/admin/user/redoc",
     ]
     app.add_middleware(
         AuthGatewayMiddleware,
         settings=settings,
         validator=validator,
         protected_paths=flattened_patterns,
+        public_paths=public_patterns,
     )
     return app

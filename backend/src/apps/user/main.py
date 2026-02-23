@@ -8,7 +8,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
 
-from app.config import DatabaseSettings, Log, Rabbitmq, SQLAlchemySettings, get_settings
+from app.config import (
+    DatabaseSettings,
+    ImageSettings,
+    Log,
+    Rabbitmq,
+    SQLAlchemySettings,
+    StorageSettings,
+    get_settings,
+)
 from app.domain.errors.base import ApplicationError
 from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import (
@@ -54,6 +62,8 @@ def start_app_dev() -> FastAPI:
             DatabaseSettings: settings.db,
             SQLAlchemySettings: settings.alchemy,
             Rabbitmq: settings.rabbitmq,
+            StorageSettings: settings.storage,
+            ImageSettings: settings.image,
             RabbitBroker: broker,
         },
     )

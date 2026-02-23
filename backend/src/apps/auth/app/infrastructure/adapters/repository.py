@@ -25,11 +25,11 @@ class UserAbstractRepository(Protocol, Generic[T]):
 
     @abc.abstractmethod
     async def get_by_email(self, email) -> T | None:
-        raise NotImplemented
+        raise NotImplementedError
 
     @abc.abstractmethod
     async def get_by_username(self, username: str) -> T | None:
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class UserSqlAlchemyRepository(UserAbstractRepository[entities.User]):

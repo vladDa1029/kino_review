@@ -1,13 +1,14 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.application.errors.errors import EntityNotFoundError, UserNotFoundError
 from app.application.ports.repositories import (
     CameraFreeTimeRepository,
     CameraRepository,
-    CameraTripodRepository,
     CameraTripodFreeTimeRepository,
-    LightRepository,
+    CameraTripodRepository,
     LightFreeTimeRepository,
+    LightRepository,
     LightTripodFreeTimeRepository,
     LightTripodRepository,
     MicrofonFreeTimeRepository,
@@ -19,90 +20,85 @@ from app.application.ports.repositories import (
     UserRepository,
 )
 from app.application.ports.transaction import TransactionManager
-from app.domain.entity.base import BaseId
-from app.domain.service.equipment_service import EquipmentService
+from app.domain.entity.base import BaseId, Spare_time
+from app.domain.service.equipment_free_time_service import EquipmentFreeTimeService
+from app.infrastructure.generation import AbstractGenerationID
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateMicrofonCommand:
+class AddMicrofonFreeTimeCommand:
     user_id: BaseId
     microfon_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateCameraCommand:
+class AddCameraFreeTimeCommand:
     user_id: BaseId
     camera_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateCameraTripodCommand:
+class AddCameraTripodFreeTimeCommand:
     user_id: BaseId
     camera_tripod_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateLightCommand:
+class AddLightFreeTimeCommand:
     user_id: BaseId
     light_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateLightTripodCommand:
+class AddLightTripodFreeTimeCommand:
     user_id: BaseId
     light_tripod_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateSoundCommand:
+class AddSoundFreeTimeCommand:
     user_id: BaseId
     sound_id: BaseId
-    title: str
-    description: str
-    type: str
+    start_time: datetime
+    end_time: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class UpdateRequisiteCommand:
+class AddRequisiteFreeTimeCommand:
     user_id: BaseId
     requisite_id: BaseId
-    title: str
-    description: str
-    type: str
-    size: str
+    start_time: datetime
+    end_time: datetime
 
 
-class UpdateMicrofonHandler:
+class AddMicrofonFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         microfon_repository: MicrofonRepository,
         microfon_free_time_repository: MicrofonFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._microfon_repository = microfon_repository
         self._microfon_free_time_repository = microfon_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateMicrofonCommand) -> None:
+    async def __call__(self, command: AddMicrofonFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -111,36 +107,41 @@ class UpdateMicrofonHandler:
         if microfon is None:
             raise EntityNotFoundError("Microfon")
 
-        windows = await self._microfon_free_time_repository.list_by_obj_id(microfon.oid)
+        timings = await self._microfon_free_time_repository.list_by_obj_id(microfon.oid)
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=microfon.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
+        )
 
         try:
-            self._service.update(user, microfon, windows)
-            microfon.title = command.title
-            microfon.description = command.description
-            microfon.type = command.type
-            await self._microfon_repository.update(microfon)
+            self._service.add_timing(user, microfon, timings, new_timing)
+            await self._microfon_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateCameraHandler:
+class AddCameraFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         camera_repository: CameraRepository,
         camera_free_time_repository: CameraFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._camera_repository = camera_repository
         self._camera_free_time_repository = camera_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateCameraCommand) -> None:
+    async def __call__(self, command: AddCameraFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -149,28 +150,32 @@ class UpdateCameraHandler:
         if camera is None:
             raise EntityNotFoundError("Camera")
 
-        windows = await self._camera_free_time_repository.list_by_obj_id(camera.oid)
+        timings = await self._camera_free_time_repository.list_by_obj_id(camera.oid)
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=camera.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
+        )
 
         try:
-            self._service.update(user, camera, windows)
-            camera.title = command.title
-            camera.description = command.description
-            camera.type = command.type
-            await self._camera_repository.update(camera)
+            self._service.add_timing(user, camera, timings, new_timing)
+            await self._camera_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateCameraTripodHandler:
+class AddCameraTripodFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         camera_tripod_repository: CameraTripodRepository,
         camera_tripod_free_time_repository: CameraTripodFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._camera_tripod_repository = camera_tripod_repository
@@ -178,9 +183,10 @@ class UpdateCameraTripodHandler:
             camera_tripod_free_time_repository
         )
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateCameraTripodCommand) -> None:
+    async def __call__(self, command: AddCameraTripodFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -191,38 +197,43 @@ class UpdateCameraTripodHandler:
         if camera_tripod is None:
             raise EntityNotFoundError("CameraTripod")
 
-        windows = await self._camera_tripod_free_time_repository.list_by_obj_id(
+        timings = await self._camera_tripod_free_time_repository.list_by_obj_id(
             camera_tripod.oid
+        )
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=camera_tripod.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
         )
 
         try:
-            self._service.update(user, camera_tripod, windows)
-            camera_tripod.title = command.title
-            camera_tripod.description = command.description
-            camera_tripod.type = command.type
-            await self._camera_tripod_repository.update(camera_tripod)
+            self._service.add_timing(user, camera_tripod, timings, new_timing)
+            await self._camera_tripod_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateLightHandler:
+class AddLightFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         light_repository: LightRepository,
         light_free_time_repository: LightFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._light_repository = light_repository
         self._light_free_time_repository = light_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateLightCommand) -> None:
+    async def __call__(self, command: AddLightFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -231,76 +242,88 @@ class UpdateLightHandler:
         if light is None:
             raise EntityNotFoundError("Light")
 
-        windows = await self._light_free_time_repository.list_by_obj_id(light.oid)
+        timings = await self._light_free_time_repository.list_by_obj_id(light.oid)
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=light.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
+        )
 
         try:
-            self._service.update(user, light, windows)
-            light.title = command.title
-            light.description = command.description
-            light.type = command.type
-            await self._light_repository.update(light)
+            self._service.add_timing(user, light, timings, new_timing)
+            await self._light_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateLightTripodHandler:
+class AddLightTripodFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         light_tripod_repository: LightTripodRepository,
         light_tripod_free_time_repository: LightTripodFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._light_tripod_repository = light_tripod_repository
         self._light_tripod_free_time_repository = light_tripod_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateLightTripodCommand) -> None:
+    async def __call__(self, command: AddLightTripodFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
 
-        light_tripod = await self._light_tripod_repository.get(command.light_tripod_id)
+        light_tripod = await self._light_tripod_repository.get(
+            command.light_tripod_id
+        )
         if light_tripod is None:
             raise EntityNotFoundError("LightTripod")
 
-        windows = await self._light_tripod_free_time_repository.list_by_obj_id(
+        timings = await self._light_tripod_free_time_repository.list_by_obj_id(
             light_tripod.oid
+        )
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=light_tripod.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
         )
 
         try:
-            self._service.update(user, light_tripod, windows)
-            light_tripod.title = command.title
-            light_tripod.description = command.description
-            light_tripod.type = command.type
-            await self._light_tripod_repository.update(light_tripod)
+            self._service.add_timing(user, light_tripod, timings, new_timing)
+            await self._light_tripod_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateSoundHandler:
+class AddSoundFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         sound_repository: SoundRepository,
         sound_free_time_repository: SoundFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._sound_repository = sound_repository
         self._sound_free_time_repository = sound_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateSoundCommand) -> None:
+    async def __call__(self, command: AddSoundFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -309,36 +332,41 @@ class UpdateSoundHandler:
         if sound is None:
             raise EntityNotFoundError("Sound")
 
-        windows = await self._sound_free_time_repository.list_by_obj_id(sound.oid)
+        timings = await self._sound_free_time_repository.list_by_obj_id(sound.oid)
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=sound.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
+        )
 
         try:
-            self._service.update(user, sound, windows)
-            sound.title = command.title
-            sound.description = command.description
-            sound.type = command.type
-            await self._sound_repository.update(sound)
+            self._service.add_timing(user, sound, timings, new_timing)
+            await self._sound_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
             raise
 
 
-class UpdateRequisiteHandler:
+class AddRequisiteFreeTimeHandler:
     def __init__(
         self,
         user_repository: UserRepository,
         requisite_repository: RequisiteRepository,
         requisite_free_time_repository: RequisiteFreeTimeRepository,
         transaction: TransactionManager,
-        service: EquipmentService,
+        id_generator: AbstractGenerationID,
+        service: EquipmentFreeTimeService,
     ) -> None:
         self._user_repository = user_repository
         self._requisite_repository = requisite_repository
         self._requisite_free_time_repository = requisite_free_time_repository
         self._transaction = transaction
+        self._id_generator = id_generator
         self._service = service
 
-    async def __call__(self, command: UpdateRequisiteCommand) -> None:
+    async def __call__(self, command: AddRequisiteFreeTimeCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
@@ -347,17 +375,19 @@ class UpdateRequisiteHandler:
         if requisite is None:
             raise EntityNotFoundError("Requisite")
 
-        windows = await self._requisite_free_time_repository.list_by_obj_id(
+        timings = await self._requisite_free_time_repository.list_by_obj_id(
             requisite.oid
+        )
+        new_timing = Spare_time(
+            oid=self._id_generator(),
+            obj=requisite.oid,
+            start_time=command.start_time,
+            end_time=command.end_time,
         )
 
         try:
-            self._service.update(user, requisite, windows)
-            requisite.title = command.title
-            requisite.description = command.description
-            requisite.type = command.type
-            requisite.size = command.size
-            await self._requisite_repository.update(requisite)
+            self._service.add_timing(user, requisite, timings, new_timing)
+            await self._requisite_free_time_repository.add(new_timing)
             await self._transaction.commit()
         except Exception:
             await self._transaction.rollback()
