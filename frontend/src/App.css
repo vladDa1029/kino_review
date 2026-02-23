@@ -981,11 +981,25 @@ body {
   padding: 6px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .password-toggle:hover {
   color: #e67e22;
   background-color: rgba(52, 152, 219, 0.1);
+}
+
+.password-eye-icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.password-toggle:hover .password-eye-icon {
+  opacity: 0.9;
 }
 
 .dark-theme .password-toggle {

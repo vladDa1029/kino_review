@@ -3,6 +3,64 @@ import { useAuth } from '../context/useAuth';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
 
+const EyeIcon = () => (
+  <svg
+    className="password-eye-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M1 12C2.73 7.61 7 4.5 12 4.5C17 4.5 21.27 7.61 23 12C21.27 16.39 17 19.5 12 19.5C7 19.5 2.73 16.39 1 12Z"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg
+    className="password-eye-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M2 2L22 22"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.88 9.88C9.34 10.42 9 11.17 9 12C9 13.66 10.34 15 12 15C12.83 15 13.58 14.66 14.12 14.12"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6.45 6.45C4.25 7.77 2.53 9.71 1.5 12C3.23 16.39 7.5 19.5 12.5 19.5C14.16 19.5 15.75 19.16 17.2 18.55"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M10.62 4.62C11.24 4.54 11.87 4.5 12.5 4.5C17.5 4.5 21.77 7.61 23.5 12C22.84 13.67 21.85 15.17 20.62 16.41"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const AuthModal = ({ showAuth, setShowAuth }) => {
   const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
   const [formData, setFormData] = useState({
@@ -31,10 +89,8 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isLogin) {
-      if (passwordStrength < 3) {
-        return;
-      }
+    if (!isLogin && passwordStrength < 3) {
+      return;
     }
 
     try {
@@ -42,11 +98,11 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
         await handleLogin(formData.email, formData.password);
       } else {
         await handleRegister(formData.email, formData.password);
-        setIsLogin(true); // Переключаемся на форму входа после регистрации
+        setIsLogin(true);
       }
       setFormData({ email: '', password: '' });
     } catch {
-      // Обработка ошибок уже осуществляется в соответствующих функциях
+      // Error handling is managed in auth methods.
     }
   };
 
@@ -55,10 +111,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
       <div className="auth-modal open">
         <div className="auth-container">
           <div className="auth-content">
-            <button
-              className="close-btn"
-              onClick={() => setShowAuth(false)}
-            >
+            <button className="close-btn" onClick={() => setShowAuth(false)}>
               &times;
             </button>
             <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
@@ -89,9 +142,10 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                   <button
                     type="button"
                     className="password-toggle"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
                 {!isLogin && (
@@ -112,11 +166,10 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
               </button>
 
               <p className="auth-switch">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <span
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="switch-link"
-                >
+                {isLogin
+                  ? "Don't have an account? "
+                  : 'Already have an account? '}
+                <span onClick={() => setIsLogin(!isLogin)} className="switch-link">
                   {isLogin ? 'Sign up' : 'Sign in'}
                 </span>
               </p>
