@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
 
@@ -45,7 +45,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
         setIsLogin(true); // Переключаемся на форму входа после регистрации
       }
       setFormData({ email: '', password: '' });
-    } catch (error) {
+    } catch {
       // Обработка ошибок уже осуществляется в соответствующих функциях
     }
   };

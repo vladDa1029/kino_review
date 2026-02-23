@@ -1,34 +1,45 @@
-import { API_BASE_URL } from '../constants';
+import apiClient from './httpClient';
 
-const apiClient = async (endpoint, options = {}) => {
-  // Получаем токен из localStorage
-  const token = localStorage.getItem('access_token');
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    credentials: 'include', // Важно для передачи куки с refresh токеном
-    headers: {
-      'Content-Type': options.body instanceof FormData ? 'multipart/form-data' : 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers,
-    },
+export const register = async (email, password) =>
+  apiClient('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
   });
 
-  let data;
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    data = await response.json();
-  } else {
-    data = await response.text();
-  }
+export const login = async (username, password) => {
+  const formData = new URLSearchParams();
+  formData.append('username', username);
+  formData.append('password', password);
+  formData.append('grant_type', 'password');
 
-  if (!response.ok) {
-    const error = new Error(data.detail || data || 'Request failed');
-    error.status = response.status;
-    throw error;
-  }
-
-  return data;
+  return apiClient('/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData,
+  });
 };
 
-export default apiClient;
+export const refreshToken = async () =>
+  apiClient('/auth/refresh', {
+    method: 'POST',
+    withCredentials: true,
+  });
+
+export const logout = async () =>
+  apiClient('/auth/logout', {
+    method: 'GET',
+    withCredentials: true,
+  });
+
+export const getUsers = async (page = 1, pageSize = 5) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+  });
+
+  return apiClient(`/auth/users?${params.toString()}`, {
+    method: 'GET',
+  });
+};

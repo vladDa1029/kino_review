@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { getUsers } from '../services/authService';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/useAuth';
+import { getUsers } from '../services/api';
 
 const UserList = () => {
   const [users, setUsers] = useState([]);
@@ -15,11 +15,7 @@ const UserList = () => {
 
   const { token } = useAuth();
 
-  useEffect(() => {
-    fetchUsers();
-  }, [pagination.page, pagination.pageSize]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getUsers(pagination.page, pagination.pageSize);
@@ -35,7 +31,11 @@ const UserList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.pageSize]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {

@@ -1,81 +1,105 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import * as authService from '../services/authService';
-import { shouldRefreshToken } from '../utils/tokenUtils';
-
-const AuthContext = createContext();
+import * as authApi from '../services/api';
+import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
+import { clearAccessToken, getAccessToken, setAccessToken, setTokenType } from '../services/tokenStorage';
+import { AuthContext } from './authContextInstance';
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('access_token') || null);
+  const [token, setTokenState] = useState(() => getAccessToken());
   const [userData, setUserData] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const applyToken = useCallback((nextToken, nextTokenType = 'Bearer') => {
+    setTokenType(nextToken ? nextTokenType : 'Bearer');
+    setAccessToken(nextToken);
+    setTokenState(nextToken || null);
+    setUserData(nextToken ? decodeToken(nextToken) : null);
+  }, []);
+
+  const handleRefreshToken = useCallback(async () => {
+    try {
+      const response = await authApi.refreshToken();
+      if (response?.access_token) {
+        applyToken(response.access_token, response.token_type);
+        return response.access_token;
+      }
+      applyToken(null);
+      return null;
+    } catch {
+      applyToken(null);
+      return null;
+    }
+  }, [applyToken]);
 
   useEffect(() => {
-    // Проверяем возможность обновления токена при загрузке приложения
-    // Только если токен был сохранен ранее и возможно его обновление
-    if (token && shouldRefreshToken(token, 300)) { // Обновляем, если токен истекает в течение 5 минут
-      handleRefreshToken();
-    }
-  }, [token]);
+    setIsAuthReady(true);
+  }, []);
 
-  const handleRefreshToken = async () => {
-    try {
-      const response = await authService.refreshToken();
-      if (response.access_token) {
-        setToken(response.access_token);
-        localStorage.setItem('access_token', response.access_token);
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      if (shouldRefreshToken(token, 300)) {
+        handleRefreshToken();
       }
-    } catch (error) {
-      console.log('Could not refresh token, user not logged in');
-    }
-  };
+    }, 30_000);
 
-  const handleLogin = async (email, password) => {
-    try {
-      const response = await authService.login(email, password);
-      if (response.access_token) {
-        setToken(response.access_token);
-        localStorage.setItem('access_token', response.access_token);
-        toast.success('Successfully logged in!');
-        setIsAuthModalOpen(false);
-        return response;
+    return () => clearInterval(interval);
+  }, [handleRefreshToken, token]);
+
+  const handleLogin = useCallback(
+    async (email, password) => {
+      try {
+        const response = await authApi.login(email, password);
+        if (response?.access_token) {
+          applyToken(response.access_token, response.token_type);
+          toast.success('Successfully logged in!');
+          setIsAuthModalOpen(false);
+          return response;
+        }
+        throw new Error('Login response does not contain access token');
+      } catch (error) {
+        toast.error(error.message || 'Login failed');
+        throw error;
       }
-    } catch (error) {
-      toast.error(error.message || 'Login failed');
-      throw error;
-    }
-  };
+    },
+    [applyToken],
+  );
 
-  const handleRegister = async (email, password) => {
+  const handleRegister = useCallback(async (email, password) => {
     try {
-      const response = await authService.register(email, password);
+      const response = await authApi.register(email, password);
       toast.success('Registration successful! Please login.');
       return response;
     } catch (error) {
       toast.error(error.message || 'Registration failed');
       throw error;
     }
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
+      await authApi.logout();
+    } catch {
+      // Ignore backend logout errors and clear local auth state anyway.
     } finally {
-      setToken(null);
-      setUserData(null);
-      localStorage.removeItem('access_token');
+      clearAccessToken();
+      applyToken(null);
       toast.info('Logged out successfully');
       setIsAuthModalOpen(false);
     }
-  };
+  }, [applyToken]);
 
-  return (
-    <AuthContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       token,
       userData,
+      isAuthReady,
       isAuthModalOpen,
       setIsAuthModalOpen,
       isLogin,
@@ -84,11 +108,20 @@ export const AuthProvider = ({ children }) => {
       handleLogin,
       handleRegister,
       handleLogout,
-      handleRefreshToken
-    }}>
-      {children}
-    </AuthContext.Provider>
+      handleRefreshToken,
+    }),
+    [
+      handleLogin,
+      handleLogout,
+      handleRefreshToken,
+      handleRegister,
+      isAuthModalOpen,
+      isAuthReady,
+      isLogin,
+      token,
+      userData,
+    ],
   );
-};
 
-export const useAuth = () => useContext(AuthContext);
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+};
