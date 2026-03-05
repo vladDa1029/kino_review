@@ -1,7 +1,7 @@
 # Требуется стандартизировать настройки и ограничить некоторые параметры
 services:
   pg:
-    image: postgres:15
+    image: postgres:18.3-bookworm
     environment:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: kino
@@ -14,7 +14,8 @@ services:
     ports: # Для разработки прокидуется ссылка для подключения в не контейнера
       - "5433:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql
+      - ./docker/pg-init:/docker-entrypoint-initdb.d
     command: ["postgres", "-c", "listen_addresses=*"] # Для разработки слушает все порты
   pgadmin:
     image: dpage/pgadmin4
@@ -75,6 +76,23 @@ services:
     volumes:
       - ./backend/src/apps/user/app:/app/app
     command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8002"]
+  project: # INFO: Сервис не готов
+    build:
+      dockerfile: /Dockerfile
+      context: ./backend/src/apps/project
+    
+    # Порты для доступа если требуется
+    ports:
+      - "8004:8003"
+    depends_on:
+      pg:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: pg
+      DATABASE_PORT_NETWORK: 5432
+    volumes:
+      - ./backend/src/apps/project/app:/app/app
+    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8003"]
   broker:
     image: rabbitmq:3-management-alpine
     ports:
@@ -119,3 +137,5 @@ volumes:
   pgadmin_data:
   broker-data:
   minio_data:
+
+

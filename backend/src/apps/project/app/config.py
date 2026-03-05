@@ -2,8 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AmqpDsn, Field
-from pydantic import model_validator
+from pydantic import AmqpDsn, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,10 +52,7 @@ class DatabaseSettings(ConfigABC):
         if self.password is None:
             missing.append("DATABASE_PASSWORD")
         if missing:
-            raise ValueError(
-                "Missing required DB settings for non-sqlite: "
-                + ", ".join(missing)
-            )
+            raise ValueError("Missing required DB settings for non-sqlite: " + ", ".join(missing))
         return self
 
     @property
@@ -102,11 +98,28 @@ class Rabbitmq(ConfigABC):
         )
 
 
+class UserService(ConfigABC):
+    base_url: str = Field(alias="USER_SERVICE_BASE_URL")
+    timeout_seconds: float = Field(alias="USER_SERVICE_TIMEOUT_SECONDS", default=10.0)
+
+
+class Minio(ConfigABC):
+    endpoint_url: str = Field(alias="MINIO_ENDPOINT_URL")
+    region_name: str = Field(alias="MINIO_REGION", default="us-east-1")
+    access_key: str = Field(alias="MINIO_ACCESS_KEY")
+    secret_key: str = Field(alias="MINIO_SECRET_KEY")
+    bucket: str = Field(alias="MINIO_BUCKET", default="project-documents")
+    secure: bool = Field(alias="MINIO_SECURE", default=False)
+    presign_expires_seconds: int = Field(alias="MINIO_PRESIGN_EXPIRES_SECONDS", default=900)
+
+
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
     rabbitmq: Rabbitmq = Rabbitmq()
+    user_service: UserService = UserService()
+    minio: Minio = Minio()
 
 
 @lru_cache(1)

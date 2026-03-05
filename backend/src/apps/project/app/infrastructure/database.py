@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import (
 from app.config import DatabaseSettings, SQLAlchemySettings
 
 
-def get_engine(settings: DatabaseSettings, alchemy: SQLAlchemySettings) -> AsyncEngine:
-    return create_async_engine(
+async def get_engine(
+    settings: DatabaseSettings, alchemy: SQLAlchemySettings
+) -> AsyncIterator[AsyncEngine]:
+    engine = create_async_engine(
         settings.url,
         echo=alchemy.echo,
         echo_pool=alchemy.echo_pool,
@@ -21,6 +23,8 @@ def get_engine(settings: DatabaseSettings, alchemy: SQLAlchemySettings) -> Async
         pool_recycle=alchemy.pool_recycle,
         pool_pre_ping=alchemy.pool_pre_ping,
     )
+    yield engine
+    await engine.dispose()
 
 
 def get_sessionmaker(
@@ -38,3 +42,10 @@ async def get_session(
 ) -> AsyncIterator[AsyncSession]:
     async with sessionmaker() as session:
         yield session
+
+
+async def create_schema(engine: AsyncEngine) -> None:
+    from app.infrastructure.adapters.orm import metadata
+
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)

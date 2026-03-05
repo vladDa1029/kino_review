@@ -2,7 +2,6 @@ from faststream.rabbit import ExchangeType, RabbitBroker, RabbitExchange
 
 from app.application.ports.broker import EventPublisher
 
-
 PROJECT_EVENTS_EXCHANGE = RabbitExchange(
     name="project.events",
     type=ExchangeType.TOPIC,
