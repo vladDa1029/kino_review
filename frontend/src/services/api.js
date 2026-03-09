@@ -25,6 +25,8 @@ export const refreshToken = async () =>
   apiClient('/auth/refresh', {
     method: 'POST',
     withCredentials: true,
+    skipAuth: true,
+    skipJsonContentType: true,
   });
 
 export const logout = async () =>

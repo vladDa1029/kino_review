@@ -23,15 +23,27 @@ const getValidationMessage = (detail) => {
 };
 
 const apiClient = async (endpoint, options = {}) => {
-  const { withCredentials = false, ...fetchOptions } = options;
+  const {
+    withCredentials = false,
+    skipAuth = false,
+    skipJsonContentType = false,
+    ...fetchOptions
+  } = options;
   const token = getAccessToken();
   const tokenType = getTokenType();
+  const hasBody = fetchOptions.body !== undefined && fetchOptions.body !== null;
   const headers = {
-    ...(token ? { Authorization: `${tokenType} ${token}` } : {}),
+    ...(!skipAuth && token ? { Authorization: `${tokenType} ${token}` } : {}),
     ...fetchOptions.headers,
   };
 
-  if (!(fetchOptions.body instanceof FormData) && !(fetchOptions.body instanceof URLSearchParams) && !headers['Content-Type']) {
+  if (
+    hasBody &&
+    !skipJsonContentType &&
+    !(fetchOptions.body instanceof FormData) &&
+    !(fetchOptions.body instanceof URLSearchParams) &&
+    !headers['Content-Type']
+  ) {
     headers['Content-Type'] = 'application/json';
   }
 
