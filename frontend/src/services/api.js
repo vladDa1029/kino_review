@@ -60,3 +60,47 @@ export const updateUserDescription = async (descriptionId, payload) =>
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+
+export const createMicrofon = async (payload) =>
+  apiClient('/user/users/me/microfons', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const listMicrofons = async ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    sort_dir: sortDir,
+  });
+
+  if (sortBy) params.set('sort_by', sortBy);
+  if (type) params.set('type', type);
+  if (search) params.set('search', search);
+  if (createdFrom) params.set('created_from', createdFrom);
+  if (createdTo) params.set('created_to', createdTo);
+
+  return apiClient(`/user/users/me/microfons?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const updateMicrofon = async (microfonId, payload) =>
+  apiClient(`/user/users/me/microfons/${microfonId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteMicrofon = async (microfonId) =>
+  apiClient(`/user/users/me/microfons/${microfonId}`, {
+    method: 'DELETE',
+  });

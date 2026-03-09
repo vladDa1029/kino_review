@@ -62,12 +62,12 @@ const UserList = () => {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Email</th>
+                <th>Почта</th>
                 <th>Имя</th>
                 <th>Телефон</th>
                 <th>Активен</th>
                 <th>Суперпользователь</th>
-                <th>Подтверждён</th>
+                <th>Подтвержден</th>
               </tr>
             </thead>
             <tbody>
@@ -101,7 +101,7 @@ const UserList = () => {
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={pagination.page === pagination.totalPages}
             >
-              Вперёд
+              Вперед
             </button>
           </div>
         </>
@@ -111,4 +111,3 @@ const UserList = () => {
 };
 
 export default UserList;
-

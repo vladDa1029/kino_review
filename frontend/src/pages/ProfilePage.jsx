@@ -71,10 +71,19 @@ const ProfilePage = () => {
 
       if (descriptionId) {
         await updateUserDescription(descriptionId, payload);
+        const freshData = await getUserDescription();
+        setProfile({
+          username: freshData.username || '',
+          phone: freshData.phone || '',
+        });
       } else {
         await createUserDescription(payload);
         const data = await getUserDescription();
         setDescriptionId(data.oid);
+        setProfile({
+          username: data.username || '',
+          phone: data.phone || '',
+        });
       }
 
       toast.success('Описание профиля сохранено');
@@ -114,7 +123,7 @@ const ProfilePage = () => {
                 className={`profile-avatar-preview ${avatarPreview ? '' : 'is-empty'}`}
                 htmlFor="avatar-upload"
               >
-                {avatarPreview ? <img src={avatarPreview} alt="Avatar preview" /> : null}
+                {avatarPreview ? <img src={avatarPreview} alt="Предпросмотр аватара" /> : null}
               </label>
               <input
                 id="avatar-upload"
@@ -133,7 +142,7 @@ const ProfilePage = () => {
                 type="text"
                 value={profile.username}
                 onChange={handleChange}
-                placeholder="Например: Ivan Petrov"
+                placeholder="Например: Иван Петров"
                 className="profile-input"
                 required
               />

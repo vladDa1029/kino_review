@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import * as authApi from '../services/api';
 import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
@@ -58,13 +58,13 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.login(email, password);
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
-          toast.success('Successfully logged in!');
+          toast.success('Вы успешно вошли в систему');
           setIsAuthModalOpen(false);
           return response;
         }
-        throw new Error('Login response does not contain access token');
+        throw new Error('Сервер не вернул токен доступа');
       } catch (error) {
-        toast.error(error.message || 'Login failed');
+        toast.error(error.message || 'Ошибка входа');
         throw error;
       }
     },
@@ -77,14 +77,14 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.register(email, password);
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
-          toast.success('Registration and login successful!');
+          toast.success('Регистрация и вход выполнены успешно');
           setIsAuthModalOpen(false);
           return response;
         }
-        toast.success('Registration successful! Please login.');
+        toast.success('Регистрация завершена. Выполните вход.');
         return response;
       } catch (error) {
-        toast.error(error.message || 'Registration failed');
+        toast.error(error.message || 'Ошибка регистрации');
         throw error;
       }
     },
@@ -95,11 +95,11 @@ export const AuthProvider = ({ children }) => {
     try {
       await authApi.logout();
     } catch {
-      // Ignore backend logout errors and clear local auth state anyway.
+      // Ошибки выхода на бэкенде игнорируем и очищаем локальное состояние.
     } finally {
       clearAccessToken();
       applyToken(null);
-      toast.info('Logged out successfully');
+      toast.info('Вы вышли из системы');
       setIsAuthModalOpen(false);
     }
   }, [applyToken]);

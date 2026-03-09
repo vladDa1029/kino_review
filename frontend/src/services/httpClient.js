@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants';
+﻿import { API_BASE_URL } from '../constants';
 import { getAccessToken, getTokenType } from './tokenStorage';
 
 export class ApiError extends Error {
@@ -50,7 +50,7 @@ const apiClient = async (endpoint, options = {}) => {
       const errorMessage =
         typeof data === 'object' && data !== null
           ? validationMessage || data.detail || data.message || JSON.stringify(data)
-          : data || 'Request failed';
+          : data || 'Ошибка запроса';
 
       throw new ApiError(errorMessage, response.status, data);
     }
@@ -60,7 +60,7 @@ const apiClient = async (endpoint, options = {}) => {
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(error.message || 'Network error', 0, null);
+    throw new ApiError(error.message || 'Ошибка сети', 0, null);
   }
 };
 
