@@ -26,7 +26,7 @@ class BaseEntity(ABC):
         return hash(self.oid)
 
 
-# WARN:  важно для этого сервиса : `is_active`, `is_superuser`, `is_verified`
+# WARN: Не должно быть в сервисе `is_active`, `is_superuser`, `is_verified` так как это не его ответственность
 @dataclass(eq=False, kw_only=True)
 class User(BaseEntity):
     email: Email

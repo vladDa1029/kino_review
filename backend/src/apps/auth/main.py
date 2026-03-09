@@ -34,7 +34,7 @@ config = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    broker: RabbitBroker = cast("RabbitBroker", app.state._broker)
+    broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
 
     await broker.start()
     await broker.declare_exchange(USER_REGISTERED_EXCHANGE)
@@ -42,15 +42,10 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await broker.stop()
-        await cast(AsyncContainer, app.state.dishka_container).aclose()
-
-    yield
-    broker.stop()
-    await cast("AsyncContainer", app.state.dishka_container).close()
+        await cast(AsyncContainer, app.state.dishka_container).close()
 
 
 def setup_start_test_app():
-
     app = FastAPI(lifespan=lifespan, debug=True, title="Сервис авторизации.")
     broker = RabbitBroker(url=config.rabbitmq.url)
     app.state._broker = broker

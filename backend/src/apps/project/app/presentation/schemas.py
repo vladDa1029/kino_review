@@ -1,0 +1,276 @@
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from app.domain.entities import (
+    Document,
+    Project,
+    ProjectMember,
+    Shift,
+    ShiftParticipant,
+    ShiftResourceRequest,
+)
+from app.domain.enums import DocumentType, ProjectRole
+
+
+class ProjectRoleInput(str, Enum):
+    DIRECTOR = "DIRECTOR"
+    PROP_MASTER = "PROP_MASTER"
+    CAMERA = "CAMERA"
+    SOUND = "SOUND"
+    LIGHT = "LIGHT"
+    ACTOR = "ACTOR"
+
+    def to_domain(self) -> ProjectRole:
+        return ProjectRole[self.value]
+
+
+class DocumentTypeInput(str, Enum):
+    PLAN = "PLAN"
+    SCENARIO = "SCENARIO"
+
+    def to_domain(self) -> DocumentType:
+        return DocumentType[self.value]
+
+
+def _to_project_role_input(value: ProjectRole | int) -> ProjectRoleInput:
+    role = value if isinstance(value, ProjectRole) else ProjectRole(int(value))
+    return ProjectRoleInput[role.name]
+
+
+class ProjectCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str = ""
+
+
+class ProjectResponse(BaseModel):
+    oid: UUID
+    title: str
+    description: str
+    owner_id: UUID
+    status: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, project: Project) -> ProjectResponse:
+        return cls(
+            oid=project.oid,
+            title=project.title,
+            description=project.description,
+            owner_id=project.owner_id,
+            status=int(project.status),
+            created_at=project.created_at,
+            updated_at=project.updated_at,
+        )
+
+
+class InviteProjectMemberRequest(BaseModel):
+    user_id: UUID
+    role: ProjectRoleInput = Field(
+        description="Role of invited user. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
+    )
+
+
+class ProjectMemberResponse(BaseModel):
+    oid: UUID
+    project_id: UUID
+    user_id: UUID
+    role: ProjectRoleInput
+    status: int
+    invited_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, member: ProjectMember) -> ProjectMemberResponse:
+        return cls(
+            oid=member.oid,
+            project_id=member.project_id,
+            user_id=member.user_id,
+            role=_to_project_role_input(member.role),
+            status=int(member.status),
+            invited_by=member.invited_by,
+            created_at=member.created_at,
+            updated_at=member.updated_at,
+        )
+
+
+class ChangeProjectMemberRoleRequest(BaseModel):
+    role: ProjectRoleInput = Field(
+        description="New role in project. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
+    )
+
+
+class CreateShiftRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    start_time: datetime
+    end_time: datetime
+
+
+class ShiftResponse(BaseModel):
+    oid: UUID
+    project_id: UUID
+    title: str
+    description: str
+    start_time: datetime
+    end_time: datetime
+    status: int
+    created_by: UUID
+    approved_by: UUID | None
+    approved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, shift: Shift) -> ShiftResponse:
+        return cls(
+            oid=shift.oid,
+            project_id=shift.project_id,
+            title=shift.title,
+            description=shift.description,
+            start_time=shift.start_time,
+            end_time=shift.end_time,
+            status=int(shift.status),
+            created_by=shift.created_by,
+            approved_by=shift.approved_by,
+            approved_at=shift.approved_at,
+            created_at=shift.created_at,
+            updated_at=shift.updated_at,
+        )
+
+
+class InviteShiftParticipantRequest(BaseModel):
+    user_id: UUID
+    role: ProjectRoleInput = Field(
+        description="Participant role. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
+    )
+    time_from: datetime
+    time_to: datetime
+
+
+class ShiftParticipantResponse(BaseModel):
+    oid: UUID
+    shift_id: UUID
+    user_id: UUID
+    role: ProjectRoleInput
+    time_from: datetime
+    time_to: datetime
+    status: int
+    user_reservation_id: UUID | None
+    reserve_failure_reason: str | None
+    added_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, participant: ShiftParticipant) -> ShiftParticipantResponse:
+        return cls(
+            oid=participant.oid,
+            shift_id=participant.shift_id,
+            user_id=participant.user_id,
+            role=_to_project_role_input(participant.role),
+            time_from=participant.time_from,
+            time_to=participant.time_to,
+            status=int(participant.status),
+            user_reservation_id=participant.user_reservation_id,
+            reserve_failure_reason=participant.reserve_failure_reason,
+            added_by=participant.added_by,
+            created_at=participant.created_at,
+            updated_at=participant.updated_at,
+        )
+
+
+class CreateResourceRequestBody(BaseModel):
+    resource_type: str = Field(min_length=1, max_length=64)
+    resource_id: UUID
+    resource_owner_user_id: UUID
+    time_from: datetime
+    time_to: datetime
+
+
+class RejectResourceRequestBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class ShiftResourceRequestResponse(BaseModel):
+    oid: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_type: str
+    resource_id: UUID
+    resource_owner_user_id: UUID
+    requested_by_user_id: UUID
+    time_from: datetime
+    time_to: datetime
+    status: int
+    resource_reservation_id: UUID | None
+    rejection_reason: str | None
+    reserve_failure_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, request: ShiftResourceRequest) -> ShiftResourceRequestResponse:
+        return cls(
+            oid=request.oid,
+            project_id=request.project_id,
+            shift_id=request.shift_id,
+            resource_type=request.resource_type,
+            resource_id=request.resource_id,
+            resource_owner_user_id=request.resource_owner_user_id,
+            requested_by_user_id=request.requested_by_user_id,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            status=int(request.status),
+            resource_reservation_id=request.resource_reservation_id,
+            rejection_reason=request.rejection_reason,
+            reserve_failure_reason=request.reserve_failure_reason,
+            created_at=request.created_at,
+            updated_at=request.updated_at,
+        )
+
+
+class DocumentUploadResponse(BaseModel):
+    oid: UUID
+    shift_id: UUID
+    doc_type: int
+    filename: str
+    title: str
+    storage_key: str
+    bucket: str
+    mime_type: str
+    size: int
+    owner_id: UUID
+    description: str | None
+    version: int
+    status: int
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, document: Document) -> DocumentUploadResponse:
+        return cls(
+            oid=document.oid,
+            shift_id=document.shift_id,
+            doc_type=int(document.doc_type),
+            filename=document.filename,
+            title=document.title,
+            storage_key=document.storage_key,
+            bucket=document.bucket,
+            mime_type=document.mime_type,
+            size=document.size,
+            owner_id=document.owner_id,
+            description=document.description,
+            version=document.version,
+            status=int(document.status),
+            created_at=document.created_at,
+        )
+
+
+class DocumentDownloadUrlResponse(BaseModel):
+    download_url: str
