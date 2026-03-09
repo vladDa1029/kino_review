@@ -106,3 +106,135 @@ export const deleteMicrofon = async (microfonId) =>
   apiClient(`/user/users/me/microfons/${microfonId}`, {
     method: 'DELETE',
   });
+
+export const createCamera = async (payload) =>
+  apiClient('/user/users/me/cameras', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const listCameras = async ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    sort_dir: sortDir,
+  });
+
+  if (sortBy) params.set('sort_by', sortBy);
+  if (type) params.set('type', type);
+  if (search) params.set('search', search);
+  if (createdFrom) params.set('created_from', createdFrom);
+  if (createdTo) params.set('created_to', createdTo);
+
+  return apiClient(`/user/users/me/cameras?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const updateCamera = async (cameraId, payload) =>
+  apiClient(`/user/users/me/cameras/${cameraId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteCamera = async (cameraId) =>
+  apiClient(`/user/users/me/cameras/${cameraId}`, {
+    method: 'DELETE',
+  });
+
+export const createCameraTripod = async (payload) =>
+  apiClient('/user/users/me/camera-tripods', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const listCameraTripods = async ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    sort_dir: sortDir,
+  });
+
+  if (sortBy) params.set('sort_by', sortBy);
+  if (type) params.set('type', type);
+  if (search) params.set('search', search);
+  if (createdFrom) params.set('created_from', createdFrom);
+  if (createdTo) params.set('created_to', createdTo);
+
+  return apiClient(`/user/users/me/camera-tripods?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const updateCameraTripod = async (cameraTripodId, payload) =>
+  apiClient(`/user/users/me/camera-tripods/${cameraTripodId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteCameraTripod = async (cameraTripodId) =>
+  apiClient(`/user/users/me/camera-tripods/${cameraTripodId}`, {
+    method: 'DELETE',
+  });
+
+export const createLight = async (payload) =>
+  apiClient('/user/users/me/lights', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const listLights = async ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    sort_dir: sortDir,
+  });
+
+  if (sortBy) params.set('sort_by', sortBy);
+  if (type) params.set('type', type);
+  if (search) params.set('search', search);
+  if (createdFrom) params.set('created_from', createdFrom);
+  if (createdTo) params.set('created_to', createdTo);
+
+  return apiClient(`/user/users/me/lights?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const updateLight = async (lightId, payload) =>
+  apiClient(`/user/users/me/lights/${lightId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteLight = async (lightId) =>
+  apiClient(`/user/users/me/lights/${lightId}`, {
+    method: 'DELETE',
+  });

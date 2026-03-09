@@ -4,6 +4,7 @@ import * as authApi from '../services/api';
 import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
 import { clearAccessToken, getAccessToken, setAccessToken, setTokenType } from '../services/tokenStorage';
 import { AuthContext } from './authContextInstance';
+import { ApiError } from '../services/httpClient';
 
 export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(() => getAccessToken());
@@ -28,11 +29,20 @@ export const AuthProvider = ({ children }) => {
       }
       applyToken(null);
       return null;
-    } catch {
-      applyToken(null);
-      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 0) {
+        // Сетевая/CORS ошибка: не сбрасываем сессию, чтобы не разлогинивать пользователя.
+        return token;
+      }
+
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        applyToken(null);
+        return null;
+      }
+
+      return token;
     }
-  }, [applyToken]);
+  }, [applyToken, token]);
 
   useEffect(() => {
     setIsAuthReady(true);
