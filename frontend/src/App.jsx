@@ -16,9 +16,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedMode = localStorage.getItem('darkMode');
-    setDarkMode(savedMode ? savedMode === 'true' : prefersDark);
+    setDarkMode(savedMode ? savedMode === 'true' : true);
   }, []);
 
   useEffect(() => {
@@ -36,23 +35,23 @@ function App() {
       <AppToastContainer darkMode={darkMode} />
       <header className="app-header">
         <div className="logo-container">
-          <h1 className="logo">ShotTracker</h1>
+          <h1 className="logo">KinoFlow</h1>
         </div>
         <nav className="nav-links">
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#about">About</a>
+          <a href="#features">Возможности</a>
+          <a href="#pricing">Тарифы</a>
+          <a href="#about">О платформе</a>
         </nav>
         <div className="header-controls">
           <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} />
           {token ? (
-            <button className="auth-btn" onClick={handleLogout}>Logout</button>
+            <button className="auth-btn" onClick={handleLogout}>Выйти</button>
           ) : (
             <button
               className="auth-btn"
               onClick={() => setIsAuthModalOpen(true)}
             >
-              Sign In
+              Войти
             </button>
           )}
         </div>

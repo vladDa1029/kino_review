@@ -43,3 +43,20 @@ export const getUsers = async (page = 1, pageSize = 5) => {
     method: 'GET',
   });
 };
+
+export const createUserDescription = async (payload) =>
+  apiClient('/user/users/me/description', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const getUserDescription = async () =>
+  apiClient('/user/users/me/description', {
+    method: 'GET',
+  });
+
+export const updateUserDescription = async (descriptionId, payload) =>
+  apiClient(`/user/users/me/description/${descriptionId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });

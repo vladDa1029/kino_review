@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/useAuth';
 import { getUsers } from '../services/api';
 
@@ -10,7 +10,7 @@ const UserList = () => {
     page: 1,
     pageSize: 5,
     totalPages: 1,
-    totalCount: 0
+    totalCount: 0,
   });
 
   const { token } = useAuth();
@@ -19,12 +19,12 @@ const UserList = () => {
     try {
       setLoading(true);
       const response = await getUsers(pagination.page, pagination.pageSize);
-      
+
       setUsers(response.users);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         totalPages: response.pages,
-        totalCount: response.total_count
+        totalCount: response.total_count,
       }));
     } catch (err) {
       setError(err.message);
@@ -39,7 +39,7 @@ const UserList = () => {
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({ ...prev, page: newPage }));
+      setPagination((prev) => ({ ...prev, page: newPage }));
     }
   };
 
@@ -63,16 +63,20 @@ const UserList = () => {
               <tr>
                 <th>ID</th>
                 <th>Email</th>
+                <th>Имя</th>
+                <th>Телефон</th>
                 <th>Активен</th>
                 <th>Суперпользователь</th>
                 <th>Подтверждён</th>
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.map((user) => (
                 <tr key={user.oid}>
                   <td>{user.oid}</td>
                   <td>{user.email}</td>
+                  <td>{user.username ?? user.description?.username ?? '-'}</td>
+                  <td>{user.phone ?? user.description?.phone ?? '-'}</td>
                   <td>{user.is_active ? 'Да' : 'Нет'}</td>
                   <td>{user.is_superuser ? 'Да' : 'Нет'}</td>
                   <td>{user.is_verified ? 'Да' : 'Нет'}</td>
@@ -80,20 +84,20 @@ const UserList = () => {
               ))}
             </tbody>
           </table>
-          
+
           <div className="pagination">
-            <button 
+            <button
               onClick={() => handlePageChange(pagination.page - 1)}
               disabled={pagination.page === 1}
             >
               Назад
             </button>
-            
+
             <span>
               Страница {pagination.page} из {pagination.totalPages}
             </span>
-            
-            <button 
+
+            <button
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={pagination.page === pagination.totalPages}
             >
@@ -107,3 +111,4 @@ const UserList = () => {
 };
 
 export default UserList;
+

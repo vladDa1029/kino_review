@@ -1,12 +1,21 @@
-import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { ApiError } from '../services/httpClient';
+import {
+  createUserDescription,
+  getUserDescription,
+  updateUserDescription,
+} from '../services/api';
 
 const ProfilePage = () => {
   const [profile, setProfile] = useState({
-    name: '',
-    bio: '',
-    location: '',
-    website: '',
+    username: '',
+    phone: '',
   });
+  const [descriptionId, setDescriptionId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState('');
 
   const handleChange = (event) => {
@@ -29,81 +38,125 @@ const ProfilePage = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (event) => {
+  useEffect(() => {
+    const loadDescription = async () => {
+      try {
+        const data = await getUserDescription();
+        setDescriptionId(data.oid);
+        setProfile({
+          username: data.username || '',
+          phone: data.phone || '',
+        });
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 404) {
+          toast.error(error.message || 'Не удалось загрузить описание профиля');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDescription();
+  }, []);
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        username: profile.username.trim(),
+        phone: profile.phone.trim(),
+      };
+
+      if (descriptionId) {
+        await updateUserDescription(descriptionId, payload);
+      } else {
+        await createUserDescription(payload);
+        const data = await getUserDescription();
+        setDescriptionId(data.oid);
+      }
+
+      toast.success('Описание профиля сохранено');
+    } catch (error) {
+      toast.error(error.message || 'Не удалось сохранить описание профиля');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <section className="profile-page">
-      <form className="profile-card" onSubmit={handleSubmit}>
-        <h2>Профиль</h2>
-
-        <div className="profile-avatar-block">
-          <label
-            className={`profile-avatar-preview ${avatarPreview ? '' : 'is-empty'}`}
-            htmlFor="avatar-upload"
+      <div className="profile-page-inner">
+        <div className="page-switcher">
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => `switcher-btn ${isActive ? 'active' : ''}`}
           >
-            {avatarPreview ? <img src={avatarPreview} alt="Avatar preview" /> : null}
-          </label>
-          <input
-            id="avatar-upload"
-            className="profile-avatar-input"
-            type="file"
-            accept="image/*"
-            onChange={handleAvatarChange}
-          />
+            Профиль
+          </NavLink>
+          <NavLink
+            to="/projects"
+            className={({ isActive }) => `switcher-btn ${isActive ? 'active' : ''}`}
+          >
+            Рабочая зона
+          </NavLink>
         </div>
 
-        <div className="profile-fields">
-          <label htmlFor="profile-name">Имя</label>
-          <input
-            id="profile-name"
-            name="name"
-            type="text"
-            value={profile.name}
-            onChange={handleChange}
-            placeholder="Введите имя"
-            className="profile-input"
-          />
+        {isLoading ? (
+          <div className="profile-card">Загрузка профиля...</div>
+        ) : (
+          <form className="profile-card" onSubmit={handleSubmit}>
+            <h2>Профиль</h2>
 
-          <label htmlFor="profile-bio">Описание</label>
-          <textarea
-            id="profile-bio"
-            name="bio"
-            value={profile.bio}
-            onChange={handleChange}
-            placeholder="Расскажите о себе"
-            className="profile-textarea"
-            rows={4}
-          />
+            <div className="profile-avatar-block">
+              <label
+                className={`profile-avatar-preview ${avatarPreview ? '' : 'is-empty'}`}
+                htmlFor="avatar-upload"
+              >
+                {avatarPreview ? <img src={avatarPreview} alt="Avatar preview" /> : null}
+              </label>
+              <input
+                id="avatar-upload"
+                className="profile-avatar-input"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+              />
+            </div>
 
-          <label htmlFor="profile-location">Город</label>
-          <input
-            id="profile-location"
-            name="location"
-            type="text"
-            value={profile.location}
-            onChange={handleChange}
-            placeholder="Например: Москва"
-            className="profile-input"
-          />
+            <div className="profile-fields">
+              <label htmlFor="profile-username">Имя пользователя</label>
+              <input
+                id="profile-username"
+                name="username"
+                type="text"
+                value={profile.username}
+                onChange={handleChange}
+                placeholder="Например: Ivan Petrov"
+                className="profile-input"
+                required
+              />
 
-          <label htmlFor="profile-website">Сайт</label>
-          <input
-            id="profile-website"
-            name="website"
-            type="url"
-            value={profile.website}
-            onChange={handleChange}
-            placeholder="https://example.com"
-            className="profile-input"
-          />
-        </div>
+              <label htmlFor="profile-phone">Телефон</label>
+              <input
+                id="profile-phone"
+                name="phone"
+                type="tel"
+                value={profile.phone}
+                onChange={handleChange}
+                placeholder="+79991234567"
+                className="profile-input"
+                required
+              />
+            </div>
 
-        <button type="submit" className="profile-save-btn">
-          Сохранить
-        </button>
-      </form>
+            <button type="submit" className="profile-save-btn" disabled={isSubmitting}>
+              {isSubmitting ? 'Сохранение...' : 'Сохранить'}
+            </button>
+          </form>
+        )}
+      </div>
     </section>
   );
 };
