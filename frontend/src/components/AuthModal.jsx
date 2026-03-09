@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
@@ -63,6 +64,7 @@ const EyeOffIcon = () => (
 
 const AuthModal = ({ showAuth, setShowAuth }) => {
   const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -94,12 +96,20 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
     }
 
     try {
+      let response;
       if (isLogin) {
-        await handleLogin(formData.email, formData.password);
+        response = await handleLogin(formData.email, formData.password);
       } else {
-        await handleRegister(formData.email, formData.password);
-        setIsLogin(true);
+        response = await handleRegister(formData.email, formData.password);
+        if (!response?.access_token) {
+          setIsLogin(true);
+        }
       }
+
+      if (response?.access_token) {
+        navigate('/profile');
+      }
+
       setFormData({ email: '', password: '' });
     } catch {
       // Error handling is managed in auth methods.

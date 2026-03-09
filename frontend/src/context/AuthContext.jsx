@@ -71,16 +71,25 @@ export const AuthProvider = ({ children }) => {
     [applyToken],
   );
 
-  const handleRegister = useCallback(async (email, password) => {
-    try {
-      const response = await authApi.register(email, password);
-      toast.success('Registration successful! Please login.');
-      return response;
-    } catch (error) {
-      toast.error(error.message || 'Registration failed');
-      throw error;
-    }
-  }, []);
+  const handleRegister = useCallback(
+    async (email, password) => {
+      try {
+        const response = await authApi.register(email, password);
+        if (response?.access_token) {
+          applyToken(response.access_token, response.token_type);
+          toast.success('Registration and login successful!');
+          setIsAuthModalOpen(false);
+          return response;
+        }
+        toast.success('Registration successful! Please login.');
+        return response;
+      } catch (error) {
+        toast.error(error.message || 'Registration failed');
+        throw error;
+      }
+    },
+    [applyToken],
+  );
 
   const handleLogout = useCallback(async () => {
     try {

@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/useAuth';
 import HomePage from './pages/HomePage';
 import Projects from './pages/Projects';
+import ProfilePage from './pages/ProfilePage';
 import AuthModal from './components/AuthModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeToggle from './components/ThemeToggle';
@@ -60,7 +61,9 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage onOpenAuth={() => setIsAuthModalOpen(true)} />} />
         <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><UserList /></ProtectedRoute>} />
+        <Route path="/welcome" element={<ProtectedRoute><UserList /></ProtectedRoute>} />
       </Routes>
 
       <AuthModal
