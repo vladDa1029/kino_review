@@ -15,7 +15,7 @@ const ThemeToggle = ({ darkMode, onToggle }) => {
     <button
       className="theme-toggle"
       onClick={toggle}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему'}
     >
       {isDark ? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">

@@ -1,4 +1,4 @@
-export const checkPasswordStrength = (pass) => {
+﻿export const checkPasswordStrength = (pass) => {
   const requirements = {
     length: pass.length >= 8,
     uppercase: /[A-Z]/.test(pass),
@@ -15,11 +15,11 @@ export const getPasswordStrengthColor = (strength) => {
 };
 
 export const getPasswordHint = (pass, requirements) => {
-  if (!pass) return 'Enter your password';
+  if (!pass) return 'Введите пароль';
   const missing = [];
-  if (!requirements.length) missing.push('at least 8 characters');
-  if (!requirements.uppercase) missing.push('one uppercase letter');
-  if (!requirements.number) missing.push('one number');
-  if (!requirements.specialChar) missing.push('one special character');
-  return missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Strong password!';
+  if (!requirements.length) missing.push('не менее 8 символов');
+  if (!requirements.uppercase) missing.push('одну заглавную букву');
+  if (!requirements.number) missing.push('одну цифру');
+  if (!requirements.specialChar) missing.push('один спецсимвол');
+  return missing.length > 0 ? `Нужно добавить: ${missing.join(', ')}` : 'Пароль достаточно надежный';
 };

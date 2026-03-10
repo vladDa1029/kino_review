@@ -1,4 +1,5 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
@@ -63,6 +64,7 @@ const EyeOffIcon = () => (
 
 const AuthModal = ({ showAuth, setShowAuth }) => {
   const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -94,15 +96,23 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
     }
 
     try {
+      let response;
       if (isLogin) {
-        await handleLogin(formData.email, formData.password);
+        response = await handleLogin(formData.email, formData.password);
       } else {
-        await handleRegister(formData.email, formData.password);
-        setIsLogin(true);
+        response = await handleRegister(formData.email, formData.password);
+        if (!response?.access_token) {
+          setIsLogin(true);
+        }
       }
+
+      if (response?.access_token) {
+        navigate('/profile');
+      }
+
       setFormData({ email: '', password: '' });
     } catch {
-      // Error handling is managed in auth methods.
+      // Обработка ошибок выполняется внутри auth-методов.
     }
   };
 
@@ -114,13 +124,13 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
             <button className="close-btn" onClick={() => setShowAuth(false)}>
               &times;
             </button>
-            <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+            <h2>{isLogin ? 'С возвращением' : 'Создать аккаунт'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <input
                   type="email"
                   name="email"
-                  placeholder="Email Address"
+                  placeholder="Электронная почта"
                   className="form-input"
                   value={formData.email}
                   onChange={handleInputChange}
@@ -133,7 +143,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
-                    placeholder="Password"
+                    placeholder="Пароль"
                     className="form-input"
                     value={formData.password}
                     onChange={handleInputChange}
@@ -142,7 +152,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                   <button
                     type="button"
                     className="password-toggle"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -162,15 +172,15 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                 className="auth-submit-btn"
                 disabled={!isLogin && passwordStrength < 3}
               >
-                {isLogin ? 'Sign In' : 'Sign Up'}
+                {isLogin ? 'Войти' : 'Зарегистрироваться'}
               </button>
 
               <p className="auth-switch">
                 {isLogin
-                  ? "Don't have an account? "
-                  : 'Already have an account? '}
+                  ? 'Нет аккаунта? '
+                  : 'Уже есть аккаунт? '}
                 <span onClick={() => setIsLogin(!isLogin)} className="switch-link">
-                  {isLogin ? 'Sign up' : 'Sign in'}
+                  {isLogin ? 'Регистрация' : 'Вход'}
                 </span>
               </p>
             </form>

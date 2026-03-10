@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import * as authApi from '../services/api';
 import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
 import { clearAccessToken, getAccessToken, setAccessToken, setTokenType } from '../services/tokenStorage';
 import { AuthContext } from './authContextInstance';
+import { ApiError } from '../services/httpClient';
 
 export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(() => getAccessToken());
@@ -28,11 +29,20 @@ export const AuthProvider = ({ children }) => {
       }
       applyToken(null);
       return null;
-    } catch {
-      applyToken(null);
-      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 0) {
+        // Сетевая/CORS ошибка: не сбрасываем сессию, чтобы не разлогинивать пользователя.
+        return token;
+      }
+
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        applyToken(null);
+        return null;
+      }
+
+      return token;
     }
-  }, [applyToken]);
+  }, [applyToken, token]);
 
   useEffect(() => {
     setIsAuthReady(true);
@@ -58,39 +68,48 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.login(email, password);
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
-          toast.success('Successfully logged in!');
+          toast.success('Вы успешно вошли в систему');
           setIsAuthModalOpen(false);
           return response;
         }
-        throw new Error('Login response does not contain access token');
+        throw new Error('Сервер не вернул токен доступа');
       } catch (error) {
-        toast.error(error.message || 'Login failed');
+        toast.error(error.message || 'Ошибка входа');
         throw error;
       }
     },
     [applyToken],
   );
 
-  const handleRegister = useCallback(async (email, password) => {
-    try {
-      const response = await authApi.register(email, password);
-      toast.success('Registration successful! Please login.');
-      return response;
-    } catch (error) {
-      toast.error(error.message || 'Registration failed');
-      throw error;
-    }
-  }, []);
+  const handleRegister = useCallback(
+    async (email, password) => {
+      try {
+        const response = await authApi.register(email, password);
+        if (response?.access_token) {
+          applyToken(response.access_token, response.token_type);
+          toast.success('Регистрация и вход выполнены успешно');
+          setIsAuthModalOpen(false);
+          return response;
+        }
+        toast.success('Регистрация завершена. Выполните вход.');
+        return response;
+      } catch (error) {
+        toast.error(error.message || 'Ошибка регистрации');
+        throw error;
+      }
+    },
+    [applyToken],
+  );
 
   const handleLogout = useCallback(async () => {
     try {
       await authApi.logout();
     } catch {
-      // Ignore backend logout errors and clear local auth state anyway.
+      // Ошибки выхода на бэкенде игнорируем и очищаем локальное состояние.
     } finally {
       clearAccessToken();
       applyToken(null);
-      toast.info('Logged out successfully');
+      toast.info('Вы вышли из системы');
       setIsAuthModalOpen(false);
     }
   }, [applyToken]);
