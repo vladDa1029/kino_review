@@ -19,6 +19,10 @@ class Log(ConfigABC):
         alias="LOG_LEVEL",
         default="INFO",
     )
+    third_party_level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"] = Field(
+        alias="LOG_THIRD_PARTY_LEVEL",
+        default="WARNING",
+    )
     format: str = Field(
         alias="LOG_FORMAT",
         default="%(levelname)-10s%(asctime)-25s %(name)s - %(funcName)-15s: %(lineno)-5d - %(message)3s",
@@ -67,7 +71,7 @@ class DatabaseSettings(ConfigABC):
 
 
 class SQLAlchemySettings(ConfigABC):
-    echo: bool = True
+    echo: bool = False
     echo_pool: bool = False
     pool_size: int = 5
     max_overflow: int = 10
@@ -103,6 +107,13 @@ class UserService(ConfigABC):
     timeout_seconds: float = Field(alias="USER_SERVICE_TIMEOUT_SECONDS", default=10.0)
 
 
+class ReservationOutbox(ConfigABC):
+    poll_interval_seconds: float = Field(
+        alias="RESERVATION_OUTBOX_POLL_INTERVAL_SECONDS",
+        default=5.0,
+    )
+
+
 class Minio(ConfigABC):
     endpoint_url: str = Field(alias="MINIO_ENDPOINT_URL")
     region_name: str = Field(alias="MINIO_REGION", default="us-east-1")
@@ -119,6 +130,7 @@ class Settings(ConfigABC):
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
     rabbitmq: Rabbitmq = Rabbitmq()
     user_service: UserService = UserService()
+    reservation_outbox: ReservationOutbox = ReservationOutbox()
     minio: Minio = Minio()
 
 

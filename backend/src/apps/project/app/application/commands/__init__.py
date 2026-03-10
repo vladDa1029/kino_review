@@ -2,6 +2,7 @@ from app.application.commands.documents import (
     UploadShiftDocumentCommand,
     UploadShiftDocumentHandler,
 )
+from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
 from app.application.commands.participants import (
     ConfirmShiftParticipantCommand,
     ConfirmShiftParticipantHandler,
@@ -11,12 +12,20 @@ from app.application.commands.participants import (
     InviteShiftParticipantHandler,
 )
 from app.application.commands.projects import (
+    ApproveProjectMemberInvitationCommand,
+    ApproveProjectMemberInvitationHandler,
     ChangeProjectMemberRoleCommand,
     ChangeProjectMemberRoleHandler,
     CreateProjectCommand,
     CreateProjectHandler,
+    DeleteProjectCommand,
+    DeleteProjectHandler,
     InviteProjectMemberCommand,
     InviteProjectMemberHandler,
+    RemoveProjectMemberCommand,
+    RemoveProjectMemberHandler,
+    UpdateProjectCommand,
+    UpdateProjectHandler,
 )
 from app.application.commands.resources import (
     ApproveResourceRequestCommand,
@@ -36,10 +45,18 @@ from app.application.commands.shifts import (
 __all__ = [
     "CreateProjectCommand",
     "CreateProjectHandler",
+    "DeleteProjectCommand",
+    "DeleteProjectHandler",
+    "UpdateProjectCommand",
+    "UpdateProjectHandler",
     "InviteProjectMemberCommand",
     "InviteProjectMemberHandler",
     "ChangeProjectMemberRoleCommand",
     "ChangeProjectMemberRoleHandler",
+    "ApproveProjectMemberInvitationCommand",
+    "ApproveProjectMemberInvitationHandler",
+    "RemoveProjectMemberCommand",
+    "RemoveProjectMemberHandler",
     "CreateShiftCommand",
     "CreateShiftHandler",
     "ApproveShiftCommand",
@@ -52,6 +69,7 @@ __all__ = [
     "DeclineShiftParticipantHandler",
     "UploadShiftDocumentCommand",
     "UploadShiftDocumentHandler",
+    "ProcessReservationOutboxHandler",
     "CreateResourceRequestCommand",
     "CreateResourceRequestHandler",
     "ApproveResourceRequestCommand",

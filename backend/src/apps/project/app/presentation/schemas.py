@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -17,7 +17,7 @@ from app.domain.entities import (
 from app.domain.enums import DocumentType, ProjectRole
 
 
-class ProjectRoleInput(str, Enum):
+class ProjectRoleInput(StrEnum):
     DIRECTOR = "DIRECTOR"
     PROP_MASTER = "PROP_MASTER"
     CAMERA = "CAMERA"
@@ -29,7 +29,7 @@ class ProjectRoleInput(str, Enum):
         return ProjectRole[self.value]
 
 
-class DocumentTypeInput(str, Enum):
+class DocumentTypeInput(StrEnum):
     PLAN = "PLAN"
     SCENARIO = "SCENARIO"
 
@@ -45,6 +45,11 @@ def _to_project_role_input(value: ProjectRole | int) -> ProjectRoleInput:
 class ProjectCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str = ""
+
+
+class ProjectUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class ProjectResponse(BaseModel):
@@ -67,6 +72,10 @@ class ProjectResponse(BaseModel):
             created_at=project.created_at,
             updated_at=project.updated_at,
         )
+
+
+class ProjectListResponse(BaseModel):
+    items: list[ProjectResponse]
 
 
 class InviteProjectMemberRequest(BaseModel):
@@ -104,6 +113,48 @@ class ChangeProjectMemberRoleRequest(BaseModel):
     role: ProjectRoleInput = Field(
         description="New role in project. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
     )
+
+
+class ProjectMemberShortResponse(BaseModel):
+    oid: UUID
+    user_id: UUID
+    role: ProjectRoleInput
+    status: int
+    invited_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectMemberShortListResponse(BaseModel):
+    items: list[ProjectMemberShortResponse]
+
+
+class ProjectMemberListResponse(BaseModel):
+    items: list[ProjectMemberShortResponse]
+
+
+class ResourceTimeWindowResponse(BaseModel):
+    window_id: UUID
+    start_time: datetime
+    end_time: datetime
+    status: str
+
+
+class ProjectResourceResponse(BaseModel):
+    resource_kind: str
+    resource_id: UUID
+    title: str
+    description: str
+    resource_type: str | None
+    size: str | None
+    created_at: datetime | None
+    windows: list[ResourceTimeWindowResponse]
+
+
+class ProjectUserResourcesResponse(BaseModel):
+    user_id: UUID
+    role: ProjectRoleInput
+    resources: list[ProjectResourceResponse]
 
 
 class CreateShiftRequest(BaseModel):
@@ -274,3 +325,9 @@ class DocumentUploadResponse(BaseModel):
 
 class DocumentDownloadUrlResponse(BaseModel):
     download_url: str
+
+
+class BrokerProjectMemberInvitationApproved(BaseModel):
+    project_id: UUID
+    user_id: UUID
+    approved_by_user_id: UUID | None = None

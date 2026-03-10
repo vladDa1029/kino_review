@@ -65,11 +65,22 @@ from app.application.queries.images import (
     ListRequisiteImagesHandler,
 )
 from app.application.queries.description import GetDescriptionHandler
+from app.application.queries.equipment_free_times import (
+    ListCameraFreeTimesHandler,
+    ListCameraTripodFreeTimesHandler,
+    ListLightFreeTimesHandler,
+    ListLightTripodFreeTimesHandler,
+    ListMicrofonFreeTimesHandler,
+    ListRequisiteFreeTimesHandler,
+    ListSoundFreeTimesHandler,
+)
+from app.application.queries.users import GetUserExistsHandler
 from app.application.queries.spare_times import (
     GetUserSpareTimeHandler,
     ListUserSpareTimesHandler,
 )
 from app.application.ports.repositories import (
+    AvailabilityReservationRepository,
     CameraFreeTimeRepository,
     CameraRepository,
     CameraTripodRepository,
@@ -116,6 +127,7 @@ from app.domain.specification.time_overlap import NonOverlappingTimeSpec
 from app.domain.specification.time_within import TimeWithinWindowSpec
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.repository import (
+    AvailabilityReservationSqlAlchemyRepository,
     CameraFreeTimeSqlAlchemyRepository,
     CameraSqlAlchemyRepository,
     CameraTripodSqlAlchemyRepository,
@@ -215,6 +227,10 @@ def repository_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=UserSqlAlchemyRepository, provides=UserRepository)
     provider.provide(
+        source=AvailabilityReservationSqlAlchemyRepository,
+        provides=AvailabilityReservationRepository,
+    )
+    provider.provide(
         source=DescriptionSqlAlchemyRepository, provides=DescriptionRepository
     )
     provider.provide(source=SpareTimeSqlAlchemyRepository, provides=SpareTimeRepository)
@@ -303,6 +319,14 @@ def use_case_provider() -> Provider:
     provider.provide(source=ListRequisiteImagesHandler)
     provider.provide(source=GetRequisiteImageHandler)
     provider.provide(source=GetDescriptionHandler)
+    provider.provide(source=GetUserExistsHandler)
+    provider.provide(source=ListMicrofonFreeTimesHandler)
+    provider.provide(source=ListCameraFreeTimesHandler)
+    provider.provide(source=ListCameraTripodFreeTimesHandler)
+    provider.provide(source=ListLightFreeTimesHandler)
+    provider.provide(source=ListLightTripodFreeTimesHandler)
+    provider.provide(source=ListSoundFreeTimesHandler)
+    provider.provide(source=ListRequisiteFreeTimesHandler)
     provider.provide(source=ListUserSpareTimesHandler)
     provider.provide(source=GetUserSpareTimeHandler)
     provider.provide(source=UpdateCameraHandler)

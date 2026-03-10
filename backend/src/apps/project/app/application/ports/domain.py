@@ -7,6 +7,7 @@ from app.domain.entities import (
     Document,
     Project,
     ProjectMember,
+    ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
     ShiftResourceRequest,
@@ -30,12 +31,18 @@ class ProjectRepository(Protocol):
     async def get_by_id(self, project_id: UUID) -> Project | None:
         raise NotImplementedError
 
+    async def list_by_user(self, user_id: UUID, *, include_archived: bool = False) -> list[Project]:
+        raise NotImplementedError
+
     async def update(self, project: Project) -> None:
         raise NotImplementedError
 
 
 class ProjectMemberRepository(Protocol):
     async def add(self, member: ProjectMember) -> None:
+        raise NotImplementedError
+
+    async def list_by_project(self, project_id: UUID) -> list[ProjectMember]:
         raise NotImplementedError
 
     async def get_by_project_and_user(
@@ -94,13 +101,56 @@ class ResourceRequestRepository(Protocol):
         raise NotImplementedError
 
 
+class ReservationOutboxRepository(Protocol):
+    async def add(self, message: ReservationOutboxMessage) -> None:
+        raise NotImplementedError
+
+    async def get_by_id(self, message_id: UUID) -> ReservationOutboxMessage | None:
+        raise NotImplementedError
+
+    async def list_pending(self, *, limit: int) -> list[ReservationOutboxMessage]:
+        raise NotImplementedError
+
+    async def update(self, message: ReservationOutboxMessage) -> None:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class UserResourceTimeWindow:
+    window_id: UUID
+    start_time: datetime
+    end_time: datetime
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class UserResourceItem:
+    resource_kind: str
+    resource_id: UUID
+    title: str
+    description: str
+    resource_type: str | None
+    size: str | None
+    created_at: datetime | None
+    windows: tuple[UserResourceTimeWindow, ...] = ()
+
+
 class UserServicePort(Protocol):
     async def ensure_user_exists(self, user_id: UUID) -> None:
+        raise NotImplementedError
+
+    async def list_user_resources(
+        self,
+        *,
+        user_id: UUID,
+        resource_kinds: tuple[str, ...],
+    ) -> list[UserResourceItem]:
         raise NotImplementedError
 
     async def reserve_user_time(
         self,
         *,
+        request_id: UUID,
         user_id: UUID,
         time_from: datetime,
         time_to: datetime,
@@ -113,6 +163,7 @@ class UserServicePort(Protocol):
     async def reserve_resource_time(
         self,
         *,
+        request_id: UUID,
         owner_user_id: UUID,
         resource_id: UUID,
         time_from: datetime,

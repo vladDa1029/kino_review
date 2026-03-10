@@ -6,7 +6,9 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 import httpx
 
+from app.application.errors import AccessDeniedError
 from app.config import ProtectedPathsSettings, Services
+from app.presentation.access import ensure_admin_payload
 
 router = APIRouter(
     prefix="/user",
@@ -227,10 +229,7 @@ def _ensure_admin(request: Request) -> None:
     payload = getattr(request.state, "user_payload", None)
     if not payload:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    is_superuser = payload.get("is_superuser")
-    if is_superuser is True:
-        return
-    raise HTTPException(status_code=403, detail="Admin access required")
+    ensure_admin_payload(payload)
 
 
 async def fetch_and_patch_openapi(

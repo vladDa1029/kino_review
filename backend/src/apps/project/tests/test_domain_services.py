@@ -72,6 +72,45 @@ def test_project_membership_invite_requires_director() -> None:
         )
 
 
+def test_project_membership_activate_invited_member() -> None:
+    service = ProjectMembershipService()
+    now = utc_now()
+    member = ProjectMember(
+        oid=uuid4(),
+        project_id=uuid4(),
+        user_id=uuid4(),
+        role=ProjectRole.CAMERA,
+        status=ProjectMemberStatus.INVITED,
+        invited_by=uuid4(),
+        created_at=now,
+        updated_at=now,
+    )
+
+    later = now + timedelta(minutes=5)
+    service.activate_member(member=member, now=later)
+
+    assert member.status == ProjectMemberStatus.ACTIVE
+    assert member.updated_at == later
+
+
+def test_project_membership_activate_only_invited_allowed() -> None:
+    service = ProjectMembershipService()
+    now = utc_now()
+    member = ProjectMember(
+        oid=uuid4(),
+        project_id=uuid4(),
+        user_id=uuid4(),
+        role=ProjectRole.CAMERA,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=uuid4(),
+        created_at=now,
+        updated_at=now,
+    )
+
+    with pytest.raises(StateTransitionError):
+        service.activate_member(member=member, now=now + timedelta(minutes=1))
+
+
 def test_shift_participant_must_fit_shift_interval() -> None:
     service = ShiftParticipantService()
     now = utc_now()

@@ -6,10 +6,13 @@ from app.application.ports.domain import (
     IdGeneratorPort,
     ProjectMemberRepository,
     ProjectRepository,
+    ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
     ShiftRepository,
     StoredFile,
+    UserResourceItem,
+    UserResourceTimeWindow,
     UserServicePort,
 )
 from app.application.ports.transaction import TransactionManager
@@ -25,7 +28,10 @@ __all__ = [
     "ShiftParticipantRepository",
     "DocumentRepository",
     "ResourceRequestRepository",
+    "ReservationOutboxRepository",
     "UserServicePort",
     "DocumentStoragePort",
     "StoredFile",
+    "UserResourceItem",
+    "UserResourceTimeWindow",
 ]

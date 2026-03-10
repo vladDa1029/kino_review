@@ -7,7 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ConfigABC(BaseSettings, ABC):
-
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
         env_file_encoding="utf-8",
@@ -16,7 +15,6 @@ class ConfigABC(BaseSettings, ABC):
 
 
 class Log(ConfigABC):
-
     level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"] = Field(
         alias="LOG_LEVEL",
         default="WARNING",

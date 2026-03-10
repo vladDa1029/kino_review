@@ -17,7 +17,9 @@ class DescriptionService:
     single_policy: SingleDescriptionPolicy = field(
         default_factory=SingleDescriptionPolicy
     )
-    identity_spec: DescriptionIdentitySpec = field(default_factory=DescriptionIdentitySpec)
+    identity_spec: DescriptionIdentitySpec = field(
+        default_factory=DescriptionIdentitySpec
+    )
 
     def create_description(
         self,

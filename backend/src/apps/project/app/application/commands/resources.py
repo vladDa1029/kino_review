@@ -2,11 +2,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from app.application.commands.reservation_outbox import (
+    OUTBOX_STATUS_PENDING,
+    ProcessReservationOutboxHandler,
+    RESOURCE_RESERVE_OPERATION,
+    build_resource_reservation_request_id,
+)
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
     ClockPort,
     IdGeneratorPort,
     ProjectMemberRepository,
+    ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftRepository,
     UserServicePort,
@@ -18,7 +25,8 @@ from app.application.support import (
     require_resource_request,
     require_shift,
 )
-from app.domain.entities import ShiftResourceRequest
+from app.domain.entities import ReservationOutboxMessage, ShiftResourceRequest
+from app.domain.errors.business import ExternalServiceError
 from app.domain.services import ResourceRequestService
 
 
@@ -108,6 +116,8 @@ class ApproveResourceRequestHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         user_service: UserServicePort,
+        reservation_outbox: ReservationOutboxRepository,
+        reservation_processor: ProcessReservationOutboxHandler,
         resource_requests: ResourceRequestRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
@@ -115,6 +125,8 @@ class ApproveResourceRequestHandler:
         self._clock = clock
         self._publisher = publisher
         self._user_service = user_service
+        self._reservation_outbox = reservation_outbox
+        self._reservation_processor = reservation_processor
         self._resource_requests = resource_requests
         self._resource_request_service = resource_request_service
 
@@ -124,6 +136,7 @@ class ApproveResourceRequestHandler:
             resource_requests=self._resource_requests,
             request_id=command.request_id,
         )
+        request_key = build_resource_reservation_request_id(request.oid)
         try:
             self._resource_request_service.approve(
                 request=request,
@@ -132,62 +145,30 @@ class ApproveResourceRequestHandler:
             )
             self._resource_request_service.mark_reserving(request=request, now=now)
             await self._resource_requests.update(request)
-
-            reservation_id = await self._user_service.reserve_resource_time(
-                owner_user_id=request.resource_owner_user_id,
-                resource_id=request.resource_id,
-                time_from=request.time_from,
-                time_to=request.time_to,
-                project_id=request.project_id,
-                shift_id=request.shift_id,
-                entity_id=request.oid,
+            await self._reservation_outbox.add(
+                ReservationOutboxMessage(
+                    oid=request_key,
+                    operation=RESOURCE_RESERVE_OPERATION,
+                    aggregate_id=request.oid,
+                    status=OUTBOX_STATUS_PENDING,
+                    attempts=0,
+                    created_at=now,
+                    updated_at=now,
+                )
             )
-            self._resource_request_service.mark_reserved(
-                request=request,
-                reservation_id=reservation_id,
-                now=self._clock.now(),
-            )
-            await self._resource_requests.update(request)
             await self._tx.commit()
-        except Exception as exc:
-            failed_marked = await self._try_mark_reserve_failed(
-                request=request,
-                reason=str(exc),
-            )
-            if failed_marked:
-                await self._tx.commit()
-            else:
-                await self._tx.rollback()
+        except Exception:
+            await self._tx.rollback()
             raise
 
-        await publish_best_effort(
-            publisher=self._publisher,
-            topic="shift.resource_request_reserved",
-            payload={
-                "project_id": str(request.project_id),
-                "shift_id": str(request.shift_id),
-                "request_id": str(request.oid),
-                "resource_reservation_id": str(request.resource_reservation_id),
-            },
+        result = await self._reservation_processor.process_message(request_key)
+        request = await require_resource_request(
+            resource_requests=self._resource_requests,
+            request_id=command.request_id,
         )
+        if result.status == "failed":
+            raise ExternalServiceError(result.error or "Resource reservation failed.")
         return request
-
-    async def _try_mark_reserve_failed(
-        self,
-        *,
-        request: ShiftResourceRequest,
-        reason: str,
-    ) -> bool:
-        try:
-            self._resource_request_service.mark_reserve_failed(
-                request=request,
-                reason=reason,
-                now=self._clock.now(),
-            )
-            await self._resource_requests.update(request)
-            return True
-        except Exception:
-            return False
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

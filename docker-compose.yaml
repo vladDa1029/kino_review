@@ -90,6 +90,7 @@ services:
     environment:
       DATABASE_HOST: pg
       DATABASE_PORT_NETWORK: 5432
+      USER_SERVICE_BASE_URL: http://user:8002
     volumes:
       - ./backend/src/apps/project/app:/app/app
     command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8003"]

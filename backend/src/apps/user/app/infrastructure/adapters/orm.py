@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import composite, registry, relationship
 
 from app.domain.entity.base import (
+    AvailabilityReservation,
     Camera,
     CameraTripod,
     Description,
@@ -65,6 +66,23 @@ descriptions = Table(
     ),
     Column("username", String(255), nullable=False),
     Column("phone", String(32), nullable=False),
+)
+
+availability_reservations = Table(
+    "availability_reservations",
+    metadata,
+    Column("oid", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "user_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.oid"),
+        nullable=False,
+    ),
+    Column("obj_id", UUID(as_uuid=True), nullable=False),
+    Column("start_time", DateTime(timezone=True), nullable=False),
+    Column("end_time", DateTime(timezone=True), nullable=False),
+    Column("reservation_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), default=datetime.now, nullable=False),
 )
 
 free_users_timing = Table(
@@ -321,6 +339,20 @@ def start_mappers() -> None:
             "username": descriptions.c.username,
             "phone": composite(Phone, descriptions.c.phone),
             "user": relationship("User", back_populates="description"),
+        },
+        column_prefix="_",
+    )
+    mapper_registry.map_imperatively(
+        AvailabilityReservation,
+        availability_reservations,
+        properties={
+            "oid": availability_reservations.c.oid,
+            "user_id": availability_reservations.c.user_id,
+            "obj_id": availability_reservations.c.obj_id,
+            "start_time": availability_reservations.c.start_time,
+            "end_time": availability_reservations.c.end_time,
+            "reservation_id": availability_reservations.c.reservation_id,
+            "created_at": availability_reservations.c.created_at,
         },
         column_prefix="_",
     )

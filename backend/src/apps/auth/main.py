@@ -8,6 +8,7 @@ import structlog
 from faststream.rabbit import RabbitBroker
 
 from app.application.errors.errors import (
+    AccessDeniedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
     UserAlreadyError,
@@ -81,6 +82,10 @@ def setup_start_test_app():
     app.add_exception_handler(
         PasswordOrLogInincorrectError,
         handlers.password_or_login_incorrect_error_handler,
+    )
+    app.add_exception_handler(
+        AccessDeniedError,
+        handlers.access_denied_error_handler,
     )
 
     start_mappers()

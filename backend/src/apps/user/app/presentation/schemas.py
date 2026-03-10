@@ -42,10 +42,15 @@ class SpareTimeListResponse(BaseModel):
 
 
 class ReserveAvailabilityRequest(BaseModel):
+    request_id: UUID = Field(examples=["8a0c6d4a-5d90-4b1b-8f4c-33df0f2a0ad7"])
     owner_id: UUID = Field(examples=["4a117f56-0f02-4d4d-9c25-51b2a778b6f6"])
     obj_id: UUID = Field(examples=["5f6a3b8f-3f68-4b15-9f1b-7f5c0b2f5c9a"])
     start_time: datetime = Field(examples=["2026-01-15T10:00:00Z"])
     end_time: datetime = Field(examples=["2026-01-15T12:00:00Z"])
+
+
+class ReserveAvailabilityResponse(BaseModel):
+    reservation_id: UUID = Field(examples=["5f6a3b8f-3f68-4b15-9f1b-7f5c0b2f5c9a"])
 
 
 class EquipmentCreateRequest(BaseModel):

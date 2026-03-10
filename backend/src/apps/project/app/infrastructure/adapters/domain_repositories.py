@@ -8,6 +8,7 @@ from app.application.ports.domain import (
     DocumentRepository,
     ProjectMemberRepository,
     ProjectRepository,
+    ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
     ShiftRepository,
@@ -16,11 +17,14 @@ from app.domain.entities import (
     Document,
     Project,
     ProjectMember,
+    ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
     ShiftResourceRequest,
 )
-from app.infrastructure.adapters.orm import shift_participants, users_project_role
+from app.domain.enums import ProjectMemberStatus, ProjectStatus
+from app.infrastructure.adapters.orm import projects as projects_table
+from app.infrastructure.adapters.orm import reservation_outbox, shift_participants, users_project_role
 
 T = TypeVar("T")
 
@@ -44,12 +48,32 @@ class SqlAlchemyProjectRepository(SqlAlchemyRepository[Project], ProjectReposito
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Project)
 
+    async def list_by_user(self, user_id: UUID, *, include_archived: bool = False) -> list[Project]:
+        stmt = (
+            select(Project)
+            .join(
+                users_project_role,
+                users_project_role.c.project_id == projects_table.c.oid,
+            )
+            .where(
+                users_project_role.c.user_id == user_id,
+                users_project_role.c.status == int(ProjectMemberStatus.ACTIVE),
+            )
+        )
+        if not include_archived:
+            stmt = stmt.where(projects_table.c.status != int(ProjectStatus.ARCHIVED))
+        return list((await self._session.execute(stmt)).scalars().all())
+
 
 class SqlAlchemyProjectMemberRepository(
     SqlAlchemyRepository[ProjectMember], ProjectMemberRepository
 ):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, ProjectMember)
+
+    async def list_by_project(self, project_id: UUID) -> list[ProjectMember]:
+        stmt = select(ProjectMember).where(users_project_role.c.project_id == project_id)
+        return list((await self._session.execute(stmt)).scalars().all())
 
     async def get_by_project_and_user(
         self, project_id: UUID, user_id: UUID
@@ -90,3 +114,26 @@ class SqlAlchemyResourceRequestRepository(
 ):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, ShiftResourceRequest)
+
+
+class SqlAlchemyReservationOutboxRepository(ReservationOutboxRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, message: ReservationOutboxMessage) -> None:
+        self._session.add(message)
+
+    async def get_by_id(self, message_id: UUID) -> ReservationOutboxMessage | None:
+        return await self._session.get(ReservationOutboxMessage, message_id)
+
+    async def list_pending(self, *, limit: int) -> list[ReservationOutboxMessage]:
+        stmt = (
+            select(ReservationOutboxMessage)
+            .where(reservation_outbox.c.status == "pending")
+            .order_by(reservation_outbox.c.created_at.asc())
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
+    async def update(self, message: ReservationOutboxMessage) -> None:
+        self._session.add(message)

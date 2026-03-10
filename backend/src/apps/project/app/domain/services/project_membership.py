@@ -96,3 +96,16 @@ class ProjectMembershipService:
             raise StateTransitionError("Cannot change role for removed member.")
         target.role = role
         target.updated_at = now
+
+    def remove_member(
+        self,
+        *,
+        actor: ProjectMember,
+        target: ProjectMember,
+        now: datetime,
+    ) -> None:
+        self.director_policy.check(actor, action="remove project member")
+        if target.status == ProjectMemberStatus.REMOVED:
+            raise StateTransitionError("Project member is already removed.")
+        target.status = ProjectMemberStatus.REMOVED
+        target.updated_at = now

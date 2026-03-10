@@ -1,3 +1,4 @@
+import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -8,6 +9,8 @@ from app.domain.errors.business import (
     ExternalServiceError,
     StateTransitionError,
 )
+
+log = structlog.get_logger(__file__)
 
 
 async def application_error_handler(
@@ -23,4 +26,12 @@ async def application_error_handler(
         status_code = 409
     elif isinstance(exc, ExternalServiceError):
         status_code = 502
+    log.warning(
+        "application.error",
+        path=request.url.path,
+        method=request.method,
+        status_code=status_code,
+        error_type=exc.__class__.__name__,
+        detail=str(exc),
+    )
     return JSONResponse(status_code=status_code, content={"detail": str(exc)})

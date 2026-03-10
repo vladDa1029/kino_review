@@ -179,9 +179,7 @@ class AddCameraTripodFreeTimeHandler:
     ) -> None:
         self._user_repository = user_repository
         self._camera_tripod_repository = camera_tripod_repository
-        self._camera_tripod_free_time_repository = (
-            camera_tripod_free_time_repository
-        )
+        self._camera_tripod_free_time_repository = camera_tripod_free_time_repository
         self._transaction = transaction
         self._id_generator = id_generator
         self._service = service
@@ -281,9 +279,7 @@ class AddLightTripodFreeTimeHandler:
         if user is None:
             raise UserNotFoundError("User not found.")
 
-        light_tripod = await self._light_tripod_repository.get(
-            command.light_tripod_id
-        )
+        light_tripod = await self._light_tripod_repository.get(command.light_tripod_id)
         if light_tripod is None:
             raise EntityNotFoundError("LightTripod")
 

@@ -2,19 +2,23 @@ import math
 from typing import Annotated
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Cookie, Depends, Response, Query
+from fastapi import APIRouter, Cookie, Depends, Header, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from faststream.rabbit import RabbitBroker
+from app.application.common.filters import Filter
 from app.application.common.pagination import Pagination
+from app.application.common.sorting import Sorting
 from app.application.use_case.authenticate_uc import JWTAuthServices
 from app.infrastructure.adapters.repository import UserAbstractRepository
+from app.presentations.access import ensure_admin_headers
 from app.presentations.schemas import (
     BrokerUserRegistered,
+    ListRequest,
     UserCreateRequest,
     UserGetForAdminResponse,
     UserGetResponse,
     TokenResponse,
-    UsersGetResponse,
+    ListUsersGetResponse,
 )
 from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 
@@ -22,6 +26,16 @@ router = APIRouter(tags=["auth"], route_class=DishkaRoute)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+
+def require_admin_access(
+    x_user_token_type: Annotated[str | None, Header(alias="X-User-Token-Type")] = None,
+    x_user_is_superuser: Annotated[str | None, Header(alias="X-User-Is-Superuser")] = None,
+) -> None:
+    ensure_admin_headers(
+        x_user_token_type=x_user_token_type,
+        x_user_is_superuser=x_user_is_superuser,
+    )
 
 
 @router.post(
@@ -67,7 +81,6 @@ async def login(
     authser: FromDishka[JWTAuthServices],
     response: Response,
 ) -> TokenResponse:
-
     tokens = await authser.login(form.username, form.password)
 
     response.set_cookie(
@@ -134,17 +147,30 @@ async def logout(response: Response, authser: FromDishka[JWTAuthServices]) -> st
 )
 async def get_users(
     user_repo: FromDishka[UserAbstractRepository],
-    page: int = Query(1, ge=1),
-    page_size: int = Query(5, ge=1, le=100),
-) -> UsersGetResponse:
+    param: ListRequest = Depends(),
+    _: None = Depends(require_admin_access),
+) -> ListUsersGetResponse:
     pagination = Pagination(
-        page=page,
-        page_size=page_size,
+        page=param.page,
+        page_size=param.page_size,
     )
-    users = await user_repo.list(pagination)
+    if param.sort_by is None:
+        sorting = None
+    else:
+        sorting = Sorting(
+            field=param.sort_by,
+            direction=param.sort_dir,
+        )
+    filter = Filter(
+        base_id=param.base_id,
+        created_from=param.created_from,
+        created_to=param.created_to,
+    )
+
+    users = await user_repo.list(filters=filter, pagination=pagination, sorting=sorting)
     total_count = await user_repo.count()
     total_page = math.ceil(total_count / pagination.page_size)
-    response = UsersGetResponse(
+    response = ListUsersGetResponse(
         users=[
             UserGetForAdminResponse(
                 oid=str(user.oid),

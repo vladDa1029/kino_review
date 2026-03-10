@@ -9,6 +9,7 @@ from app.application.common.sorting import EquipmentSorting
 from app.application.errors.query_param import FilterError, SortingError
 from app.application.ports.repository import Repository
 from app.domain.entity.base import (
+    AvailabilityReservation,
     BaseId,
     Camera,
     CameraTripod,
@@ -100,9 +101,7 @@ class SqlAlchemyFreeTimeRepository(Repository[Spare_time]):
             "status": str(entity.status),
         }
         stmt = (
-            update(self._table)
-            .where(self._table.c.oid == entity.oid)
-            .values(**values)
+            update(self._table).where(self._table.c.oid == entity.oid).values(**values)
         )
         await self._session.execute(stmt)
 
@@ -139,9 +138,7 @@ def _apply_equipment_filters(stmt, model: type[T], filters: EquipmentFilters | N
     return stmt
 
 
-def _apply_equipment_sorting(
-    stmt, model: type[T], sorting: EquipmentSorting | None
-):
+def _apply_equipment_sorting(stmt, model: type[T], sorting: EquipmentSorting | None):
     if sorting is None:
         return stmt
     column = getattr(model, sorting.field, None)
@@ -212,6 +209,11 @@ class SpareTimeSqlAlchemyRepository(SqlAlchemyRepository[Spare_time]):
         return list(result.scalars().all())
 
 
+class AvailabilityReservationSqlAlchemyRepository(SqlAlchemyRepository[AvailabilityReservation]):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, AvailabilityReservation)
+
+
 class MicrofonSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Microfon]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Microfon)
@@ -219,7 +221,9 @@ class MicrofonSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Microfon]):
 
 class MicrofonFreeTimeSqlAlchemyRepository(SqlAlchemyFreeTimeRepository):
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, microfon_free_times, microfon_free_times.c.microfon_id)
+        super().__init__(
+            session, microfon_free_times, microfon_free_times.c.microfon_id
+        )
 
 
 class CameraSqlAlchemyRepository(SqlAlchemyEquipmentRepository[Camera]):

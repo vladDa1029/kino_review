@@ -7,6 +7,7 @@ from starlette.types import ASGIApp
 
 from app.config import AuthGatewaySettings
 from app.infrastructure.security.jwt_validator import JWTValidator, JWTValidationError
+from app.presentation.middleware.user_headers import build_user_headers
 
 
 class AuthGatewayMiddleware(BaseHTTPMiddleware):
@@ -47,7 +48,11 @@ class AuthGatewayMiddleware(BaseHTTPMiddleware):
         if not user_id:
             return JSONResponse(status_code=401, content={"detail": "Invalid token"})
 
-        request.state.user_headers = _build_user_headers(user_id, token_type)
+        request.state.user_headers = build_user_headers(
+            user_id=user_id,
+            token_type=token_type,
+            is_superuser=payload.get("is_superuser"),
+        )
         request.state.user_payload = payload
 
         return await call_next(request)
@@ -72,10 +77,3 @@ def _extract_bearer_token(request: Request) -> str | None:
         return None
     token = parts[1].strip()
     return token or None
-
-
-def _build_user_headers(user_id: str, token_type: str | None) -> dict[str, str]:
-    headers = {"x-user-id": str(user_id)}
-    if token_type:
-        headers["x-user-token-type"] = str(token_type)
-    return headers

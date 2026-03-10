@@ -1,16 +1,17 @@
-
 from typing import AsyncIterator
-from sqlalchemy.ext.asyncio import  AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.config import DatabaseSettings, SQLAlchemySettings
 
 
-
-
-# Хз как работать с эти генератором TODO: требуется разобраться
 async def get_engine(
-        postgres_config: DatabaseSettings,
-        alchemy_config: SQLAlchemySettings,
+    postgres_config: DatabaseSettings,
+    alchemy_config: SQLAlchemySettings,
 ) -> AsyncIterator[AsyncEngine]:
     """Creates and manages the lifecycle of an async SQLAlchemy engine.
 
@@ -44,8 +45,8 @@ async def get_engine(
 
 
 async def get_sessionmaker(
-        engine: AsyncEngine,
-        alchemy_config: SQLAlchemySettings,
+    engine: AsyncEngine,
+    alchemy_config: SQLAlchemySettings,
 ) -> async_sessionmaker[AsyncSession]:
     """Creates an async session factory bound to an engine.
 
@@ -71,7 +72,7 @@ async def get_sessionmaker(
 
 
 async def get_session(
-        session_factory: async_sessionmaker[AsyncSession],
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncIterator[AsyncSession]:
     """Provides an async database session context manager.
 
@@ -92,4 +93,3 @@ async def get_session(
     """
     async with session_factory() as session:
         yield session
-

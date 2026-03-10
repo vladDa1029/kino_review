@@ -7,6 +7,7 @@ from app.domain.entities import (
     Document,
     Project,
     ProjectMember,
+    ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
     ShiftResourceRequest,
@@ -147,6 +148,19 @@ shift_resource_requests = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
 )
 
+reservation_outbox = Table(
+    "reservation_outbox",
+    metadata,
+    Column("oid", Uuid(as_uuid=True), primary_key=True),
+    Column("operation", String(64), nullable=False),
+    Column("aggregate_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("status", String(32), nullable=False, index=True),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("last_error", String(2000), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+    Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+)
+
 
 def start_mappers() -> None:
     mapper_registry.map_imperatively(
@@ -259,6 +273,21 @@ def start_mappers() -> None:
             "created_at": shift_resource_requests.c.created_at,
             "updated_at": shift_resource_requests.c.updated_at,
             "interval": composite(TimeInterval, "time_from", "time_to"),
+        },
+        column_prefix="_",
+    )
+    mapper_registry.map_imperatively(
+        ReservationOutboxMessage,
+        reservation_outbox,
+        properties={
+            "oid": reservation_outbox.c.oid,
+            "operation": reservation_outbox.c.operation,
+            "aggregate_id": reservation_outbox.c.aggregate_id,
+            "status": reservation_outbox.c.status,
+            "attempts": reservation_outbox.c.attempts,
+            "last_error": reservation_outbox.c.last_error,
+            "created_at": reservation_outbox.c.created_at,
+            "updated_at": reservation_outbox.c.updated_at,
         },
         column_prefix="_",
     )

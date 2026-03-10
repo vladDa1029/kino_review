@@ -5,6 +5,8 @@ from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.commands import (
+    ApproveProjectMemberInvitationHandler,
+    ProcessReservationOutboxHandler,
     ApproveResourceRequestHandler,
     ApproveShiftHandler,
     ChangeProjectMemberRoleHandler,
@@ -13,9 +15,12 @@ from app.application.commands import (
     CreateResourceRequestHandler,
     CreateShiftHandler,
     DeclineShiftParticipantHandler,
+    DeleteProjectHandler,
     InviteProjectMemberHandler,
     InviteShiftParticipantHandler,
     RejectResourceRequestHandler,
+    RemoveProjectMemberHandler,
+    UpdateProjectHandler,
     UploadShiftDocumentHandler,
 )
 from app.application.ports.broker import EventPublisher
@@ -26,6 +31,7 @@ from app.application.ports.domain import (
     IdGeneratorPort,
     ProjectMemberRepository,
     ProjectRepository,
+    ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
     ShiftRepository,
@@ -34,12 +40,22 @@ from app.application.ports.domain import (
 from app.application.ports.transaction import TransactionManager
 from app.application.queries.documents import GetDocumentDownloadUrlHandler
 from app.application.queries.health import HealthHandler
+from app.application.queries.projects import (
+    GetProjectHandler,
+    ListActorProjectsHandler,
+)
+from app.application.queries.resources import (
+    GetProjectMemberHandler,
+    GetProjectUserResourcesHandler,
+    ListProjectMembersHandler,
+)
 from app.application.support import SystemClock
 from app.config import (
     DatabaseSettings,
     Log,
     Minio,
     Rabbitmq,
+    ReservationOutbox,
     SQLAlchemySettings,
     UserService,
 )
@@ -59,6 +75,7 @@ from app.infrastructure.adapters.domain_repositories import (
     SqlAlchemyDocumentRepository,
     SqlAlchemyProjectMemberRepository,
     SqlAlchemyProjectRepository,
+    SqlAlchemyReservationOutboxRepository,
     SqlAlchemyResourceRequestRepository,
     SqlAlchemyShiftParticipantRepository,
     SqlAlchemyShiftRepository,
@@ -85,6 +102,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=Rabbitmq)
     provider.from_context(provides=RabbitBroker)
     provider.from_context(provides=UserService)
+    provider.from_context(provides=ReservationOutbox)
     provider.from_context(provides=Minio)
     return provider
 
@@ -116,6 +134,10 @@ def adapters_provider() -> Provider:
     )
     provider.provide(source=SqlAlchemyDocumentRepository, provides=DocumentRepository)
     provider.provide(source=SqlAlchemyResourceRequestRepository, provides=ResourceRequestRepository)
+    provider.provide(
+        source=SqlAlchemyReservationOutboxRepository,
+        provides=ReservationOutboxRepository,
+    )
     return provider
 
 
@@ -137,10 +159,19 @@ def domain_services_provider() -> Provider:
 def use_case_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=HealthHandler)
+    provider.provide(source=GetProjectHandler)
+    provider.provide(source=ListActorProjectsHandler)
     provider.provide(source=GetDocumentDownloadUrlHandler)
+    provider.provide(source=GetProjectMemberHandler)
+    provider.provide(source=GetProjectUserResourcesHandler)
+    provider.provide(source=ListProjectMembersHandler)
     provider.provide(source=CreateProjectHandler)
+    provider.provide(source=UpdateProjectHandler)
+    provider.provide(source=DeleteProjectHandler)
     provider.provide(source=InviteProjectMemberHandler)
+    provider.provide(source=ApproveProjectMemberInvitationHandler)
     provider.provide(source=ChangeProjectMemberRoleHandler)
+    provider.provide(source=RemoveProjectMemberHandler)
     provider.provide(source=CreateShiftHandler)
     provider.provide(source=ApproveShiftHandler)
     provider.provide(source=InviteShiftParticipantHandler)
@@ -150,6 +181,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=CreateResourceRequestHandler)
     provider.provide(source=ApproveResourceRequestHandler)
     provider.provide(source=RejectResourceRequestHandler)
+    provider.provide(source=ProcessReservationOutboxHandler)
     return provider
 
 

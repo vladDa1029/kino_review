@@ -47,7 +47,6 @@ class TransactionManagerAlchemy(TransactionManager):
         try:
             await self._session.commit()
         except SQLAlchemyError as err:
-
             raise CommitError(DB_COMMIT_FAILED) from err
 
     @override
@@ -62,5 +61,4 @@ class TransactionManagerAlchemy(TransactionManager):
         try:
             await self._session.rollback()
         except SQLAlchemyError as err:
-
             raise RollbackError(DB_ROLLBACK_FAILED) from err

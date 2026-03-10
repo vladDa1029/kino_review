@@ -275,6 +275,8 @@ erDiagram
 
 Резерв:
 - `POST /users/{user_id}/availability/reserve`
+- тело: `request_id`, `owner_id`, `obj_id`, `start_time`, `end_time`
+- ответ: `{"reservation_id": "<uuid>"}` на успешный reserve
 
 Оборудование (create/update/delete/list):
 - `microfons`

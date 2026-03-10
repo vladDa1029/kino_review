@@ -1,9 +1,35 @@
 import logging
+from collections.abc import Iterable
 
 import structlog
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 
 from app.config import Log
+
+NOISY_LIBRARY_LOGGERS: tuple[str, ...] = (
+    "uvicorn",
+    "uvicorn.access",
+    "fastapi",
+    "starlette",
+    "sqlalchemy",
+    "sqlalchemy.engine",
+    "sqlalchemy.pool",
+    "httpx",
+    "httpcore",
+    "aio_pika",
+    "aiormq",
+    "aioamqp",
+    "pamqp",
+    "faststream",
+    "botocore",
+    "boto3",
+    "urllib3",
+)
+
+
+def _set_log_level_for_loggers(loggers: Iterable[str], level: str) -> None:
+    for logger_name in loggers:
+        logging.getLogger(logger_name).setLevel(level.upper())
 
 
 def configure_logging(settings: Log) -> None:
@@ -42,7 +68,10 @@ def configure_logging(settings: Log) -> None:
         handlers=[handler],
         level=settings.level.upper(),
         format=settings.format,
+        force=True,
     )
+    logging.captureWarnings(True)
+    _set_log_level_for_loggers(NOISY_LIBRARY_LOGGERS, settings.third_party_level)
 
     structlog.configure(
         processors=common_processors + structlog_processors,

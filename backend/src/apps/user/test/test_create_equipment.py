@@ -28,7 +28,12 @@ from app.domain.entity.base import (
     Sound,
 )
 from app.domain.service.equipment_service import EquipmentService
-from test.helpers import FakeEntityRepository, FakeIdGenerator, FakeTransaction, make_user
+from test.helpers import (
+    FakeEntityRepository,
+    FakeIdGenerator,
+    FakeTransaction,
+    make_user,
+)
 
 
 CREATE_CASES = [

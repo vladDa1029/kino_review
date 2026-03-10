@@ -63,6 +63,16 @@ class Spare_time(BaseEntity):
 
 
 @dataclass(eq=False, kw_only=True)
+class AvailabilityReservation(BaseEntity):
+    user_id: BaseId
+    obj_id: BaseId
+    start_time: datetime
+    end_time: datetime
+    reservation_id: BaseId
+    created_at: datetime
+
+
+@dataclass(eq=False, kw_only=True)
 class Microfon(BaseEntity):
     users_id: BaseId
     title: str

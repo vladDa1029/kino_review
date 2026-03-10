@@ -15,7 +15,7 @@ from app.domain.enums import (
 from app.domain.value_objects import TimeInterval
 
 
-@dataclass(slots=True)
+@dataclass
 class Project:
     title: str
     description: str
@@ -26,7 +26,7 @@ class Project:
     updated_at: datetime
 
 
-@dataclass(slots=True)
+@dataclass
 class ProjectMember:
     project_id: UUID
     user_id: UUID
@@ -42,7 +42,7 @@ class ProjectMember:
         return self.status == ProjectMemberStatus.ACTIVE
 
 
-@dataclass(slots=True)
+@dataclass
 class Shift:
     oid: UUID
     project_id: UUID
@@ -62,7 +62,7 @@ class Shift:
         return TimeInterval(start=self.start_time, end=self.end_time)
 
 
-@dataclass(slots=True)
+@dataclass
 class ShiftParticipant:
     oid: UUID
     shift_id: UUID
@@ -82,7 +82,7 @@ class ShiftParticipant:
         return TimeInterval(start=self.time_from, end=self.time_to)
 
 
-@dataclass(slots=True)
+@dataclass
 class Document:
     oid: UUID
     shift_id: UUID
@@ -100,7 +100,7 @@ class Document:
     description: str | None = None
 
 
-@dataclass(slots=True)
+@dataclass
 class ShiftResourceRequest:
     oid: UUID
     project_id: UUID
@@ -121,3 +121,15 @@ class ShiftResourceRequest:
     @property
     def interval(self) -> TimeInterval:
         return TimeInterval(start=self.time_from, end=self.time_to)
+
+
+@dataclass
+class ReservationOutboxMessage:
+    oid: UUID
+    operation: str
+    aggregate_id: UUID
+    status: str
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+    last_error: str | None = None

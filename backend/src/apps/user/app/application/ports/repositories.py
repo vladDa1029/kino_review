@@ -5,6 +5,7 @@ from app.application.common.pagination import Pagination
 from app.application.common.sorting import EquipmentSorting
 from app.application.ports.repository import Repository
 from app.domain.entity.base import (
+    AvailabilityReservation,
     BaseId,
     Camera,
     CameraTripod,
@@ -46,6 +47,10 @@ class FreeTimeRepository(Repository[Spare_time], Protocol):
 
 class SpareTimeRepository(FreeTimeRepository, Protocol):
     """User free time repository port."""
+
+
+class AvailabilityReservationRepository(Repository[AvailabilityReservation], Protocol):
+    """Idempotency store for reserve operations."""
 
 
 class MicrofonFreeTimeRepository(FreeTimeRepository, Protocol):

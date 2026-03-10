@@ -4,12 +4,14 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.application.errors.errors import (
+    AccessDeniedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
     UserAlreadyError,
 )
 from app.infrastructure.constants import (
     PASSWORD_OR_LOGIN_INCORRECT,
+    TOKEN_PERMISSION_DENIED,
     TOKEN_INVALID,
     TOKEN_SIGNATURE_INVALID,
     USER_ALREADY_EXISTS,
@@ -46,4 +48,11 @@ async def password_or_login_incorrect_error_handler(
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={"message": PASSWORD_OR_LOGIN_INCORRECT},
+    )
+
+
+async def access_denied_error_handler(request: Request, exc: AccessDeniedError):
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={"message": TOKEN_PERMISSION_DENIED},
     )

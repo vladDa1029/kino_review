@@ -66,7 +66,9 @@ class FakeSpareTimeRepository(FakeEntityRepository):
 
 class FakeImageRepository(FakeEntityRepository):
     async def list_by_requisite_id(self, requisite_id: BaseId):
-        return [item for item in self._items.values() if item.requisite_id == requisite_id]
+        return [
+            item for item in self._items.values() if item.requisite_id == requisite_id
+        ]
 
 
 def make_user(user_id: BaseId, is_active: bool = True) -> User:

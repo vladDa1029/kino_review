@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import Annotated, List
+from typing import Annotated, List, Literal, Optional
+from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
+
+from app.application.common.pagination import MAX_PAGE_SIZE
 
 
 class UserCreateRequest(BaseModel):
-
     email: Annotated[
         EmailStr,
         Field(
@@ -40,7 +42,7 @@ class UserGetForAdminResponse(BaseModel):
     is_verified: bool
 
 
-class UsersGetResponse(BaseModel):
+class ListUsersGetResponse(BaseModel):
     users: List[UserGetForAdminResponse]
     total_count: int
     pages: int
@@ -69,3 +71,19 @@ class BrokerUserRegistered(BaseModel):
     is_verified: bool
     is_superuser: bool
     create_at: datetime
+
+
+class ListRequest(BaseModel):
+    base_id: Optional[UUID] = None
+    page: Annotated[int, Field(1, ge=1)]
+    page_size: Annotated[int, Field(20, ge=1, le=MAX_PAGE_SIZE)]
+    sort_by: Literal["create_at", "is_active", "is_superuser", "is_verified"] | None = (
+        None
+    )
+    sort_dir: Literal["asc", "desc"] = "asc"
+    search: str | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+
+
+# WARN: Здесь остановился нужно дописать схему, handler и endpoint

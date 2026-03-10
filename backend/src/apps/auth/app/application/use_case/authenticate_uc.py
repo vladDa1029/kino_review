@@ -35,7 +35,6 @@ class JWTAuthServices:
         self.generation = generation
 
     async def register(self, email: str, password: str, **data: dict) -> User:
-
         user = User(
             oid=self.generation(),
             email=Email(email),

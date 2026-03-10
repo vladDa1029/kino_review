@@ -2,11 +2,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from app.application.commands.reservation_outbox import (
+    OUTBOX_STATUS_PENDING,
+    PARTICIPANT_RESERVE_OPERATION,
+    ProcessReservationOutboxHandler,
+    build_participant_reservation_request_id,
+)
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
     ClockPort,
     IdGeneratorPort,
     ProjectMemberRepository,
+    ReservationOutboxRepository,
     ShiftParticipantRepository,
     ShiftRepository,
     UserServicePort,
@@ -18,7 +25,8 @@ from app.application.support import (
     require_participant,
     require_shift,
 )
-from app.domain.entities import ShiftParticipant
+from app.domain.entities import ReservationOutboxMessage, ShiftParticipant
+from app.domain.errors.business import ExternalServiceError
 from app.domain.enums import ProjectRole
 from app.domain.services import ShiftParticipantService
 
@@ -118,6 +126,8 @@ class ConfirmShiftParticipantHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         user_service: UserServicePort,
+        reservation_outbox: ReservationOutboxRepository,
+        reservation_processor: ProcessReservationOutboxHandler,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
         shift_participant_service: ShiftParticipantService,
@@ -126,6 +136,8 @@ class ConfirmShiftParticipantHandler:
         self._clock = clock
         self._publisher = publisher
         self._user_service = user_service
+        self._reservation_outbox = reservation_outbox
+        self._reservation_processor = reservation_processor
         self._shifts = shifts
         self._shift_participants = shift_participants
         self._shift_participant_service = shift_participant_service
@@ -137,6 +149,7 @@ class ConfirmShiftParticipantHandler:
             participant_id=command.participant_id,
         )
         shift = await require_shift(shifts=self._shifts, shift_id=participant.shift_id)
+        request_id = build_participant_reservation_request_id(participant.oid)
         try:
             self._shift_participant_service.confirm(
                 participant=participant,
@@ -145,56 +158,30 @@ class ConfirmShiftParticipantHandler:
             )
             self._shift_participant_service.mark_reserving(participant=participant, now=now)
             await self._shift_participants.update(participant)
-
-            reservation_id = await self._user_service.reserve_user_time(
-                user_id=participant.user_id,
-                time_from=participant.time_from,
-                time_to=participant.time_to,
-                project_id=shift.project_id,
-                shift_id=shift.oid,
-                entity_id=participant.oid,
+            await self._reservation_outbox.add(
+                ReservationOutboxMessage(
+                    oid=request_id,
+                    operation=PARTICIPANT_RESERVE_OPERATION,
+                    aggregate_id=participant.oid,
+                    status=OUTBOX_STATUS_PENDING,
+                    attempts=0,
+                    created_at=now,
+                    updated_at=now,
+                )
             )
-            self._shift_participant_service.mark_reserved(
-                participant=participant,
-                reservation_id=reservation_id,
-                now=self._clock.now(),
-            )
-            await self._shift_participants.update(participant)
             await self._tx.commit()
-        except Exception as exc:
-            failed_marked = await self._try_mark_reserve_failed(
-                participant=participant,
-                reason=str(exc),
-            )
-            if failed_marked:
-                await self._tx.commit()
-            else:
-                await self._tx.rollback()
+        except Exception:
+            await self._tx.rollback()
             raise
 
-        await publish_best_effort(
-            publisher=self._publisher,
-            topic="shift.participant_reserved",
-            payload={
-                "project_id": str(shift.project_id),
-                "shift_id": str(shift.oid),
-                "participant_id": str(participant.oid),
-                "user_reservation_id": str(participant.user_reservation_id),
-            },
+        result = await self._reservation_processor.process_message(request_id)
+        participant = await require_participant(
+            shift_participants=self._shift_participants,
+            participant_id=command.participant_id,
         )
+        if result.status == "failed":
+            raise ExternalServiceError(result.error or "Participant reservation failed.")
         return participant
-
-    async def _try_mark_reserve_failed(self, *, participant: ShiftParticipant, reason: str) -> bool:
-        try:
-            self._shift_participant_service.mark_reserve_failed(
-                participant=participant,
-                reason=reason,
-                now=self._clock.now(),
-            )
-            await self._shift_participants.update(participant)
-            return True
-        except Exception:
-            return False
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

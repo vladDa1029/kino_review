@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.config import AuthGatewaySettings, ProtectedPathsSettings, Services, get_settings
 from app.ioc import setup_providers
+from app.application.errors import AccessDeniedError
 from app.setup import AuthGateway_Middleware, CORS_Middleware
 from app.presentation.api.v1.routes.auth import router as router_auth
 from app.presentation.api.v1.routes.docs import router as router_docs
@@ -13,6 +14,7 @@ from app.presentation.api.v1.routes.users import (
     admin_router as router_admin_users,
     router as router_users,
 )
+from app.presentation import handlers
 from dishka.integrations.fastapi import setup_dishka
 
 
@@ -44,6 +46,7 @@ def start_app_dev():
     )
     setup_dishka(container=container, app=app)
 
+    app.add_exception_handler(AccessDeniedError, handlers.access_denied_error_handler)
     AuthGateway_Middleware(app, settings.auth_gateway, settings.protected_paths)
     CORS_Middleware(app)
     app.include_router(router_docs)

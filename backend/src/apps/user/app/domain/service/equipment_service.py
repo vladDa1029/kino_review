@@ -16,7 +16,9 @@ class OwnedEntity(Protocol):
 class EquipmentService:
     active_user_policy: ActiveUserPolicy = field(default_factory=ActiveUserPolicy)
     owner_policy: OwnershipPolicy = field(default_factory=OwnershipPolicy)
-    unlocked_policy: ResourceUnlockedPolicy = field(default_factory=ResourceUnlockedPolicy)
+    unlocked_policy: ResourceUnlockedPolicy = field(
+        default_factory=ResourceUnlockedPolicy
+    )
 
     def create(self, user: User, equipment: OwnedEntity) -> OwnedEntity:
         self.active_user_policy.check(user)

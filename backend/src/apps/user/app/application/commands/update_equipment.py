@@ -174,9 +174,7 @@ class UpdateCameraTripodHandler:
     ) -> None:
         self._user_repository = user_repository
         self._camera_tripod_repository = camera_tripod_repository
-        self._camera_tripod_free_time_repository = (
-            camera_tripod_free_time_repository
-        )
+        self._camera_tripod_free_time_repository = camera_tripod_free_time_repository
         self._transaction = transaction
         self._service = service
 

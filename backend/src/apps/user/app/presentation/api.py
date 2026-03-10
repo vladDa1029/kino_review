@@ -3,7 +3,16 @@ from uuid import UUID
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    UploadFile,
+    status,
+)
 
 from app.application.commands.add_image import AddImageCommand, AddImageHandler
 from app.application.commands.add_equipment_free_time import (
@@ -107,6 +116,22 @@ from app.application.queries.images import (
     ListRequisiteImagesHandler,
     ListRequisiteImagesQuery,
 )
+from app.application.queries.equipment_free_times import (
+    ListCameraFreeTimesHandler,
+    ListCameraFreeTimesQuery,
+    ListCameraTripodFreeTimesHandler,
+    ListCameraTripodFreeTimesQuery,
+    ListLightFreeTimesHandler,
+    ListLightFreeTimesQuery,
+    ListLightTripodFreeTimesHandler,
+    ListLightTripodFreeTimesQuery,
+    ListMicrofonFreeTimesHandler,
+    ListMicrofonFreeTimesQuery,
+    ListRequisiteFreeTimesHandler,
+    ListRequisiteFreeTimesQuery,
+    ListSoundFreeTimesHandler,
+    ListSoundFreeTimesQuery,
+)
 from app.application.queries.spare_times import (
     GetUserSpareTimeHandler,
     GetUserSpareTimeQuery,
@@ -117,6 +142,7 @@ from app.application.queries.description import (
     GetDescriptionHandler,
     GetDescriptionQuery,
 )
+from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
 from app.application.queries.list_equipment import (
     ListCamerasHandler,
     ListCameraTripodsHandler,
@@ -147,6 +173,7 @@ from app.presentation.schemas import (
     RequisiteCreateRequest,
     RequisiteUpdateRequest,
     ReserveAvailabilityRequest,
+    ReserveAvailabilityResponse,
     SpareTimeCreateRequest,
     SpareTimeListResponse,
     SpareTimeResponse,
@@ -161,6 +188,18 @@ def user_id_from_header(
 ) -> BaseId:
     if x_user_id is None:
         return BaseId(user_id)
+    if x_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="x-user-id does not match path user_id.",
+        )
+    return BaseId(x_user_id)
+
+
+def strict_user_id_from_header(
+    user_id: UUID,
+    x_user_id: UUID = Header(alias="x-user-id"),
+) -> BaseId:
     if x_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -261,6 +300,16 @@ def _spare_time_response(item) -> SpareTimeResponse:
     )
 
 
+def _equipment_free_time_response(item, *, user_id: BaseId) -> SpareTimeResponse:
+    return SpareTimeResponse(
+        oid=item.oid,
+        user_id=user_id,
+        start_time=item.start_time,
+        end_time=item.end_time,
+        status=str(item.status),
+    )
+
+
 def _description_response(item) -> DescriptionResponse:
     return DescriptionResponse(
         oid=item.oid,
@@ -330,6 +379,20 @@ async def update_description(
         phone=payload.phone,
     )
     await handler(command)
+
+
+@router.get(
+    "/users/{user_id}",
+    summary="Check user exists",
+    description="Returns existence flag for user id.",
+)
+async def get_user_exists(
+    user_id: UUID,
+    handler: FromDishka[GetUserExistsHandler],
+    _: BaseId = Depends(strict_user_id_from_header),
+) -> dict:
+    exists = await handler(GetUserExistsQuery(user_id=BaseId(user_id)))
+    return {"exists": exists, "user_id": user_id}
 
 
 @router.get(
@@ -460,6 +523,27 @@ async def add_microfon_free_time(
     await handler(command)
 
 
+@router.get(
+    "/users/{user_id}/microfons/{microfon_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List microfon free times",
+    description="Returns free time windows for the specified microfon.",
+)
+async def list_microfon_free_times(
+    microfon_id: UUID,
+    handler: FromDishka[ListMicrofonFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListMicrofonFreeTimesQuery(
+        user_id=user_id,
+        microfon_id=BaseId(microfon_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
+
+
 @router.post(
     "/users/{user_id}/cameras/{camera_id}/free-times",
     status_code=201,
@@ -479,6 +563,27 @@ async def add_camera_free_time(
         end_time=payload.end_time,
     )
     await handler(command)
+
+
+@router.get(
+    "/users/{user_id}/cameras/{camera_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List camera free times",
+    description="Returns free time windows for the specified camera.",
+)
+async def list_camera_free_times(
+    camera_id: UUID,
+    handler: FromDishka[ListCameraFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListCameraFreeTimesQuery(
+        user_id=user_id,
+        camera_id=BaseId(camera_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
 
 
 @router.post(
@@ -502,6 +607,27 @@ async def add_camera_tripod_free_time(
     await handler(command)
 
 
+@router.get(
+    "/users/{user_id}/camera-tripods/{camera_tripod_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List camera tripod free times",
+    description="Returns free time windows for the specified camera tripod.",
+)
+async def list_camera_tripod_free_times(
+    camera_tripod_id: UUID,
+    handler: FromDishka[ListCameraTripodFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListCameraTripodFreeTimesQuery(
+        user_id=user_id,
+        camera_tripod_id=BaseId(camera_tripod_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
+
+
 @router.post(
     "/users/{user_id}/lights/{light_id}/free-times",
     status_code=201,
@@ -521,6 +647,27 @@ async def add_light_free_time(
         end_time=payload.end_time,
     )
     await handler(command)
+
+
+@router.get(
+    "/users/{user_id}/lights/{light_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List light free times",
+    description="Returns free time windows for the specified light.",
+)
+async def list_light_free_times(
+    light_id: UUID,
+    handler: FromDishka[ListLightFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListLightFreeTimesQuery(
+        user_id=user_id,
+        light_id=BaseId(light_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
 
 
 @router.post(
@@ -544,6 +691,27 @@ async def add_light_tripod_free_time(
     await handler(command)
 
 
+@router.get(
+    "/users/{user_id}/light-tripods/{light_tripod_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List light tripod free times",
+    description="Returns free time windows for the specified light tripod.",
+)
+async def list_light_tripod_free_times(
+    light_tripod_id: UUID,
+    handler: FromDishka[ListLightTripodFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListLightTripodFreeTimesQuery(
+        user_id=user_id,
+        light_tripod_id=BaseId(light_tripod_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
+
+
 @router.post(
     "/users/{user_id}/sounds/{sound_id}/free-times",
     status_code=201,
@@ -563,6 +731,27 @@ async def add_sound_free_time(
         end_time=payload.end_time,
     )
     await handler(command)
+
+
+@router.get(
+    "/users/{user_id}/sounds/{sound_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List sound free times",
+    description="Returns free time windows for the specified sound.",
+)
+async def list_sound_free_times(
+    sound_id: UUID,
+    handler: FromDishka[ListSoundFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListSoundFreeTimesQuery(
+        user_id=user_id,
+        sound_id=BaseId(sound_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
 
 
 @router.post(
@@ -586,9 +775,31 @@ async def add_requisite_free_time(
     await handler(command)
 
 
+@router.get(
+    "/users/{user_id}/requisites/{requisite_id}/free-times",
+    response_model=SpareTimeListResponse,
+    summary="List requisite free times",
+    description="Returns free time windows for the specified requisite.",
+)
+async def list_requisite_free_times(
+    requisite_id: UUID,
+    handler: FromDishka[ListRequisiteFreeTimesHandler],
+    user_id: BaseId = Depends(user_id_from_header),
+) -> SpareTimeListResponse:
+    query = ListRequisiteFreeTimesQuery(
+        user_id=user_id,
+        requisite_id=BaseId(requisite_id),
+    )
+    items = await handler(query)
+    return SpareTimeListResponse(
+        items=[_equipment_free_time_response(item, user_id=user_id) for item in items]
+    )
+
+
 @router.post(
     "/users/{user_id}/availability/reserve",
     status_code=200,
+    response_model=ReserveAvailabilityResponse,
     summary="Reserve availability window",
     description="Reserves a time window within existing availability.",
 )
@@ -596,15 +807,17 @@ async def reserve_availability(
     payload: ReserveAvailabilityRequest,
     handler: FromDishka[ReserveAvailabilityHandler],
     user_id: BaseId = Depends(user_id_from_header),
-) -> None:
+) -> ReserveAvailabilityResponse:
     command = ReserveAvailabilityCommand(
+        request_id=BaseId(payload.request_id),
         user_id=user_id,
         owner_id=BaseId(payload.owner_id),
         obj_id=BaseId(payload.obj_id),
         start_time=payload.start_time,
         end_time=payload.end_time,
     )
-    await handler(command)
+    reservation_id = await handler(command)
+    return ReserveAvailabilityResponse(reservation_id=reservation_id)
 
 
 @router.post(

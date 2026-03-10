@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import httpx
 
 from app.config import ProtectedPathsSettings, Services
+from app.presentation.api.v1.openapi_utils import strip_header_parameter
 
 router = APIRouter(
     prefix="/auth",
@@ -53,6 +54,7 @@ async def proxy_request(
     req_body = await request.body()
     headers = dict(request.headers)
     headers.pop("host", None)
+    _apply_user_headers(headers, request)
 
     try:
         resp = await client.request(
@@ -75,6 +77,15 @@ async def proxy_request(
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"Service unreachable: {e}")
+
+
+def _apply_user_headers(headers: dict[str, str], request: Request) -> None:
+    headers.pop("x-user-id", None)
+    headers.pop("x-user-token-type", None)
+    headers.pop("x-user-is-superuser", None)
+    user_headers = getattr(request.state, "user_headers", None)
+    if user_headers:
+        headers.update(user_headers)
 
 
 async def fetch_and_patch_openapi(
@@ -102,6 +113,9 @@ async def fetch_and_patch_openapi(
             spec["servers"] = [{"url": "/"}]
 
         _mark_protected_endpoints_with_security(spec, protected_patterns)
+        strip_header_parameter(spec, "x-user-id")
+        strip_header_parameter(spec, "x-user-token-type")
+        strip_header_parameter(spec, "x-user-is-superuser")
 
         return spec
 

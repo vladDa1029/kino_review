@@ -2,12 +2,16 @@ from app.domain.errors.base import ApplicationError
 
 
 class InvalidCredentialsError(ApplicationError):
-    """Ошибка слоя use case."""
+    """Use-case credential validation error."""
 
 
 class UserAlreadyError(ApplicationError):
-    """Ошибка пользователь уже существует"""
+    """Raised when a user with the same email already exists."""
 
 
 class PasswordOrLogInincorrectError(ApplicationError):
-    """Пароль или логин не верные"""
+    """Raised when email or password is invalid."""
+
+
+class AccessDeniedError(ApplicationError):
+    """Raised when the caller does not have enough permissions."""
