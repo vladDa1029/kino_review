@@ -317,7 +317,7 @@ def test_integration_user_service_client_uses_resource_free_times_paths(monkeypa
         USER_SERVICE_BASE_URL="http://user.test",
         USER_SERVICE_TIMEOUT_SECONDS=1,
     )
-    client = UserServiceHttpClient(settings=settings)
+    client = UserServiceHttpClient(settings=settings, publisher=FakePublisher())
 
     resources = asyncio.run(
         client.list_user_resources(
@@ -432,7 +432,7 @@ def test_integration_user_service_client_collects_paginated_resources(monkeypatc
         USER_SERVICE_BASE_URL="http://user.test",
         USER_SERVICE_TIMEOUT_SECONDS=1,
     )
-    client = UserServiceHttpClient(settings=settings)
+    client = UserServiceHttpClient(settings=settings, publisher=FakePublisher())
 
     resources = asyncio.run(
         client.list_user_resources(
@@ -506,7 +506,7 @@ def test_integration_user_service_client_raises_on_free_times_method_mismatch(mo
         USER_SERVICE_BASE_URL="http://user.test",
         USER_SERVICE_TIMEOUT_SECONDS=1,
     )
-    client = UserServiceHttpClient(settings=settings)
+    client = UserServiceHttpClient(settings=settings, publisher=FakePublisher())
 
     with pytest.raises(ExternalServiceError):
         asyncio.run(
@@ -577,7 +577,7 @@ def test_integration_user_service_client_does_not_fallback_to_spare_times(monkey
         USER_SERVICE_BASE_URL="http://user.test",
         USER_SERVICE_TIMEOUT_SECONDS=1,
     )
-    client = UserServiceHttpClient(settings=settings)
+    client = UserServiceHttpClient(settings=settings, publisher=FakePublisher())
 
     with pytest.raises(EntityNotFoundError):
         asyncio.run(
@@ -649,7 +649,7 @@ def test_integration_user_service_client_raises_when_pagination_limit_reached(
         USER_SERVICE_BASE_URL="http://user.test",
         USER_SERVICE_TIMEOUT_SECONDS=1,
     )
-    client = UserServiceHttpClient(settings=settings)
+    client = UserServiceHttpClient(settings=settings, publisher=FakePublisher())
 
     with pytest.raises(ExternalServiceError):
         asyncio.run(

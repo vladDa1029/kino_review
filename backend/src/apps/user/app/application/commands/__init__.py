@@ -39,6 +39,20 @@ from app.application.commands.add_equipment_free_time import (
     AddSoundFreeTimeCommand,
     AddSoundFreeTimeHandler,
 )
+from app.application.commands.check_availability import (
+    CheckAvailabilityCommand,
+    CheckAvailabilityHandler,
+)
+from app.application.commands.confirm_reservation import (
+    ConfirmReservationByTokenHandler,
+    ReservationConfirmationResult,
+)
+from app.application.commands.approval_notifications import (
+    HandleParticipantApprovalRequestedCommand,
+    HandleParticipantApprovalRequestedHandler,
+    HandleResourceApprovalRequestedCommand,
+    HandleResourceApprovalRequestedHandler,
+)
 from app.application.commands.reserve_availability import (
     ReserveAvailabilityCommand,
     ReserveAvailabilityHandler,
@@ -111,6 +125,10 @@ __all__ = [
     "AddRequisiteFreeTimeHandler",
     "AddSoundFreeTimeCommand",
     "AddSoundFreeTimeHandler",
+    "CheckAvailabilityCommand",
+    "CheckAvailabilityHandler",
+    "ConfirmReservationByTokenHandler",
+    "ReservationConfirmationResult",
     "AddSpareTimeCommand",
     "AddSpareTimeHandler",
     "DeleteSpareTimeCommand",
@@ -149,6 +167,10 @@ __all__ = [
     "RemoveImageHandler",
     "ReserveAvailabilityCommand",
     "ReserveAvailabilityHandler",
+    "HandleParticipantApprovalRequestedCommand",
+    "HandleParticipantApprovalRequestedHandler",
+    "HandleResourceApprovalRequestedCommand",
+    "HandleResourceApprovalRequestedHandler",
     "UpdateCameraCommand",
     "UpdateCameraHandler",
     "UpdateCameraTripodCommand",

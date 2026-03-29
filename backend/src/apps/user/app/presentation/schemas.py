@@ -115,6 +115,75 @@ class BrokerUserRegistered(BaseModel):
     create_at: datetime = Field(examples=["2026-01-10T09:30:00Z"])
 
 
+class BrokerShiftParticipantReservationCheckRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+    start_time: datetime
+    end_time: datetime
+
+
+class BrokerShiftResourceRequestReservationCheckRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    start_time: datetime
+    end_time: datetime
+
+
+class BrokerShiftParticipantApprovalRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    participant_id: UUID
+    user_id: UUID
+    role: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftResourceRequestApprovalRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftParticipantReservationRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+    start_time: datetime
+    end_time: datetime
+
+
+class BrokerShiftResourceRequestReservationRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    start_time: datetime
+    end_time: datetime
+
+
 class EquipmentListQuery(BaseModel):
     page: int = Field(1, ge=1)
     page_size: int = Field(20, ge=1, le=MAX_PAGE_SIZE)

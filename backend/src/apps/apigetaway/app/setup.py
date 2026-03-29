@@ -62,6 +62,7 @@ def AuthGateway_Middleware(
         "/admin/user/openapi.json",
         "/admin/user/docs",
         "/admin/user/redoc",
+        "/user/confirmations/*",
     ]
     app.add_middleware(
         AuthGatewayMiddleware,

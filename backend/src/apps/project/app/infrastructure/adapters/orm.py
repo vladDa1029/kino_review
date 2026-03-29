@@ -1,7 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, UniqueConstraint, Uuid
-from sqlalchemy.orm import composite, registry
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    UniqueConstraint,
+    Uuid,
+)
+from sqlalchemy.orm import composite, registry, relationship
 
 from app.domain.entities import (
     Document,
@@ -24,6 +34,7 @@ from app.domain.enums import (
 )
 from app.domain.value_objects import TimeInterval
 
+# INFO: Требуется сделать relantionship. Не забыть прокинуть связи для user_id и project_id
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -53,7 +64,7 @@ users_project_role = Table(
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
     Column("user_id", Uuid(as_uuid=True), nullable=False, index=True),
-    Column("project_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
     Column("role", Integer, nullable=False, default=int(ProjectRole.DIRECTOR)),
     Column("status", Integer, nullable=False, default=int(ProjectMemberStatus.INVITED)),
     Column("invited_by", Uuid(as_uuid=True), nullable=False),
@@ -66,7 +77,7 @@ shift = Table(
     "shift",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("project_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
     Column("title", String(255), nullable=False),
     Column("description", String(2000), nullable=False, default=""),
     Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
@@ -83,7 +94,7 @@ shift_participants = Table(
     "shift_participants",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("shift_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
     Column("user_id", Uuid(as_uuid=True), nullable=False, index=True),
     Column("role", Integer, nullable=False),
     Column("time_from", DateTime(timezone=True), nullable=False),
@@ -107,7 +118,7 @@ documents = Table(
     "documents",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("shift_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
     Column("doc_type", Integer, nullable=False, default=int(DocumentType.PLAN)),
     Column("filename", String(512), nullable=False),
     Column("title", String(512), nullable=False),
@@ -126,8 +137,8 @@ shift_resource_requests = Table(
     "shift_resource_requests",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("project_id", Uuid(as_uuid=True), nullable=False, index=True),
-    Column("shift_id", Uuid(as_uuid=True), nullable=False, index=True),
+    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
     Column("resource_type", String(64), nullable=False),
     Column("resource_id", Uuid(as_uuid=True), nullable=False),
     Column("resource_owner_user_id", Uuid(as_uuid=True), nullable=False, index=True),
@@ -174,6 +185,18 @@ def start_mappers() -> None:
             "status": projects.c.status,
             "created_at": projects.c.created_at,
             "updated_at": projects.c.updated_at,
+            "members": relationship(
+                "ProjectMember",
+                back_populates="project",
+            ),
+            "shifts": relationship(
+                "Shift",
+                back_populates="project",
+            ),
+            "resource_requests": relationship(
+                "ShiftResourceRequest",
+                back_populates="project",
+            ),
         },
         column_prefix="_",
     )
@@ -189,6 +212,10 @@ def start_mappers() -> None:
             "invited_by": users_project_role.c.invited_by,
             "created_at": users_project_role.c.created_at,
             "updated_at": users_project_role.c.updated_at,
+            "project": relationship(
+                "Project",
+                back_populates="members",
+            ),
         },
         column_prefix="_",
     )
@@ -209,6 +236,22 @@ def start_mappers() -> None:
             "created_at": shift.c.created_at,
             "updated_at": shift.c.updated_at,
             "interval": composite(TimeInterval, "start_time", "end_time"),
+            "project": relationship(
+                "Project",
+                back_populates="shifts",
+            ),
+            "participants": relationship(
+                "ShiftParticipant",
+                back_populates="shift",
+            ),
+            "documents": relationship(
+                "Document",
+                back_populates="shift",
+            ),
+            "resource_requests": relationship(
+                "ShiftResourceRequest",
+                back_populates="shift",
+            ),
         },
         column_prefix="_",
     )
@@ -229,6 +272,10 @@ def start_mappers() -> None:
             "created_at": shift_participants.c.created_at,
             "updated_at": shift_participants.c.updated_at,
             "interval": composite(TimeInterval, "time_from", "time_to"),
+            "shift": relationship(
+                "Shift",
+                back_populates="participants",
+            ),
         },
         column_prefix="_",
     )
@@ -250,6 +297,10 @@ def start_mappers() -> None:
             "version": documents.c.version,
             "status": documents.c.status,
             "created_at": documents.c.created_at,
+            "shift": relationship(
+                "Shift",
+                back_populates="documents",
+            ),
         },
         column_prefix="_",
     )
@@ -273,6 +324,14 @@ def start_mappers() -> None:
             "created_at": shift_resource_requests.c.created_at,
             "updated_at": shift_resource_requests.c.updated_at,
             "interval": composite(TimeInterval, "time_from", "time_to"),
+            "project": relationship(
+                "Project",
+                back_populates="resource_requests",
+            ),
+            "shift": relationship(
+                "Shift",
+                back_populates="resource_requests",
+            ),
         },
         column_prefix="_",
     )

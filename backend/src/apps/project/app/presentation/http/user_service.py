@@ -3,8 +3,8 @@ from datetime import datetime
 from uuid import UUID
 
 import httpx
-from pydantic import BaseModel, ValidationError
 
+from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
     UserResourceItem,
     UserResourceTimeWindow,
@@ -12,18 +12,6 @@ from app.application.ports.domain import (
 )
 from app.config import UserService
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
-
-
-class ReserveAvailabilityRequest(BaseModel):
-    request_id: UUID
-    owner_id: UUID
-    obj_id: UUID
-    start_time: datetime
-    end_time: datetime
-
-
-class ReserveAvailabilityResponse(BaseModel):
-    reservation_id: UUID
 
 
 class UserServiceHttpClient(UserServicePort):
@@ -49,8 +37,9 @@ class UserServiceHttpClient(UserServicePort):
     }
     _log = logging.getLogger(__name__)
 
-    def __init__(self, settings: UserService) -> None:
+    def __init__(self, settings: UserService, publisher: EventPublisher) -> None:
         self._settings = settings
+        self._publisher = publisher
 
     async def ensure_user_exists(self, user_id: UUID) -> None:
         data = await self._request(
@@ -151,17 +140,18 @@ class UserServiceHttpClient(UserServicePort):
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
-        del project_id, shift_id, entity_id
-        return await self._reserve_availability(
-            user_id=user_id,
-            payload=ReserveAvailabilityRequest(
-                request_id=request_id,
-                owner_id=user_id,
-                obj_id=user_id,
-                start_time=time_from,
-                end_time=time_to,
-            ),
+    ) -> None:
+        await self._publisher.publish(
+            "shift.participant_reservation_check_requested",
+            {
+                "request_id": str(request_id),
+                "project_id": str(project_id),
+                "shift_id": str(shift_id),
+                "participant_id": str(entity_id),
+                "user_id": str(user_id),
+                "start_time": time_from.isoformat(),
+                "end_time": time_to.isoformat(),
+            },
         )
 
     async def reserve_resource_time(
@@ -175,17 +165,19 @@ class UserServiceHttpClient(UserServicePort):
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
-        del project_id, shift_id, entity_id
-        return await self._reserve_availability(
-            user_id=owner_user_id,
-            payload=ReserveAvailabilityRequest(
-                request_id=request_id,
-                owner_id=owner_user_id,
-                obj_id=resource_id,
-                start_time=time_from,
-                end_time=time_to,
-            ),
+    ) -> None:
+        await self._publisher.publish(
+            "shift.resource_request_reservation_check_requested",
+            {
+                "request_id": str(request_id),
+                "project_id": str(project_id),
+                "shift_id": str(shift_id),
+                "resource_request_id": str(entity_id),
+                "owner_user_id": str(owner_user_id),
+                "resource_id": str(resource_id),
+                "start_time": time_from.isoformat(),
+                "end_time": time_to.isoformat(),
+            },
         )
 
     async def _request(
@@ -222,23 +214,6 @@ class UserServiceHttpClient(UserServicePort):
         if not response.content:
             return {}
         return response.json()
-
-    async def _reserve_availability(
-        self,
-        *,
-        user_id: UUID,
-        payload: ReserveAvailabilityRequest,
-    ) -> UUID:
-        data = await self._request(
-            "POST",
-            f"/users/{user_id}/availability/reserve",
-            json=payload.model_dump(mode="json"),
-        )
-        try:
-            response = ReserveAvailabilityResponse.model_validate(data)
-        except ValidationError as exc:
-            raise ExternalServiceError("User-service returned invalid reserve contract.") from exc
-        return response.reservation_id
 
     async def _list_resource_windows(
         self,

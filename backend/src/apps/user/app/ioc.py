@@ -17,6 +17,12 @@ from app.application.commands.add_equipment_free_time import (
     AddSoundFreeTimeHandler,
 )
 from app.application.commands.add_spare_time import AddSpareTimeHandler
+from app.application.commands.approval_notifications import (
+    HandleParticipantApprovalRequestedHandler,
+    HandleResourceApprovalRequestedHandler,
+)
+from app.application.commands.check_availability import CheckAvailabilityHandler
+from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
 from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.create_description import CreateDescriptionHandler
 from app.application.commands.create_equipment import (
@@ -100,12 +106,16 @@ from app.application.ports.repositories import (
     SpareTimeRepository,
     UserRepository,
 )
+from app.application.ports.approvals import ConfirmationTokenPort, ProjectApprovalStatePort
+from app.application.ports.broker import EventPublisher
 from app.application.ports.storage import FileStorage
 from app.application.ports.transaction import TransactionManager
 from app.config import (
+    ConfirmationSettings,
     DatabaseSettings,
     ImageSettings,
     Log,
+    ProjectService,
     Rabbitmq,
     SQLAlchemySettings,
     StorageSettings,
@@ -147,10 +157,13 @@ from app.infrastructure.adapters.repository import (
     SpareTimeSqlAlchemyRepository,
     UserSqlAlchemyRepository,
 )
+from app.infrastructure.adapters.broker import RabbitPublisher
 from app.infrastructure.adapters.storage import create_file_storage
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
+from app.infrastructure.security.confirmation_token import JWTConfirmationTokenService
 from app.infrastructure.transactions import TransactionManagerAlchemy
+from app.presentation.http.project_service import ProjectApprovalStateHttpClient
 
 
 def settings_provider() -> Provider:
@@ -161,12 +174,25 @@ def settings_provider() -> Provider:
     provider.from_context(provides=Rabbitmq)
     provider.from_context(provides=StorageSettings)
     provider.from_context(provides=ImageSettings)
+    provider.from_context(provides=ProjectService)
+    provider.from_context(provides=ConfirmationSettings)
     return provider
 
 
 def broker_provider() -> Provider:
     provider = Provider(scope=Scope.APP)
     provider.from_context(provides=RabbitBroker)
+    provider.provide(source=RabbitPublisher, provides=EventPublisher, scope=Scope.APP)
+    provider.provide(
+        source=ProjectApprovalStateHttpClient,
+        provides=ProjectApprovalStatePort,
+        scope=Scope.APP,
+    )
+    provider.provide(
+        source=JWTConfirmationTokenService,
+        provides=ConfirmationTokenPort,
+        scope=Scope.APP,
+    )
     return provider
 
 
@@ -307,6 +333,10 @@ def use_case_provider() -> Provider:
     provider.provide(source=DeleteRequisiteHandler)
     provider.provide(source=DeleteSoundHandler)
     provider.provide(source=RemoveImageHandler)
+    provider.provide(source=CheckAvailabilityHandler)
+    provider.provide(source=HandleParticipantApprovalRequestedHandler)
+    provider.provide(source=HandleResourceApprovalRequestedHandler)
+    provider.provide(source=ConfirmReservationByTokenHandler)
     provider.provide(source=ReserveAvailabilityHandler)
     provider.provide(source=UserRegisteredHandler)
     provider.provide(source=ListMicrofonsHandler)

@@ -7,6 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.commands import (
     ApproveProjectMemberInvitationHandler,
     ProcessReservationOutboxHandler,
+    HandleParticipantReservationCheckFailedHandler,
+    HandleParticipantReservationCheckSucceededHandler,
+    HandleParticipantReservationFailedHandler,
+    HandleParticipantReservationSucceededHandler,
+    HandleResourceReservationCheckFailedHandler,
+    HandleResourceReservationCheckSucceededHandler,
+    HandleResourceReservationFailedHandler,
+    HandleResourceReservationSucceededHandler,
     ApproveResourceRequestHandler,
     ApproveShiftHandler,
     ChangeProjectMemberRoleHandler,
@@ -43,6 +51,10 @@ from app.application.queries.health import HealthHandler
 from app.application.queries.projects import (
     GetProjectHandler,
     ListActorProjectsHandler,
+)
+from app.application.queries.approvals import (
+    GetParticipantApprovalStateHandler,
+    GetResourceApprovalStateHandler,
 )
 from app.application.queries.resources import (
     GetProjectMemberHandler,
@@ -119,7 +131,7 @@ def adapters_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=TransactionManagerAlchemy, provides=TransactionManager)
     provider.provide(source=GenerationUUID, provides=IdGeneratorPort, scope=Scope.APP)
-    provider.provide(source=RabbitPublisher, provides=EventPublisher)
+    provider.provide(source=RabbitPublisher, provides=EventPublisher, scope=Scope.APP)
     provider.provide(source=UserServiceHttpClient, provides=UserServicePort, scope=Scope.APP)
     provider.provide(
         source=MinioDocumentStorage,
@@ -159,6 +171,8 @@ def domain_services_provider() -> Provider:
 def use_case_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=HealthHandler)
+    provider.provide(source=GetParticipantApprovalStateHandler)
+    provider.provide(source=GetResourceApprovalStateHandler)
     provider.provide(source=GetProjectHandler)
     provider.provide(source=ListActorProjectsHandler)
     provider.provide(source=GetDocumentDownloadUrlHandler)
@@ -177,10 +191,18 @@ def use_case_provider() -> Provider:
     provider.provide(source=InviteShiftParticipantHandler)
     provider.provide(source=ConfirmShiftParticipantHandler)
     provider.provide(source=DeclineShiftParticipantHandler)
+    provider.provide(source=HandleParticipantReservationCheckSucceededHandler)
+    provider.provide(source=HandleParticipantReservationCheckFailedHandler)
+    provider.provide(source=HandleParticipantReservationSucceededHandler)
+    provider.provide(source=HandleParticipantReservationFailedHandler)
     provider.provide(source=UploadShiftDocumentHandler)
     provider.provide(source=CreateResourceRequestHandler)
     provider.provide(source=ApproveResourceRequestHandler)
     provider.provide(source=RejectResourceRequestHandler)
+    provider.provide(source=HandleResourceReservationCheckSucceededHandler)
+    provider.provide(source=HandleResourceReservationCheckFailedHandler)
+    provider.provide(source=HandleResourceReservationSucceededHandler)
+    provider.provide(source=HandleResourceReservationFailedHandler)
     provider.provide(source=ProcessReservationOutboxHandler)
     return provider
 

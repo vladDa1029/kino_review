@@ -107,6 +107,25 @@ class ImageSettings(ConfigABC):
     )
 
 
+class ProjectService(ConfigABC):
+    base_url: str = Field(alias="PROJECT_SERVICE_BASE_URL", default="http://project:8003")
+    timeout_seconds: float = Field(alias="PROJECT_SERVICE_TIMEOUT_SECONDS", default=10.0)
+    internal_api_key: str = Field(
+        alias="PROJECT_SERVICE_INTERNAL_API_KEY",
+        default="kino-internal-dev-key",
+    )
+
+
+class ConfirmationSettings(ConfigABC):
+    secret_key: str = Field(
+        alias="CONFIRMATION_SECRET_KEY",
+        default="kino-confirmation-dev-key-please-change",
+    )
+    ttl_hours: int = Field(alias="CONFIRMATION_TTL_HOURS", default=24)
+    public_base_url: str = Field(alias="PUBLIC_BASE_URL", default="http://localhost:8000")
+    algorithm: str = Field(alias="CONFIRMATION_ALGORITHM", default="HS256")
+
+
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
@@ -114,6 +133,8 @@ class Settings(ConfigABC):
     rabbitmq: Rabbitmq = Rabbitmq()
     storage: StorageSettings = StorageSettings()
     image: ImageSettings = ImageSettings()
+    project_service: ProjectService = ProjectService()
+    confirmation: ConfirmationSettings = ConfirmationSettings()
 
 
 @lru_cache(1)

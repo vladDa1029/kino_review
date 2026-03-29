@@ -5,7 +5,6 @@ from uuid import UUID
 from app.application.commands.reservation_outbox import (
     OUTBOX_STATUS_PENDING,
     PARTICIPANT_RESERVE_OPERATION,
-    ProcessReservationOutboxHandler,
     build_participant_reservation_request_id,
 )
 from app.application.ports.broker import EventPublisher
@@ -26,7 +25,6 @@ from app.application.support import (
     require_shift,
 )
 from app.domain.entities import ReservationOutboxMessage, ShiftParticipant
-from app.domain.errors.business import ExternalServiceError
 from app.domain.enums import ProjectRole
 from app.domain.services import ShiftParticipantService
 
@@ -125,9 +123,7 @@ class ConfirmShiftParticipantHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         publisher: EventPublisher,
-        user_service: UserServicePort,
         reservation_outbox: ReservationOutboxRepository,
-        reservation_processor: ProcessReservationOutboxHandler,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
         shift_participant_service: ShiftParticipantService,
@@ -135,9 +131,7 @@ class ConfirmShiftParticipantHandler:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
-        self._user_service = user_service
         self._reservation_outbox = reservation_outbox
-        self._reservation_processor = reservation_processor
         self._shifts = shifts
         self._shift_participants = shift_participants
         self._shift_participant_service = shift_participant_service
@@ -174,13 +168,6 @@ class ConfirmShiftParticipantHandler:
             await self._tx.rollback()
             raise
 
-        result = await self._reservation_processor.process_message(request_id)
-        participant = await require_participant(
-            shift_participants=self._shift_participants,
-            participant_id=command.participant_id,
-        )
-        if result.status == "failed":
-            raise ExternalServiceError(result.error or "Participant reservation failed.")
         return participant
 
 

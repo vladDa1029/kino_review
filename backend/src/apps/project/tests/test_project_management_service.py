@@ -63,12 +63,7 @@ from app.domain.enums import (
     ShiftParticipantStatus,
     ShiftStatus,
 )
-from app.domain.errors.business import (
-    AccessDeniedError,
-    EntityNotFoundError,
-    ExternalServiceError,
-    StateTransitionError,
-)
+from app.domain.errors.business import AccessDeniedError, EntityNotFoundError, StateTransitionError
 from app.domain.policy.member_access import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
     ProjectMembershipService,
@@ -121,11 +116,11 @@ class FakeUserService:
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
+    ) -> None:
         self.request_ids.append(request_id)
         if self.fail_reserve_user:
             raise RuntimeError("reserve failed")
-        return uuid4()
+        return None
 
     async def reserve_resource_time(
         self,
@@ -138,9 +133,9 @@ class FakeUserService:
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
+    ) -> None:
         self.request_ids.append(request_id)
-        return uuid4()
+        return None
 
     async def list_user_resources(
         self,
@@ -339,8 +334,6 @@ def build_context(
         shift_participants=participants,
         resource_requests=requests,
         reservation_outbox=reservation_outbox,
-        shift_participant_service=ShiftParticipantService(),
-        resource_request_service=ResourceRequestService(),
     )
 
     create_project_handler = CreateProjectHandler(
@@ -357,9 +350,7 @@ def build_context(
         transaction_manager=tx,
         clock=clock,
         publisher=publisher,
-        user_service=user_service,
         reservation_outbox=reservation_outbox,
-        reservation_processor=reservation_processor,
         shifts=shifts,
         shift_participants=participants,
         shift_participant_service=ShiftParticipantService(),
@@ -799,7 +790,7 @@ def test_remove_project_member_marks_removed() -> None:
     asyncio.run(scenario())
 
 
-def test_confirm_participant_marks_reserve_failed_on_external_error() -> None:
+def test_confirm_participant_moves_to_reserving_and_leaves_processing_to_outbox() -> None:
     async def scenario():
         (
             _,
@@ -814,7 +805,7 @@ def test_confirm_participant_marks_reserve_failed_on_external_error() -> None:
             participants,
             _,
             _,
-        ) = build_context(fail_reserve_user=True)
+        ) = build_context()
         now = now_utc()
         project_id = uuid4()
         director_id = uuid4()
@@ -856,18 +847,16 @@ def test_confirm_participant_marks_reserve_failed_on_external_error() -> None:
         )
         await participants.add(participant)
 
-        with pytest.raises(ExternalServiceError):
-            await confirm_participant_handler(
-                ConfirmShiftParticipantCommand(
-                    participant_id=participant.oid,
-                    actor_user_id=participant_user_id,
-                )
+        updated = await confirm_participant_handler(
+            ConfirmShiftParticipantCommand(
+                participant_id=participant.oid,
+                actor_user_id=participant_user_id,
             )
+        )
 
-        updated = await participants.get_by_id(participant.oid)
         assert updated is not None
-        assert updated.status == ShiftParticipantStatus.RESERVE_FAILED
-        assert tx.commits == 2
+        assert updated.status == ShiftParticipantStatus.RESERVING
+        assert tx.commits == 1
         assert tx.rollbacks == 0
 
     asyncio.run(scenario())

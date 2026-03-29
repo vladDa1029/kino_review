@@ -13,6 +13,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import HTMLResponse
 
 from app.application.commands.add_image import AddImageCommand, AddImageHandler
 from app.application.commands.add_equipment_free_time import (
@@ -39,6 +40,7 @@ from app.application.commands.delete_spare_time import (
     DeleteSpareTimeCommand,
     DeleteSpareTimeHandler,
 )
+from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
 from app.application.commands.create_description import (
     CreateDescriptionCommand,
     CreateDescriptionHandler,
@@ -179,7 +181,7 @@ from app.presentation.schemas import (
     SpareTimeResponse,
 )
 
-router = APIRouter(tags=["web"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 
 
 def user_id_from_header(
@@ -341,9 +343,65 @@ def _validate_image_upload(
         )
 
 
+def _confirmation_page(title: str, message: str, kind: str) -> HTMLResponse:
+    html = f"""
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <style>
+      body {{
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        color: #1f2933;
+        margin: 0;
+        padding: 32px 16px;
+      }}
+      main {{
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      }}
+      .badge {{
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #e5edf5;
+        color: #334e68;
+        font-size: 14px;
+        margin-bottom: 16px;
+      }}
+      h1 {{
+        margin: 0 0 12px 0;
+        font-size: 28px;
+      }}
+      p {{
+        margin: 0;
+        line-height: 1.6;
+      }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="badge">{kind}</div>
+      <h1>{title}</h1>
+      <p>{message}</p>
+    </main>
+  </body>
+</html>
+"""
+    return HTMLResponse(content=html.strip())
+
+
 @router.post(
     "/users/{user_id}/description",
     status_code=201,
+    tags=["descriptions"],
     summary="Create user description",
     description="Creates a single description record for the user.",
 )
@@ -360,9 +418,25 @@ async def create_description(
     await handler(command)
 
 
+@router.get(
+    "/confirmations/{token}",
+    response_class=HTMLResponse,
+    tags=["confirmations"],
+    summary="Confirm reservation from email link",
+    description="Confirms reservation approval by signed email link.",
+)
+async def confirm_reservation(
+    token: str,
+    handler: FromDishka[ConfirmReservationByTokenHandler],
+) -> HTMLResponse:
+    result = await handler(token)
+    return _confirmation_page(result.title, result.message, result.page)
+
+
 @router.put(
     "/users/{user_id}/description/{description_id}",
     status_code=204,
+    tags=["descriptions"],
     summary="Update user description",
     description="Updates the existing user description.",
 )
@@ -383,6 +457,7 @@ async def update_description(
 
 @router.get(
     "/users/{user_id}",
+    tags=["users"],
     summary="Check user exists",
     description="Returns existence flag for user id.",
 )
@@ -398,6 +473,7 @@ async def get_user_exists(
 @router.get(
     "/users/{user_id}/description",
     response_model=DescriptionResponse,
+    tags=["descriptions"],
     summary="Get user description",
     description="Returns the description record for the user.",
 )
@@ -413,6 +489,7 @@ async def get_description(
 @router.post(
     "/users/{user_id}/spare-times",
     status_code=201,
+    tags=["spare-times"],
     summary="Add user free time window",
     description="Adds a free time window for the user.",
 )
@@ -432,6 +509,7 @@ async def add_spare_time(
 @router.get(
     "/users/{user_id}/spare-times",
     response_model=SpareTimeListResponse,
+    tags=["spare-times"],
     summary="List user free time windows",
     description="Returns all free time windows for the user.",
 )
@@ -447,6 +525,7 @@ async def list_spare_times(
 @router.get(
     "/users/{user_id}/spare-times/{spare_time_id}",
     response_model=SpareTimeResponse,
+    tags=["spare-times"],
     summary="Get user free time window",
     description="Returns the specified free time window for the user.",
 )
@@ -466,6 +545,7 @@ async def get_spare_time(
 @router.put(
     "/users/{user_id}/spare-times/{spare_time_id}",
     status_code=204,
+    tags=["spare-times"],
     summary="Update user free time window",
     description="Updates a free time window for the user.",
 )
@@ -487,6 +567,7 @@ async def update_spare_time(
 @router.delete(
     "/users/{user_id}/spare-times/{spare_time_id}",
     status_code=204,
+    tags=["spare-times"],
     summary="Delete user free time window",
     description="Deletes a free time window for the user.",
 )
@@ -505,6 +586,7 @@ async def delete_spare_time(
 @router.post(
     "/users/{user_id}/microfons/{microfon_id}/free-times",
     status_code=201,
+    tags=["microfons"],
     summary="Add microfon free time",
     description="Adds a free time window for the specified microfon.",
 )
@@ -526,6 +608,7 @@ async def add_microfon_free_time(
 @router.get(
     "/users/{user_id}/microfons/{microfon_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["microfons"],
     summary="List microfon free times",
     description="Returns free time windows for the specified microfon.",
 )
@@ -547,6 +630,7 @@ async def list_microfon_free_times(
 @router.post(
     "/users/{user_id}/cameras/{camera_id}/free-times",
     status_code=201,
+    tags=["cameras"],
     summary="Add camera free time",
     description="Adds a free time window for the specified camera.",
 )
@@ -568,6 +652,7 @@ async def add_camera_free_time(
 @router.get(
     "/users/{user_id}/cameras/{camera_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["cameras"],
     summary="List camera free times",
     description="Returns free time windows for the specified camera.",
 )
@@ -589,6 +674,7 @@ async def list_camera_free_times(
 @router.post(
     "/users/{user_id}/camera-tripods/{camera_tripod_id}/free-times",
     status_code=201,
+    tags=["camera-tripods"],
     summary="Add camera tripod free time",
     description="Adds a free time window for the specified camera tripod.",
 )
@@ -610,6 +696,7 @@ async def add_camera_tripod_free_time(
 @router.get(
     "/users/{user_id}/camera-tripods/{camera_tripod_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["camera-tripods"],
     summary="List camera tripod free times",
     description="Returns free time windows for the specified camera tripod.",
 )
@@ -631,6 +718,7 @@ async def list_camera_tripod_free_times(
 @router.post(
     "/users/{user_id}/lights/{light_id}/free-times",
     status_code=201,
+    tags=["lights"],
     summary="Add light free time",
     description="Adds a free time window for the specified light.",
 )
@@ -652,6 +740,7 @@ async def add_light_free_time(
 @router.get(
     "/users/{user_id}/lights/{light_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["lights"],
     summary="List light free times",
     description="Returns free time windows for the specified light.",
 )
@@ -673,6 +762,7 @@ async def list_light_free_times(
 @router.post(
     "/users/{user_id}/light-tripods/{light_tripod_id}/free-times",
     status_code=201,
+    tags=["light-tripods"],
     summary="Add light tripod free time",
     description="Adds a free time window for the specified light tripod.",
 )
@@ -694,6 +784,7 @@ async def add_light_tripod_free_time(
 @router.get(
     "/users/{user_id}/light-tripods/{light_tripod_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["light-tripods"],
     summary="List light tripod free times",
     description="Returns free time windows for the specified light tripod.",
 )
@@ -715,6 +806,7 @@ async def list_light_tripod_free_times(
 @router.post(
     "/users/{user_id}/sounds/{sound_id}/free-times",
     status_code=201,
+    tags=["sounds"],
     summary="Add sound free time",
     description="Adds a free time window for the specified sound.",
 )
@@ -736,6 +828,7 @@ async def add_sound_free_time(
 @router.get(
     "/users/{user_id}/sounds/{sound_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["sounds"],
     summary="List sound free times",
     description="Returns free time windows for the specified sound.",
 )
@@ -757,6 +850,7 @@ async def list_sound_free_times(
 @router.post(
     "/users/{user_id}/requisites/{requisite_id}/free-times",
     status_code=201,
+    tags=["requisites"],
     summary="Add requisite free time",
     description="Adds a free time window for the specified requisite.",
 )
@@ -778,6 +872,7 @@ async def add_requisite_free_time(
 @router.get(
     "/users/{user_id}/requisites/{requisite_id}/free-times",
     response_model=SpareTimeListResponse,
+    tags=["requisites"],
     summary="List requisite free times",
     description="Returns free time windows for the specified requisite.",
 )
@@ -800,6 +895,7 @@ async def list_requisite_free_times(
     "/users/{user_id}/availability/reserve",
     status_code=200,
     response_model=ReserveAvailabilityResponse,
+    tags=["availability"],
     summary="Reserve availability window",
     description="Reserves a time window within existing availability.",
 )
@@ -823,6 +919,7 @@ async def reserve_availability(
 @router.post(
     "/users/{user_id}/microfons",
     status_code=201,
+    tags=["microfons"],
     summary="Create microfon",
     description="Creates a new microfon owned by the user.",
 )
@@ -843,6 +940,7 @@ async def create_microfon(
 @router.put(
     "/users/{user_id}/microfons/{microfon_id}",
     status_code=204,
+    tags=["microfons"],
     summary="Update microfon",
     description="Updates the specified microfon.",
 )
@@ -865,6 +963,7 @@ async def update_microfon(
 @router.delete(
     "/users/{user_id}/microfons/{microfon_id}",
     status_code=204,
+    tags=["microfons"],
     summary="Delete microfon",
     description="Deletes the specified microfon.",
 )
@@ -883,6 +982,7 @@ async def delete_microfon(
 @router.post(
     "/users/{user_id}/cameras",
     status_code=201,
+    tags=["cameras"],
     summary="Create camera",
     description="Creates a new camera owned by the user.",
 )
@@ -903,6 +1003,7 @@ async def create_camera(
 @router.put(
     "/users/{user_id}/cameras/{camera_id}",
     status_code=204,
+    tags=["cameras"],
     summary="Update camera",
     description="Updates the specified camera.",
 )
@@ -925,6 +1026,7 @@ async def update_camera(
 @router.delete(
     "/users/{user_id}/cameras/{camera_id}",
     status_code=204,
+    tags=["cameras"],
     summary="Delete camera",
     description="Deletes the specified camera.",
 )
@@ -943,6 +1045,7 @@ async def delete_camera(
 @router.post(
     "/users/{user_id}/camera-tripods",
     status_code=201,
+    tags=["camera-tripods"],
     summary="Create camera tripod",
     description="Creates a new camera tripod owned by the user.",
 )
@@ -963,6 +1066,7 @@ async def create_camera_tripod(
 @router.put(
     "/users/{user_id}/camera-tripods/{camera_tripod_id}",
     status_code=204,
+    tags=["camera-tripods"],
     summary="Update camera tripod",
     description="Updates the specified camera tripod.",
 )
@@ -985,6 +1089,7 @@ async def update_camera_tripod(
 @router.delete(
     "/users/{user_id}/camera-tripods/{camera_tripod_id}",
     status_code=204,
+    tags=["camera-tripods"],
     summary="Delete camera tripod",
     description="Deletes the specified camera tripod.",
 )
@@ -1003,6 +1108,7 @@ async def delete_camera_tripod(
 @router.post(
     "/users/{user_id}/lights",
     status_code=201,
+    tags=["lights"],
     summary="Create light",
     description="Creates a new light owned by the user.",
 )
@@ -1023,6 +1129,7 @@ async def create_light(
 @router.put(
     "/users/{user_id}/lights/{light_id}",
     status_code=204,
+    tags=["lights"],
     summary="Update light",
     description="Updates the specified light.",
 )
@@ -1045,6 +1152,7 @@ async def update_light(
 @router.delete(
     "/users/{user_id}/lights/{light_id}",
     status_code=204,
+    tags=["lights"],
     summary="Delete light",
     description="Deletes the specified light.",
 )
@@ -1063,6 +1171,7 @@ async def delete_light(
 @router.post(
     "/users/{user_id}/light-tripods",
     status_code=201,
+    tags=["light-tripods"],
     summary="Create light tripod",
     description="Creates a new light tripod owned by the user.",
 )
@@ -1083,6 +1192,7 @@ async def create_light_tripod(
 @router.put(
     "/users/{user_id}/light-tripods/{light_tripod_id}",
     status_code=204,
+    tags=["light-tripods"],
     summary="Update light tripod",
     description="Updates the specified light tripod.",
 )
@@ -1105,6 +1215,7 @@ async def update_light_tripod(
 @router.delete(
     "/users/{user_id}/light-tripods/{light_tripod_id}",
     status_code=204,
+    tags=["light-tripods"],
     summary="Delete light tripod",
     description="Deletes the specified light tripod.",
 )
@@ -1123,6 +1234,7 @@ async def delete_light_tripod(
 @router.post(
     "/users/{user_id}/sounds",
     status_code=201,
+    tags=["sounds"],
     summary="Create sound",
     description="Creates a new sound owned by the user.",
 )
@@ -1143,6 +1255,7 @@ async def create_sound(
 @router.put(
     "/users/{user_id}/sounds/{sound_id}",
     status_code=204,
+    tags=["sounds"],
     summary="Update sound",
     description="Updates the specified sound.",
 )
@@ -1165,6 +1278,7 @@ async def update_sound(
 @router.delete(
     "/users/{user_id}/sounds/{sound_id}",
     status_code=204,
+    tags=["sounds"],
     summary="Delete sound",
     description="Deletes the specified sound.",
 )
@@ -1183,6 +1297,7 @@ async def delete_sound(
 @router.post(
     "/users/{user_id}/requisites",
     status_code=201,
+    tags=["requisites"],
     summary="Create requisite",
     description="Creates a new requisite owned by the user.",
 )
@@ -1204,6 +1319,7 @@ async def create_requisite(
 @router.put(
     "/users/{user_id}/requisites/{requisite_id}",
     status_code=204,
+    tags=["requisites"],
     summary="Update requisite",
     description="Updates the specified requisite.",
 )
@@ -1227,6 +1343,7 @@ async def update_requisite(
 @router.delete(
     "/users/{user_id}/requisites/{requisite_id}",
     status_code=204,
+    tags=["requisites"],
     summary="Delete requisite",
     description="Deletes the specified requisite.",
 )
@@ -1245,6 +1362,7 @@ async def delete_requisite(
 @router.post(
     "/users/{user_id}/requisites/{requisite_id}/images",
     status_code=201,
+    tags=["images"],
     summary="Add image",
     description="Adds an image to the specified requisite.",
 )
@@ -1282,6 +1400,7 @@ async def add_image(
 @router.get(
     "/users/{user_id}/requisites/{requisite_id}/images",
     response_model=ImageListResponse,
+    tags=["images"],
     summary="List images",
     description="Returns all images for the specified requisite.",
 )
@@ -1301,6 +1420,7 @@ async def list_requisite_images(
 @router.get(
     "/users/{user_id}/requisites/{requisite_id}/images/{image_id}",
     response_model=ImageResponse,
+    tags=["images"],
     summary="Get image",
     description="Returns an image metadata for the specified requisite.",
 )
@@ -1322,6 +1442,7 @@ async def get_requisite_image(
 @router.delete(
     "/users/{user_id}/requisites/{requisite_id}/images/{image_id}",
     status_code=204,
+    tags=["images"],
     summary="Remove image",
     description="Removes an image from the specified requisite.",
 )
@@ -1342,6 +1463,7 @@ async def remove_image(
 @router.get(
     "/users/{user_id}/microfons",
     response_model=EquipmentListResponse,
+    tags=["microfons"],
     summary="List microfons",
     description="Returns a paginated list of microfons.",
 )
@@ -1371,6 +1493,7 @@ async def list_microfons(
 @router.get(
     "/users/{user_id}/cameras",
     response_model=EquipmentListResponse,
+    tags=["cameras"],
     summary="List cameras",
     description="Returns a paginated list of cameras.",
 )
@@ -1400,6 +1523,7 @@ async def list_cameras(
 @router.get(
     "/users/{user_id}/camera-tripods",
     response_model=EquipmentListResponse,
+    tags=["camera-tripods"],
     summary="List camera tripods",
     description="Returns a paginated list of camera tripods.",
 )
@@ -1429,6 +1553,7 @@ async def list_camera_tripods(
 @router.get(
     "/users/{user_id}/lights",
     response_model=EquipmentListResponse,
+    tags=["lights"],
     summary="List lights",
     description="Returns a paginated list of lights.",
 )
@@ -1458,6 +1583,7 @@ async def list_lights(
 @router.get(
     "/users/{user_id}/light-tripods",
     response_model=EquipmentListResponse,
+    tags=["light-tripods"],
     summary="List light tripods",
     description="Returns a paginated list of light tripods.",
 )
@@ -1487,6 +1613,7 @@ async def list_light_tripods(
 @router.get(
     "/users/{user_id}/sounds",
     response_model=EquipmentListResponse,
+    tags=["sounds"],
     summary="List sounds",
     description="Returns a paginated list of sounds.",
 )
@@ -1516,6 +1643,7 @@ async def list_sounds(
 @router.get(
     "/users/{user_id}/requisites",
     response_model=RequisiteListResponse,
+    tags=["requisites"],
     summary="List requisites",
     description="Returns a paginated list of requisites.",
 )

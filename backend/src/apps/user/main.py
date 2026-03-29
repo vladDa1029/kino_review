@@ -9,9 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
 
 from app.config import (
+    ConfirmationSettings,
     DatabaseSettings,
     ImageSettings,
     Log,
+    ProjectService,
     Rabbitmq,
     SQLAlchemySettings,
     StorageSettings,
@@ -20,6 +22,14 @@ from app.config import (
 from app.domain.errors.base import ApplicationError
 from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import (
+    PROJECT_EVENTS_EXCHANGE,
+    SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
+    USER_EVENTS_EXCHANGE,
     USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
 )
@@ -36,8 +46,16 @@ log = structlog.get_logger(__file__)
 async def lifespan(app: FastAPI):
     broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
     await broker.start()
+    await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
     await broker.declare_exchange(USER_REGISTERED_EXCHANGE)
+    await broker.declare_exchange(USER_EVENTS_EXCHANGE)
     await broker.declare_queue(USER_REGISTERED_QUEUE)
+    await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE)
     try:
         yield
     finally:
@@ -64,6 +82,8 @@ def start_app_dev() -> FastAPI:
             Rabbitmq: settings.rabbitmq,
             StorageSettings: settings.storage,
             ImageSettings: settings.image,
+            ProjectService: settings.project_service,
+            ConfirmationSettings: settings.confirmation,
             RabbitBroker: broker,
         },
     )

@@ -1,15 +1,47 @@
 from dishka import AsyncContainer
 from faststream.rabbit import RabbitRouter
 
+from app.application.commands.approval_notifications import (
+    HandleParticipantApprovalRequestedCommand,
+    HandleParticipantApprovalRequestedHandler,
+    HandleResourceApprovalRequestedCommand,
+    HandleResourceApprovalRequestedHandler,
+)
+from app.application.commands.check_availability import (
+    CheckAvailabilityCommand,
+    CheckAvailabilityHandler,
+)
+from app.application.commands.reserve_availability import (
+    ReserveAvailabilityCommand,
+    ReserveAvailabilityHandler,
+)
 from app.application.commands.user_registered import (
     UserRegisteredCommand,
     UserRegisteredHandler,
 )
+from app.application.ports.broker import EventPublisher
+from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.broker import (
+    PROJECT_EVENTS_EXCHANGE,
+    SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
+    USER_EVENTS_EXCHANGE,
     USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
 )
-from app.presentation.schemas import BrokerUserRegistered
+from app.presentation.schemas import (
+    BrokerShiftParticipantApprovalRequested,
+    BrokerShiftParticipantReservationCheckRequested,
+    BrokerShiftParticipantReservationRequested,
+    BrokerShiftResourceRequestApprovalRequested,
+    BrokerShiftResourceRequestReservationCheckRequested,
+    BrokerShiftResourceRequestReservationRequested,
+    BrokerUserRegistered,
+)
 
 
 def create_broker_router(container: AsyncContainer) -> RabbitRouter:
@@ -28,5 +60,238 @@ def create_broker_router(container: AsyncContainer) -> RabbitRouter:
         async with container() as request_container:
             handler = await request_container.get(UserRegisteredHandler)
             await handler(command)
+
+    @router.subscriber(
+        SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_participant_reservation_check_requested(
+        event: BrokerShiftParticipantReservationCheckRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(CheckAvailabilityHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                await handler(
+                    CheckAvailabilityCommand(
+                        user_id=BaseId(event.user_id),
+                        owner_id=BaseId(event.user_id),
+                        obj_id=BaseId(event.user_id),
+                        start_time=event.start_time,
+                        end_time=event.end_time,
+                    )
+                )
+            except Exception as exc:
+                await publisher.publish(
+                    "shift.participant_reservation_check_failed",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "participant_id": str(event.participant_id),
+                        "user_id": str(event.user_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    "shift.participant_reservation_check_succeeded",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "participant_id": str(event.participant_id),
+                        "user_id": str(event.user_id),
+                    },
+                )
+
+    @router.subscriber(
+        SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_resource_request_reservation_check_requested(
+        event: BrokerShiftResourceRequestReservationCheckRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(CheckAvailabilityHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                await handler(
+                    CheckAvailabilityCommand(
+                        user_id=BaseId(event.owner_user_id),
+                        owner_id=BaseId(event.owner_user_id),
+                        obj_id=BaseId(event.resource_id),
+                        start_time=event.start_time,
+                        end_time=event.end_time,
+                    )
+                )
+            except Exception as exc:
+                await publisher.publish(
+                    "shift.resource_request_reservation_check_failed",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "resource_request_id": str(event.resource_request_id),
+                        "owner_user_id": str(event.owner_user_id),
+                        "resource_id": str(event.resource_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    "shift.resource_request_reservation_check_succeeded",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "resource_request_id": str(event.resource_request_id),
+                        "owner_user_id": str(event.owner_user_id),
+                        "resource_id": str(event.resource_id),
+                    },
+                )
+
+    @router.subscriber(
+        SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_participant_approval_requested(
+        event: BrokerShiftParticipantApprovalRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(HandleParticipantApprovalRequestedHandler)
+            await handler(
+                HandleParticipantApprovalRequestedCommand(
+                    request_id=event.request_id,
+                    project_id=event.project_id,
+                    project_title=event.project_title,
+                    shift_id=event.shift_id,
+                    shift_title=event.shift_title,
+                    participant_id=event.participant_id,
+                    user_id=event.user_id,
+                    role=event.role,
+                    time_from=event.time_from,
+                    time_to=event.time_to,
+                )
+            )
+
+    @router.subscriber(
+        SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_resource_approval_requested(
+        event: BrokerShiftResourceRequestApprovalRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(HandleResourceApprovalRequestedHandler)
+            await handler(
+                HandleResourceApprovalRequestedCommand(
+                    request_id=event.request_id,
+                    project_id=event.project_id,
+                    project_title=event.project_title,
+                    shift_id=event.shift_id,
+                    shift_title=event.shift_title,
+                    resource_request_id=event.resource_request_id,
+                    owner_user_id=event.owner_user_id,
+                    resource_id=event.resource_id,
+                    resource_type=event.resource_type,
+                    time_from=event.time_from,
+                    time_to=event.time_to,
+                )
+            )
+
+    @router.subscriber(
+        SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_participant_reservation_requested(
+        event: BrokerShiftParticipantReservationRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(ReserveAvailabilityHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                reservation_id = await handler(
+                    ReserveAvailabilityCommand(
+                        request_id=BaseId(event.request_id),
+                        user_id=BaseId(event.user_id),
+                        owner_id=BaseId(event.user_id),
+                        obj_id=BaseId(event.user_id),
+                        start_time=event.start_time,
+                        end_time=event.end_time,
+                    )
+                )
+            except Exception as exc:
+                await publisher.publish(
+                    "shift.participant_reserve_failed",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "participant_id": str(event.participant_id),
+                        "user_id": str(event.user_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    "shift.participant_reserved.user",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "participant_id": str(event.participant_id),
+                        "user_id": str(event.user_id),
+                        "reservation_id": str(reservation_id),
+                    },
+                )
+
+    @router.subscriber(
+        SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_resource_request_reservation_requested(
+        event: BrokerShiftResourceRequestReservationRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(ReserveAvailabilityHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                reservation_id = await handler(
+                    ReserveAvailabilityCommand(
+                        request_id=BaseId(event.request_id),
+                        user_id=BaseId(event.owner_user_id),
+                        owner_id=BaseId(event.owner_user_id),
+                        obj_id=BaseId(event.resource_id),
+                        start_time=event.start_time,
+                        end_time=event.end_time,
+                    )
+                )
+            except Exception as exc:
+                await publisher.publish(
+                    "shift.resource_request_reserve_failed",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "resource_request_id": str(event.resource_request_id),
+                        "owner_user_id": str(event.owner_user_id),
+                        "resource_id": str(event.resource_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    "shift.resource_request_reserved.user",
+                    {
+                        "request_id": str(event.request_id),
+                        "project_id": str(event.project_id),
+                        "shift_id": str(event.shift_id),
+                        "resource_request_id": str(event.resource_request_id),
+                        "owner_user_id": str(event.owner_user_id),
+                        "resource_id": str(event.resource_id),
+                        "reservation_id": str(reservation_id),
+                    },
+                )
 
     return router

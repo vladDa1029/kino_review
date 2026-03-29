@@ -3,7 +3,7 @@ from uuid import UUID
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, File, Form, Header, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
 
 from app.application.commands import (
     ApproveResourceRequestCommand,
@@ -38,6 +38,8 @@ from app.application.commands import (
     UploadShiftDocumentHandler,
 )
 from app.application.queries import (
+    GetParticipantApprovalStateHandler,
+    GetParticipantApprovalStateQuery,
     GetDocumentDownloadUrlHandler,
     GetDocumentDownloadUrlQuery,
     GetProjectHandler,
@@ -46,6 +48,8 @@ from app.application.queries import (
     GetProjectQuery,
     GetProjectUserResourcesHandler,
     GetProjectUserResourcesQuery,
+    GetResourceApprovalStateHandler,
+    GetResourceApprovalStateQuery,
     HealthHandler,
     HealthQuery,
     ListActorProjectsHandler,
@@ -53,6 +57,7 @@ from app.application.queries import (
     ListProjectMembersHandler,
     ListProjectMembersQuery,
 )
+from app.config import get_settings
 from app.presentation.schemas import (
     ChangeProjectMemberRoleRequest,
     CreateResourceRequestBody,
@@ -73,13 +78,27 @@ from app.presentation.schemas import (
     ProjectUpdateRequest,
     ProjectUserResourcesResponse,
     RejectResourceRequestBody,
+    ParticipantApprovalStateResponse,
+    ResourceApprovalStateResponse,
     ResourceTimeWindowResponse,
     ShiftParticipantResponse,
     ShiftResourceRequestResponse,
     ShiftResponse,
+    to_project_role_input,
 )
 
 router = APIRouter(tags=["project"], route_class=DishkaRoute)
+
+
+def require_internal_api_key(
+    x_internal_api_key: Annotated[str, Header(alias="X-Internal-Api-Key")],
+) -> None:
+    expected = get_settings().internal_api.api_key
+    if x_internal_api_key != expected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal API key.",
+        )
 
 
 @router.get("/health", summary="Health check")
@@ -217,7 +236,7 @@ async def list_project_members(
             ProjectMemberShortResponse(
                 oid=member.oid,
                 user_id=member.user_id,
-                role=ProjectRoleInput[member.role.name],
+                role=to_project_role_input(member.role),
                 status=member.status,
                 invited_by=member.invited_by,
                 created_at=member.created_at,
@@ -252,7 +271,7 @@ async def get_project_member(
         oid=member.oid,
         project_id=project_id,
         user_id=member.user_id,
-        role=ProjectRoleInput[member.role.name],
+        role=to_project_role_input(member.role),
         status=member.status,
         invited_by=member.invited_by,
         created_at=member.created_at,
@@ -324,7 +343,7 @@ async def get_project_user_resources(
     )
     return ProjectUserResourcesResponse(
         user_id=result.user_id,
-        role=ProjectRoleInput[result.role.name],
+        role=to_project_role_input(result.role),
         resources=[
             ProjectResourceResponse(
                 resource_kind=item.resource_kind,
@@ -450,6 +469,35 @@ async def decline_shift_participant(
     return ShiftParticipantResponse.from_entity(participant)
 
 
+@router.get(
+    "/internal/participants/{participant_id}/approval-state",
+    response_model=ParticipantApprovalStateResponse,
+    include_in_schema=False,
+)
+async def get_participant_approval_state(
+    participant_id: UUID,
+    handler: FromDishka[GetParticipantApprovalStateHandler],
+    _: None = Depends(require_internal_api_key),
+) -> ParticipantApprovalStateResponse:
+    result = await handler(GetParticipantApprovalStateQuery(participant_id=participant_id))
+    return ParticipantApprovalStateResponse(
+        request_id=result.request_id,
+        project_id=result.project_id,
+        project_title=result.project_title,
+        shift_id=result.shift_id,
+        shift_title=result.shift_title,
+        participant_id=result.participant_id,
+        user_id=result.user_id,
+        role=ProjectRoleInput[result.role_name],
+        time_from=result.time_from,
+        time_to=result.time_to,
+        status=result.status,
+        status_name=result.status_name,
+        user_reservation_id=result.user_reservation_id,
+        reserve_failure_reason=result.reserve_failure_reason,
+    )
+
+
 @router.post(
     "/shifts/{shift_id}/documents",
     response_model=DocumentUploadResponse,
@@ -565,3 +613,33 @@ async def reject_resource_request(
         )
     )
     return ShiftResourceRequestResponse.from_entity(request)
+
+
+@router.get(
+    "/internal/resource-requests/{request_id}/approval-state",
+    response_model=ResourceApprovalStateResponse,
+    include_in_schema=False,
+)
+async def get_resource_request_approval_state(
+    request_id: UUID,
+    handler: FromDishka[GetResourceApprovalStateHandler],
+    _: None = Depends(require_internal_api_key),
+) -> ResourceApprovalStateResponse:
+    result = await handler(GetResourceApprovalStateQuery(resource_request_id=request_id))
+    return ResourceApprovalStateResponse(
+        request_id=result.request_id,
+        project_id=result.project_id,
+        project_title=result.project_title,
+        shift_id=result.shift_id,
+        shift_title=result.shift_title,
+        resource_request_id=result.resource_request_id,
+        owner_user_id=result.owner_user_id,
+        resource_id=result.resource_id,
+        resource_type=result.resource_type,
+        time_from=result.time_from,
+        time_to=result.time_to,
+        status=result.status,
+        status_name=result.status_name,
+        resource_reservation_id=result.resource_reservation_id,
+        reserve_failure_reason=result.reserve_failure_reason,
+    )

@@ -157,7 +157,7 @@ class UserServicePort(Protocol):
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
+    ) -> None:
         raise NotImplementedError
 
     async def reserve_resource_time(
@@ -171,7 +171,7 @@ class UserServicePort(Protocol):
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,
-    ) -> UUID:
+    ) -> None:
         raise NotImplementedError
 
 

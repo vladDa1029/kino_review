@@ -26,6 +26,14 @@ from app.domain.errors.base import ApplicationError
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.broker.consumer import (
     PROJECT_MEMBER_APPROVED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE,
     USER_EVENTS_EXCHANGE,
 )
 from app.infrastructure.broker.publisher import PROJECT_EVENTS_EXCHANGE
@@ -49,6 +57,14 @@ async def lifespan(app: FastAPI):
         await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
         await broker.declare_exchange(USER_EVENTS_EXCHANGE)
         await broker.declare_queue(PROJECT_MEMBER_APPROVED_QUEUE)
+        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE)
+        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE)
+        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVED_QUEUE)
+        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE)
+        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE)
+        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE)
+        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE)
+        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE)
         broker_started = True
     except Exception as exc:
         log.warning("RabbitMQ is unavailable, starting without broker", error=str(exc))
@@ -167,7 +183,13 @@ def start_app_dev() -> FastAPI:
         ],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "Accept", "Cache-Control", "X-User-Id"],
+        allow_headers=[
+            "Content-Type",
+            "Accept",
+            "Cache-Control",
+            "X-User-Id",
+            "X-Internal-Api-Key",
+        ],
     )
 
     app.include_router(api_router)

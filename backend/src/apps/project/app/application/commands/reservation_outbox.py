@@ -13,7 +13,7 @@ from app.application.ports.domain import (
 from app.application.ports.transaction import TransactionManager
 from app.application.support import publish_best_effort
 from app.domain.entities import ReservationOutboxMessage
-from app.domain.services import ResourceRequestService, ShiftParticipantService
+from app.domain.enums import ResourceRequestStatus, ShiftParticipantStatus
 
 RESERVATION_OUTBOX_NAMESPACE = UUID("3d46f2ae-2d14-4edf-aeb8-b0e4f15f6f20")
 PARTICIPANT_RESERVE_OPERATION = "participant_reserve"
@@ -48,8 +48,6 @@ class ProcessReservationOutboxHandler:
         shift_participants: ShiftParticipantRepository,
         resource_requests: ResourceRequestRepository,
         reservation_outbox: ReservationOutboxRepository,
-        shift_participant_service: ShiftParticipantService,
-        resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
@@ -59,8 +57,6 @@ class ProcessReservationOutboxHandler:
         self._shift_participants = shift_participants
         self._resource_requests = resource_requests
         self._reservation_outbox = reservation_outbox
-        self._shift_participant_service = shift_participant_service
-        self._resource_request_service = resource_request_service
 
     async def __call__(self, *, limit: int = 20) -> int:
         messages = await self._reservation_outbox.list_pending(limit=limit)
@@ -97,10 +93,11 @@ class ProcessReservationOutboxHandler:
             return await self._complete_missing_message(message, "Shift participant is not found.")
         if participant.user_reservation_id is not None:
             return await self._complete_message(message)
-        if participant.status.name != "RESERVING":
+        participant_status = _enum_name(participant.status, ShiftParticipantStatus)
+        if participant_status != "RESERVING":
             return await self._complete_message(
                 message,
-                error=f"Shift participant is in non-reserving status: {participant.status.name}",
+                error=f"Shift participant is in non-reserving status: {participant_status}",
             )
 
         shift = await self._shifts.get_by_id(participant.shift_id)
@@ -108,7 +105,7 @@ class ProcessReservationOutboxHandler:
             return await self._complete_missing_message(message, "Shift is not found.")
 
         try:
-            reservation_id = await self._user_service.reserve_user_time(
+            await self._user_service.reserve_user_time(
                 request_id=message.oid,
                 user_id=participant.user_id,
                 time_from=participant.time_from,
@@ -118,44 +115,14 @@ class ProcessReservationOutboxHandler:
                 entity_id=participant.oid,
             )
         except Exception as exc:
-            self._shift_participant_service.mark_reserve_failed(
-                participant=participant,
-                reason=str(exc),
-                now=self._clock.now(),
-            )
-            message.status = OUTBOX_STATUS_COMPLETED
             message.attempts += 1
             message.last_error = str(exc)
             message.updated_at = self._clock.now()
-            await self._shift_participants.update(participant)
             await self._reservation_outbox.update(message)
             await self._tx.commit()
             return ProcessReservationOutboxResult(status="failed", error=str(exc))
 
-        self._shift_participant_service.mark_reserved(
-            participant=participant,
-            reservation_id=reservation_id,
-            now=self._clock.now(),
-        )
-        participant.reserve_failure_reason = None
-        message.status = OUTBOX_STATUS_COMPLETED
-        message.attempts += 1
-        message.last_error = None
-        message.updated_at = self._clock.now()
-        await self._shift_participants.update(participant)
-        await self._reservation_outbox.update(message)
-        await self._tx.commit()
-        await publish_best_effort(
-            publisher=self._publisher,
-            topic="shift.participant_reserved",
-            payload={
-                "project_id": str(shift.project_id),
-                "shift_id": str(shift.oid),
-                "participant_id": str(participant.oid),
-                "user_reservation_id": str(participant.user_reservation_id),
-            },
-        )
-        return ProcessReservationOutboxResult(status="reserved")
+        return await self._complete_message(message)
 
     async def _process_resource_reserve(
         self,
@@ -166,14 +133,15 @@ class ProcessReservationOutboxHandler:
             return await self._complete_missing_message(message, "Resource request is not found.")
         if request.resource_reservation_id is not None:
             return await self._complete_message(message)
-        if request.status.name != "RESERVING":
+        request_status = _enum_name(request.status, ResourceRequestStatus)
+        if request_status != "RESERVING":
             return await self._complete_message(
                 message,
-                error=f"Resource request is in non-reserving status: {request.status.name}",
+                error=f"Resource request is in non-reserving status: {request_status}",
             )
 
         try:
-            reservation_id = await self._user_service.reserve_resource_time(
+            await self._user_service.reserve_resource_time(
                 request_id=message.oid,
                 owner_user_id=request.resource_owner_user_id,
                 resource_id=request.resource_id,
@@ -184,44 +152,14 @@ class ProcessReservationOutboxHandler:
                 entity_id=request.oid,
             )
         except Exception as exc:
-            self._resource_request_service.mark_reserve_failed(
-                request=request,
-                reason=str(exc),
-                now=self._clock.now(),
-            )
-            message.status = OUTBOX_STATUS_COMPLETED
             message.attempts += 1
             message.last_error = str(exc)
             message.updated_at = self._clock.now()
-            await self._resource_requests.update(request)
             await self._reservation_outbox.update(message)
             await self._tx.commit()
             return ProcessReservationOutboxResult(status="failed", error=str(exc))
 
-        self._resource_request_service.mark_reserved(
-            request=request,
-            reservation_id=reservation_id,
-            now=self._clock.now(),
-        )
-        request.reserve_failure_reason = None
-        message.status = OUTBOX_STATUS_COMPLETED
-        message.attempts += 1
-        message.last_error = None
-        message.updated_at = self._clock.now()
-        await self._resource_requests.update(request)
-        await self._reservation_outbox.update(message)
-        await self._tx.commit()
-        await publish_best_effort(
-            publisher=self._publisher,
-            topic="shift.resource_request_reserved",
-            payload={
-                "project_id": str(request.project_id),
-                "shift_id": str(request.shift_id),
-                "request_id": str(request.oid),
-                "resource_reservation_id": str(request.resource_reservation_id),
-            },
-        )
-        return ProcessReservationOutboxResult(status="reserved")
+        return await self._complete_message(message)
 
     async def _complete_message(
         self,
@@ -230,6 +168,7 @@ class ProcessReservationOutboxHandler:
         error: str | None = None,
     ) -> ProcessReservationOutboxResult:
         message.status = OUTBOX_STATUS_COMPLETED
+        message.attempts += 1
         message.last_error = error
         message.updated_at = self._clock.now()
         await self._reservation_outbox.update(message)
@@ -248,3 +187,9 @@ class ProcessReservationOutboxHandler:
         await self._reservation_outbox.update(message)
         await self._tx.commit()
         return ProcessReservationOutboxResult(status="failed", error=error)
+
+
+def _enum_name(value: object, enum_cls: type[ShiftParticipantStatus] | type[ResourceRequestStatus]) -> str:
+    if hasattr(value, "name"):
+        return str(getattr(value, "name"))
+    return enum_cls(int(value)).name

@@ -4,7 +4,6 @@ from uuid import UUID
 
 from app.application.commands.reservation_outbox import (
     OUTBOX_STATUS_PENDING,
-    ProcessReservationOutboxHandler,
     RESOURCE_RESERVE_OPERATION,
     build_resource_reservation_request_id,
 )
@@ -26,7 +25,6 @@ from app.application.support import (
     require_shift,
 )
 from app.domain.entities import ReservationOutboxMessage, ShiftResourceRequest
-from app.domain.errors.business import ExternalServiceError
 from app.domain.services import ResourceRequestService
 
 
@@ -115,18 +113,14 @@ class ApproveResourceRequestHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         publisher: EventPublisher,
-        user_service: UserServicePort,
         reservation_outbox: ReservationOutboxRepository,
-        reservation_processor: ProcessReservationOutboxHandler,
         resource_requests: ResourceRequestRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
-        self._user_service = user_service
         self._reservation_outbox = reservation_outbox
-        self._reservation_processor = reservation_processor
         self._resource_requests = resource_requests
         self._resource_request_service = resource_request_service
 
@@ -161,13 +155,6 @@ class ApproveResourceRequestHandler:
             await self._tx.rollback()
             raise
 
-        result = await self._reservation_processor.process_message(request_key)
-        request = await require_resource_request(
-            resource_requests=self._resource_requests,
-            request_id=command.request_id,
-        )
-        if result.status == "failed":
-            raise ExternalServiceError(result.error or "Resource reservation failed.")
         return request
 
 

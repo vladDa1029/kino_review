@@ -37,7 +37,7 @@ class DocumentTypeInput(StrEnum):
         return DocumentType[self.value]
 
 
-def _to_project_role_input(value: ProjectRole | int) -> ProjectRoleInput:
+def to_project_role_input(value: ProjectRole | int) -> ProjectRoleInput:
     role = value if isinstance(value, ProjectRole) else ProjectRole(int(value))
     return ProjectRoleInput[role.name]
 
@@ -101,7 +101,7 @@ class ProjectMemberResponse(BaseModel):
             oid=member.oid,
             project_id=member.project_id,
             user_id=member.user_id,
-            role=_to_project_role_input(member.role),
+            role=to_project_role_input(member.role),
             status=int(member.status),
             invited_by=member.invited_by,
             created_at=member.created_at,
@@ -225,7 +225,7 @@ class ShiftParticipantResponse(BaseModel):
             oid=participant.oid,
             shift_id=participant.shift_id,
             user_id=participant.user_id,
-            role=_to_project_role_input(participant.role),
+            role=to_project_role_input(participant.role),
             time_from=participant.time_from,
             time_to=participant.time_to,
             status=int(participant.status),
@@ -235,6 +235,23 @@ class ShiftParticipantResponse(BaseModel):
             created_at=participant.created_at,
             updated_at=participant.updated_at,
         )
+
+
+class ParticipantApprovalStateResponse(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    participant_id: UUID
+    user_id: UUID
+    role: ProjectRoleInput
+    time_from: datetime
+    time_to: datetime
+    status: int
+    status_name: str
+    user_reservation_id: UUID | None
+    reserve_failure_reason: str | None
 
 
 class CreateResourceRequestBody(BaseModel):
@@ -287,6 +304,24 @@ class ShiftResourceRequestResponse(BaseModel):
         )
 
 
+class ResourceApprovalStateResponse(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+    status: int
+    status_name: str
+    resource_reservation_id: UUID | None
+    reserve_failure_reason: str | None
+
+
 class DocumentUploadResponse(BaseModel):
     oid: UUID
     shift_id: UUID
@@ -331,3 +366,77 @@ class BrokerProjectMemberInvitationApproved(BaseModel):
     project_id: UUID
     user_id: UUID
     approved_by_user_id: UUID | None = None
+
+
+class BrokerShiftParticipantReservationCheckSucceeded(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+
+
+class BrokerShiftParticipantReservationCheckFailed(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+    reason: str
+
+
+class BrokerShiftParticipantReserved(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+    reservation_id: UUID
+
+
+class BrokerShiftParticipantReserveFailed(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participant_id: UUID
+    user_id: UUID
+    reason: str
+
+
+class BrokerShiftResourceRequestReservationCheckSucceeded(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+
+
+class BrokerShiftResourceRequestReservationCheckFailed(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    reason: str
+
+
+class BrokerShiftResourceRequestReserved(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    reservation_id: UUID
+
+
+class BrokerShiftResourceRequestReserveFailed(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    resource_request_id: UUID
+    owner_user_id: UUID
+    resource_id: UUID
+    reason: str

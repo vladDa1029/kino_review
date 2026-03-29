@@ -73,6 +73,15 @@ services:
     depends_on:
       pg:
         condition: service_healthy
+      broker:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: pg
+      DATABASE_PORT_NETWORK: 5432
+      PROJECT_SERVICE_BASE_URL: http://project:8003
+      PROJECT_SERVICE_INTERNAL_API_KEY: kino-internal-dev-key
+      CONFIRMATION_SECRET_KEY: kino-confirmation-dev-key-please-change
+      PUBLIC_BASE_URL: http://localhost:8000
     volumes:
       - ./backend/src/apps/user/app:/app/app
     command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8002"]
@@ -91,9 +100,46 @@ services:
       DATABASE_HOST: pg
       DATABASE_PORT_NETWORK: 5432
       USER_SERVICE_BASE_URL: http://user:8002
+      INTERNAL_API_KEY: kino-internal-dev-key
     volumes:
       - ./backend/src/apps/project/app:/app/app
     command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8003"]
+  notificate:
+    build:
+      dockerfile: /Dockerfile
+      context: ./backend/src/apps/notificate
+    ports:
+      - "8005:8005"
+    depends_on:
+      broker:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM_EMAIL: no-reply@kino.local
+      SMTP_FROM_NAME: Kino
+    volumes:
+      - ./backend/src/apps/notificate/app:/app/app
+    command: ["sh", "-c", "poetry run python -m uvicorn main:start_app_dev --factory --host 0.0.0.0 --port 8005"]
+  notificate-worker:
+    build:
+      dockerfile: /Dockerfile
+      context: ./backend/src/apps/notificate
+    depends_on:
+      broker:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM_EMAIL: no-reply@kino.local
+      SMTP_FROM_NAME: Kino
+    volumes:
+      - ./backend/src/apps/notificate/app:/app/app
+    command: ["sh", "-c", "poetry run taskiq worker worker:create_worker_taskiq_app"]
   broker:
     image: rabbitmq:3-management-alpine
     ports:
@@ -109,6 +155,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
   
 
   minio:
@@ -117,7 +168,7 @@ services:
       - "9000:9000"    
       - "9001:9001"    
     environment:
-      MINIO_ROOT_USER: 
+      MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data

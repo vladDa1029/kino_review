@@ -107,6 +107,10 @@ class UserService(ConfigABC):
     timeout_seconds: float = Field(alias="USER_SERVICE_TIMEOUT_SECONDS", default=10.0)
 
 
+class InternalApi(ConfigABC):
+    api_key: str = Field(alias="INTERNAL_API_KEY", default="kino-internal-dev-key")
+
+
 class ReservationOutbox(ConfigABC):
     poll_interval_seconds: float = Field(
         alias="RESERVATION_OUTBOX_POLL_INTERVAL_SECONDS",
@@ -130,6 +134,7 @@ class Settings(ConfigABC):
     alchemy: SQLAlchemySettings = SQLAlchemySettings()
     rabbitmq: Rabbitmq = Rabbitmq()
     user_service: UserService = UserService()
+    internal_api: InternalApi = InternalApi()
     reservation_outbox: ReservationOutbox = ReservationOutbox()
     minio: Minio = Minio()
 
