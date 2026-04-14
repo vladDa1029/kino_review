@@ -1,51 +1,46 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import * as authApi from '../services/api';
+import { refreshAccessToken } from '../services/authSession';
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAuthSession,
+  subscribeToTokenChanges,
+} from '../services/tokenStorage';
 import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
-import { clearAccessToken, getAccessToken, setAccessToken, setTokenType } from '../services/tokenStorage';
 import { AuthContext } from './authContextInstance';
-import { ApiError } from '../services/httpClient';
 
 export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(() => getAccessToken());
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState(() => {
+    const currentToken = getAccessToken();
+    return currentToken ? decodeToken(currentToken) : null;
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   const applyToken = useCallback((nextToken, nextTokenType = 'Bearer') => {
-    setTokenType(nextToken ? nextTokenType : 'Bearer');
-    setAccessToken(nextToken);
-    setTokenState(nextToken || null);
-    setUserData(nextToken ? decodeToken(nextToken) : null);
+    setAuthSession(nextToken, nextTokenType);
   }, []);
 
   const handleRefreshToken = useCallback(async () => {
     try {
-      const response = await authApi.refreshToken();
-      if (response?.access_token) {
-        applyToken(response.access_token, response.token_type);
-        return response.access_token;
-      }
-      applyToken(null);
-      return null;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 0) {
-        // Сетевая/CORS ошибка: не сбрасываем сессию, чтобы не разлогинивать пользователя.
-        return token;
-      }
-
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        applyToken(null);
-        return null;
-      }
-
-      return token;
+      return await refreshAccessToken({ preserveSessionOnNetworkError: true });
+    } catch {
+      return getAccessToken();
     }
-  }, [applyToken, token]);
+  }, []);
 
   useEffect(() => {
+    const unsubscribe = subscribeToTokenChanges(({ accessToken }) => {
+      setTokenState(accessToken);
+      setUserData(accessToken ? decodeToken(accessToken) : null);
+    });
+
     setIsAuthReady(true);
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -108,11 +103,10 @@ export const AuthProvider = ({ children }) => {
       // Ошибки выхода на бэкенде игнорируем и очищаем локальное состояние.
     } finally {
       clearAccessToken();
-      applyToken(null);
       toast.info('Вы вышли из системы');
       setIsAuthModalOpen(false);
     }
-  }, [applyToken]);
+  }, []);
 
   const contextValue = useMemo(
     () => ({

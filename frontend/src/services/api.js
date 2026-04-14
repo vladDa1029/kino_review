@@ -1,10 +1,110 @@
 import apiClient from './httpClient';
 
-export const register = async (email, password) =>
-  apiClient('/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
+const buildQueryString = (params = {}) => {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+
+    searchParams.set(key, String(value));
   });
+
+  return searchParams.toString();
+};
+
+const withQuery = (path, params) => {
+  const queryString = buildQueryString(params);
+  return queryString ? `${path}?${queryString}` : path;
+};
+
+const createJsonRequest = (path, method, payload) =>
+  apiClient(path, {
+    method,
+    body: JSON.stringify(payload),
+  });
+
+const createCollectionHelpers = (collectionPath, buildListParams) => ({
+  create: async (payload) => createJsonRequest(collectionPath, 'POST', payload),
+  list: async (params = {}) =>
+    apiClient(withQuery(collectionPath, buildListParams(params)), {
+      method: 'GET',
+    }),
+  update: async (itemId, payload) => createJsonRequest(`${collectionPath}/${itemId}`, 'PUT', payload),
+  remove: async (itemId) =>
+    apiClient(`${collectionPath}/${itemId}`, {
+      method: 'DELETE',
+    }),
+});
+
+const buildEquipmentListParams = ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => ({
+  page,
+  page_size: pageSize,
+  sort_by: sortBy,
+  sort_dir: sortDir,
+  type,
+  search,
+  created_from: createdFrom,
+  created_to: createdTo,
+});
+
+const buildRequisiteListParams = ({
+  page = 1,
+  pageSize = 20,
+  sortBy,
+  sortDir = 'asc',
+  type,
+  size,
+  search,
+  createdFrom,
+  createdTo,
+} = {}) => ({
+  page,
+  page_size: pageSize,
+  sort_by: sortBy,
+  sort_dir: sortDir,
+  type,
+  size,
+  search,
+  created_from: createdFrom,
+  created_to: createdTo,
+});
+
+const createEquipmentFreeTimeHelper = (resourcePath) => async (itemId, payload) =>
+  createJsonRequest(`/user/users/me/${resourcePath}/${itemId}/free-times`, 'POST', payload);
+
+const createImageUploadFormData = (payload) => {
+  if (payload instanceof FormData) {
+    return payload;
+  }
+
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  formData.append('title', payload.title);
+  formData.append('description', payload.description);
+  return formData;
+};
+
+const microfonsApi = createCollectionHelpers('/user/users/me/microfons', buildEquipmentListParams);
+const camerasApi = createCollectionHelpers('/user/users/me/cameras', buildEquipmentListParams);
+const cameraTripodsApi = createCollectionHelpers('/user/users/me/camera-tripods', buildEquipmentListParams);
+const lightsApi = createCollectionHelpers('/user/users/me/lights', buildEquipmentListParams);
+const lightTripodsApi = createCollectionHelpers('/user/users/me/light-tripods', buildEquipmentListParams);
+const soundsApi = createCollectionHelpers('/user/users/me/sounds', buildEquipmentListParams);
+const requisitesApi = createCollectionHelpers('/user/users/me/requisites', buildRequisiteListParams);
+
+export const register = async (email, password) =>
+  createJsonRequest('/auth/register', 'POST', { email, password });
 
 export const login = async (username, password) => {
   const formData = new URLSearchParams();
@@ -35,22 +135,19 @@ export const logout = async () =>
     withCredentials: true,
   });
 
-export const getUsers = async (page = 1, pageSize = 5) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: pageSize.toString(),
-  });
-
-  return apiClient(`/auth/users?${params.toString()}`, {
-    method: 'GET',
-  });
-};
+export const getUsers = async (page = 1, pageSize = 5) =>
+  apiClient(
+    withQuery('/auth/users', {
+      page,
+      page_size: pageSize,
+    }),
+    {
+      method: 'GET',
+    },
+  );
 
 export const createUserDescription = async (payload) =>
-  apiClient('/user/users/me/description', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  createJsonRequest('/user/users/me/description', 'POST', payload);
 
 export const getUserDescription = async () =>
   apiClient('/user/users/me/description', {
@@ -58,183 +155,91 @@ export const getUserDescription = async () =>
   });
 
 export const updateUserDescription = async (descriptionId, payload) =>
-  apiClient(`/user/users/me/description/${descriptionId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  createJsonRequest(`/user/users/me/description/${descriptionId}`, 'PUT', payload);
 
-export const createMicrofon = async (payload) =>
-  apiClient('/user/users/me/microfons', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export const createSpareTime = async (payload) =>
+  createJsonRequest('/user/users/me/spare-times', 'POST', payload);
 
-export const listMicrofons = async ({
-  page = 1,
-  pageSize = 20,
-  sortBy,
-  sortDir = 'asc',
-  type,
-  search,
-  createdFrom,
-  createdTo,
-} = {}) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: pageSize.toString(),
-    sort_dir: sortDir,
-  });
-
-  if (sortBy) params.set('sort_by', sortBy);
-  if (type) params.set('type', type);
-  if (search) params.set('search', search);
-  if (createdFrom) params.set('created_from', createdFrom);
-  if (createdTo) params.set('created_to', createdTo);
-
-  return apiClient(`/user/users/me/microfons?${params.toString()}`, {
+export const listSpareTimes = async () =>
+  apiClient('/user/users/me/spare-times', {
     method: 'GET',
   });
-};
 
-export const updateMicrofon = async (microfonId, payload) =>
-  apiClient(`/user/users/me/microfons/${microfonId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
+export const getSpareTime = async (spareTimeId) =>
+  apiClient(`/user/users/me/spare-times/${spareTimeId}`, {
+    method: 'GET',
   });
 
-export const deleteMicrofon = async (microfonId) =>
-  apiClient(`/user/users/me/microfons/${microfonId}`, {
+export const updateSpareTime = async (spareTimeId, payload) =>
+  createJsonRequest(`/user/users/me/spare-times/${spareTimeId}`, 'PUT', payload);
+
+export const deleteSpareTime = async (spareTimeId) =>
+  apiClient(`/user/users/me/spare-times/${spareTimeId}`, {
     method: 'DELETE',
   });
 
-export const createCamera = async (payload) =>
-  apiClient('/user/users/me/cameras', {
+export const reserveAvailability = async (payload) =>
+  createJsonRequest('/user/users/me/availability/reserve', 'POST', payload);
+
+export const createMicrofon = microfonsApi.create;
+export const listMicrofons = microfonsApi.list;
+export const updateMicrofon = microfonsApi.update;
+export const deleteMicrofon = microfonsApi.remove;
+export const addMicrofonFreeTime = createEquipmentFreeTimeHelper('microfons');
+
+export const createCamera = camerasApi.create;
+export const listCameras = camerasApi.list;
+export const updateCamera = camerasApi.update;
+export const deleteCamera = camerasApi.remove;
+export const addCameraFreeTime = createEquipmentFreeTimeHelper('cameras');
+
+export const createCameraTripod = cameraTripodsApi.create;
+export const listCameraTripods = cameraTripodsApi.list;
+export const updateCameraTripod = cameraTripodsApi.update;
+export const deleteCameraTripod = cameraTripodsApi.remove;
+export const addCameraTripodFreeTime = createEquipmentFreeTimeHelper('camera-tripods');
+
+export const createLight = lightsApi.create;
+export const listLights = lightsApi.list;
+export const updateLight = lightsApi.update;
+export const deleteLight = lightsApi.remove;
+export const addLightFreeTime = createEquipmentFreeTimeHelper('lights');
+
+export const createLightTripod = lightTripodsApi.create;
+export const listLightTripods = lightTripodsApi.list;
+export const updateLightTripod = lightTripodsApi.update;
+export const deleteLightTripod = lightTripodsApi.remove;
+export const addLightTripodFreeTime = createEquipmentFreeTimeHelper('light-tripods');
+
+export const createSound = soundsApi.create;
+export const listSounds = soundsApi.list;
+export const updateSound = soundsApi.update;
+export const deleteSound = soundsApi.remove;
+export const addSoundFreeTime = createEquipmentFreeTimeHelper('sounds');
+
+export const createRequisite = requisitesApi.create;
+export const listRequisites = requisitesApi.list;
+export const updateRequisite = requisitesApi.update;
+export const deleteRequisite = requisitesApi.remove;
+export const addRequisiteFreeTime = createEquipmentFreeTimeHelper('requisites');
+
+export const addRequisiteImage = async (requisiteId, payload) =>
+  apiClient(`/user/users/me/requisites/${requisiteId}/images`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: createImageUploadFormData(payload),
   });
 
-export const listCameras = async ({
-  page = 1,
-  pageSize = 20,
-  sortBy,
-  sortDir = 'asc',
-  type,
-  search,
-  createdFrom,
-  createdTo,
-} = {}) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: pageSize.toString(),
-    sort_dir: sortDir,
-  });
-
-  if (sortBy) params.set('sort_by', sortBy);
-  if (type) params.set('type', type);
-  if (search) params.set('search', search);
-  if (createdFrom) params.set('created_from', createdFrom);
-  if (createdTo) params.set('created_to', createdTo);
-
-  return apiClient(`/user/users/me/cameras?${params.toString()}`, {
+export const listRequisiteImages = async (requisiteId) =>
+  apiClient(`/user/users/me/requisites/${requisiteId}/images`, {
     method: 'GET',
   });
-};
 
-export const updateCamera = async (cameraId, payload) =>
-  apiClient(`/user/users/me/cameras/${cameraId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
-
-export const deleteCamera = async (cameraId) =>
-  apiClient(`/user/users/me/cameras/${cameraId}`, {
-    method: 'DELETE',
-  });
-
-export const createCameraTripod = async (payload) =>
-  apiClient('/user/users/me/camera-tripods', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-
-export const listCameraTripods = async ({
-  page = 1,
-  pageSize = 20,
-  sortBy,
-  sortDir = 'asc',
-  type,
-  search,
-  createdFrom,
-  createdTo,
-} = {}) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: pageSize.toString(),
-    sort_dir: sortDir,
-  });
-
-  if (sortBy) params.set('sort_by', sortBy);
-  if (type) params.set('type', type);
-  if (search) params.set('search', search);
-  if (createdFrom) params.set('created_from', createdFrom);
-  if (createdTo) params.set('created_to', createdTo);
-
-  return apiClient(`/user/users/me/camera-tripods?${params.toString()}`, {
+export const getRequisiteImage = async (requisiteId, imageId) =>
+  apiClient(`/user/users/me/requisites/${requisiteId}/images/${imageId}`, {
     method: 'GET',
   });
-};
 
-export const updateCameraTripod = async (cameraTripodId, payload) =>
-  apiClient(`/user/users/me/camera-tripods/${cameraTripodId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
-
-export const deleteCameraTripod = async (cameraTripodId) =>
-  apiClient(`/user/users/me/camera-tripods/${cameraTripodId}`, {
-    method: 'DELETE',
-  });
-
-export const createLight = async (payload) =>
-  apiClient('/user/users/me/lights', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-
-export const listLights = async ({
-  page = 1,
-  pageSize = 20,
-  sortBy,
-  sortDir = 'asc',
-  type,
-  search,
-  createdFrom,
-  createdTo,
-} = {}) => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: pageSize.toString(),
-    sort_dir: sortDir,
-  });
-
-  if (sortBy) params.set('sort_by', sortBy);
-  if (type) params.set('type', type);
-  if (search) params.set('search', search);
-  if (createdFrom) params.set('created_from', createdFrom);
-  if (createdTo) params.set('created_to', createdTo);
-
-  return apiClient(`/user/users/me/lights?${params.toString()}`, {
-    method: 'GET',
-  });
-};
-
-export const updateLight = async (lightId, payload) =>
-  apiClient(`/user/users/me/lights/${lightId}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
-
-export const deleteLight = async (lightId) =>
-  apiClient(`/user/users/me/lights/${lightId}`, {
+export const removeRequisiteImage = async (requisiteId, imageId) =>
+  apiClient(`/user/users/me/requisites/${requisiteId}/images/${imageId}`, {
     method: 'DELETE',
   });
