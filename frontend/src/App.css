@@ -1441,6 +1441,346 @@ body:not(.dark-theme) {
   border: 1px solid var(--line);
 }
 
+.dashboard-panel {
+  padding: 1.15rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow-lg);
+}
+
+.projects-page.projects-dashboard-layout {
+  width: min(1480px, 95vw);
+  display: grid;
+  grid-template-columns: 240px minmax(360px, 0.95fr) minmax(420px, 1.1fr);
+  gap: 1rem;
+  align-items: start;
+  --projects-panel-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 92%, transparent),
+    color-mix(in srgb, var(--surface-strong) 88%, transparent)
+  );
+  --projects-input-bg: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  --projects-input-line: color-mix(in srgb, var(--line) 90%, transparent);
+  --projects-soft-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+}
+
+.projects-sidebar,
+.projects-center-column,
+.projects-right-column {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.projects-sidebar {
+  position: sticky;
+  top: 5.4rem;
+}
+
+.projects-sidebar-heading {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.projects-panel-eyebrow {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.projects-sidebar-nav {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.projects-sidebar-button {
+  width: 100%;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.95rem 1rem;
+  text-align: left;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.projects-dashboard-layout .dashboard-panel,
+.projects-dashboard-layout .management-panel,
+.projects-dashboard-layout .media-card,
+.projects-dashboard-layout .image-details-card,
+.projects-dashboard-layout .selected-entity-summary {
+  background: var(--projects-panel-bg);
+  border-color: color-mix(in srgb, var(--line) 82%, transparent);
+  box-shadow: var(--projects-soft-shadow);
+}
+
+.projects-dashboard-layout .section-heading {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.projects-dashboard-layout .section-heading h2,
+.projects-dashboard-layout .section-heading h3,
+.projects-dashboard-layout .projects-sidebar-heading h1,
+.projects-dashboard-layout .projects-calendar-header h2,
+.projects-dashboard-layout .projects-table-heading h2 {
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.projects-dashboard-layout .field-block input,
+.projects-dashboard-layout .field-block textarea,
+.projects-dashboard-layout .field-block select,
+.projects-dashboard-layout input[type='datetime-local'] {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--projects-input-line);
+  background: var(--projects-input-bg);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.projects-dashboard-layout .field-block textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.projects-dashboard-layout .field-block input::placeholder,
+.projects-dashboard-layout .field-block textarea::placeholder,
+.projects-dashboard-layout .field-block select::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 88%, transparent);
+}
+
+.projects-dashboard-layout .field-block input:focus,
+.projects-dashboard-layout .field-block textarea:focus,
+.projects-dashboard-layout .field-block select:focus,
+.projects-dashboard-layout input[type='datetime-local']:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 78%, white 6%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.projects-dashboard-layout .field-block input[type='file'] {
+  padding: 0.75rem;
+}
+
+.projects-dashboard-layout .field-block input[type='file']::file-selector-button {
+  margin-right: 0.85rem;
+  padding: 0.72rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.projects-dashboard-layout .profile-save-btn,
+.projects-dashboard-layout .secondary-btn,
+.projects-dashboard-layout .ghost-action-btn,
+.projects-dashboard-layout .pagination button {
+  min-height: 48px;
+  padding: 0.75rem 1.2rem;
+}
+
+.projects-dashboard-layout .secondary-btn,
+.projects-dashboard-layout .ghost-action-btn {
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+  box-shadow: none;
+}
+
+.projects-dashboard-layout .secondary-btn:hover,
+.projects-dashboard-layout .ghost-action-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+}
+
+.projects-dashboard-layout .profile-save-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.projects-dashboard-layout .table-shell {
+  padding: 0.35rem;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+}
+
+.projects-dashboard-layout .user-table {
+  margin-top: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.projects-dashboard-layout .user-table thead {
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+}
+
+.projects-dashboard-layout .user-table th,
+.projects-dashboard-layout .user-table td {
+  border-bottom-color: color-mix(in srgb, var(--line) 76%, transparent);
+}
+
+.projects-dashboard-layout .user-table tbody tr {
+  background: color-mix(in srgb, var(--surface) 64%, transparent);
+  transition: background-color 0.2s ease;
+}
+
+.projects-dashboard-layout .user-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.projects-dashboard-layout .table-row-selected {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+}
+
+.projects-dashboard-layout .profile-calendar-card {
+  background: var(--projects-panel-bg);
+}
+
+.projects-dashboard-layout .calendar-day-btn {
+  background: color-mix(in srgb, var(--surface-strong) 68%, transparent);
+  border-color: color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.projects-dashboard-layout .calendar-day-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-strong));
+}
+
+.projects-dashboard-layout .calendar-day-btn.is-selected {
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.projects-dashboard-layout .selected-entity-summary,
+.projects-dashboard-layout .management-panel,
+.projects-dashboard-layout .media-card,
+.projects-dashboard-layout .image-details-card,
+.projects-dashboard-layout .projects-sidebar-button,
+.projects-dashboard-layout .table-shell {
+  backdrop-filter: blur(14px);
+}
+
+.projects-dashboard-layout .helper-note {
+  line-height: 1.55;
+}
+
+.dark-theme .projects-dashboard-layout .field-block input,
+.dark-theme .projects-dashboard-layout .field-block textarea,
+.dark-theme .projects-dashboard-layout .field-block select,
+.dark-theme .projects-dashboard-layout input[type='datetime-local'] {
+  color-scheme: dark;
+}
+
+.projects-sidebar-button span {
+  font-weight: 700;
+}
+
+.projects-sidebar-button small,
+.projects-sidebar-note p,
+.projects-calendar-summary p,
+.projects-table-heading p,
+.projects-empty-state {
+  color: var(--text-muted);
+}
+
+.projects-sidebar-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.projects-sidebar-button.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.projects-sidebar-note {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.projects-form-placeholder {
+  border-radius: var(--radius-md);
+  border: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+}
+
+.projects-calendar-panel {
+  position: sticky;
+  top: 5.4rem;
+}
+
+.projects-calendar-header,
+.projects-table-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.projects-calendar-header h2,
+.projects-table-heading h2 {
+  margin: 0.2rem 0 0;
+}
+
+.projects-calendar-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.projects-table-panel .table-shell {
+  margin-top: 0.3rem;
+}
+
+.projects-empty-state {
+  margin: 0.8rem 0 0;
+}
+
+.media-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.entity-meta-list {
+  margin: 0;
+}
+
+.entity-meta-list div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.entity-meta-list dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.entity-meta-list dd {
+  margin: 0;
+}
+
 @keyframes drawLine {
   to {
     stroke-dashoffset: 0;
@@ -1458,6 +1798,20 @@ body:not(.dark-theme) {
 }
 
 @media (max-width: 980px) {
+  .projects-page.projects-dashboard-layout {
+    width: min(1100px, 94vw);
+    grid-template-columns: 1fr;
+  }
+
+  .projects-sidebar,
+  .projects-calendar-panel {
+    position: static;
+  }
+
+  .projects-sidebar-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-section,
   .about-container {
     grid-template-columns: 1fr;
@@ -1514,6 +1868,16 @@ body:not(.dark-theme) {
   .grid-two-columns,
   .management-grid {
     grid-template-columns: 1fr;
+  }
+
+  .projects-sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .projects-calendar-summary,
+  .projects-calendar-header,
+  .projects-table-heading {
+    flex-direction: column;
   }
 
   .profile-reference-scroll {

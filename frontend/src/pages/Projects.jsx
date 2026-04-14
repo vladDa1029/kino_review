@@ -45,23 +45,11 @@ import {
 } from '../services/api';
 import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
 
-const createInitialResourceForm = () => ({
-  title: '',
-  description: '',
-  type: '',
-  size: '',
-});
+const resourceOrder = ['microfons', 'cameras', 'camera-tripods', 'lights', 'light-tripods', 'sounds', 'requisites'];
 
-const createInitialWindowForm = () => ({
-  startTime: '',
-  endTime: '',
-});
-
-const createInitialImageForm = () => ({
-  file: null,
-  title: '',
-  description: '',
-});
+const createInitialResourceForm = () => ({ title: '', description: '', type: '', size: '' });
+const createInitialWindowForm = () => ({ startTime: '', endTime: '' });
+const createInitialImageForm = () => ({ file: null, title: '', description: '' });
 
 const tableColumns = {
   equipment: [
@@ -88,15 +76,9 @@ const resourceMeta = {
     update: updateMicrofon,
     remove: deleteMicrofon,
     addFreeTime: addMicrofonFreeTime,
-    titlePlaceholder: 'Rode NT1',
-    descriptionPlaceholder: 'Например: студийный конденсаторный микрофон',
-    typePlaceholder: 'Например: condenser',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'Rode NTG5', description: 'Пушка для съемок на площадке', type: 'shotgun' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   cameras: {
     label: 'Камеры',
@@ -106,15 +88,9 @@ const resourceMeta = {
     update: updateCamera,
     remove: deleteCamera,
     addFreeTime: addCameraFreeTime,
-    titlePlaceholder: 'Sony A7S III',
-    descriptionPlaceholder: 'Например: полнокадровая беззеркальная камера',
-    typePlaceholder: 'Например: mirrorless',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'Sony A7S III', description: 'Основная камера для съемочного дня', type: 'mirrorless' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   'camera-tripods': {
     label: 'Штативы для камер',
@@ -124,33 +100,21 @@ const resourceMeta = {
     update: updateCameraTripod,
     remove: deleteCameraTripod,
     addFreeTime: addCameraTripodFreeTime,
-    titlePlaceholder: 'Manfrotto 190X',
-    descriptionPlaceholder: 'Например: алюминиевый штатив для видео и фото',
-    typePlaceholder: 'Например: fluid-head',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'Manfrotto 190', description: 'Штатив для статичных планов', type: 'tripod' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   lights: {
     label: 'Свет',
-    one: 'источник света',
+    one: 'осветитель',
     create: createLight,
     list: listLights,
     update: updateLight,
     remove: deleteLight,
     addFreeTime: addLightFreeTime,
-    titlePlaceholder: 'Aputure 120d',
-    descriptionPlaceholder: 'Например: светодиодный источник постоянного света',
-    typePlaceholder: 'Например: led',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'Aputure 300D', description: 'Постоянный свет для ключевой сцены', type: 'led' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   'light-tripods': {
     label: 'Стойки для света',
@@ -160,15 +124,9 @@ const resourceMeta = {
     update: updateLightTripod,
     remove: deleteLightTripod,
     addFreeTime: addLightTripodFreeTime,
-    titlePlaceholder: 'C-Stand Avenger',
-    descriptionPlaceholder: 'Например: тяжелая стойка для светового оборудования',
-    typePlaceholder: 'Например: c-stand',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'C-Stand', description: 'Стойка для световых приборов', type: 'stand' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   sounds: {
     label: 'Звук',
@@ -178,30 +136,21 @@ const resourceMeta = {
     update: updateSound,
     remove: deleteSound,
     addFreeTime: addSoundFreeTime,
-    titlePlaceholder: 'Zoom H6',
-    descriptionPlaceholder: 'Например: портативный рекордер с XLR-входами',
-    typePlaceholder: 'Например: recorder',
     columns: tableColumns.equipment,
-    buildPayload: (form) => ({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type.trim(),
-    }),
+    placeholders: { title: 'Zoom F6', description: 'Рекордер для полевого звука', type: 'recorder' },
+    buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
   },
   requisites: {
     label: 'Реквизит',
-    one: 'элемент реквизита',
+    one: 'реквизит',
     create: createRequisite,
     list: listRequisites,
     update: updateRequisite,
     remove: deleteRequisite,
     addFreeTime: addRequisiteFreeTime,
-    titlePlaceholder: 'Vintage lamp',
-    descriptionPlaceholder: 'Например: тёплая декоративная лампа для кадра',
-    typePlaceholder: 'Например: decor',
-    sizePlaceholder: 'Например: m',
     columns: tableColumns.requisites,
     supportsImages: true,
+    placeholders: { title: 'Винтажная лампа', description: 'Декоративная лампа в теплых тонах', type: 'decor', size: 'm' },
     buildPayload: (form) => ({
       title: form.title.trim(),
       description: form.description.trim(),
@@ -211,61 +160,133 @@ const resourceMeta = {
   },
 };
 
-const getColumnValue = (item, column) => {
-  if (typeof column.render === 'function') {
-    return column.render(item);
-  }
-
-  return item[column.key] || '-';
+const pad = (value) => String(value).padStart(2, '0');
+const toDateKey = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
+const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+const getColumnValue = (item, column) => (typeof column.render === 'function' ? column.render(item) : item[column.key] || '-');
 
 const getPreviewSource = (image) => {
   const candidate = image?.file || image?.storage_key || '';
-  return /^(https?:\/\/|\/)/i.test(candidate) ? candidate : '';
+  return /^https?:\/\//i.test(candidate) || candidate.startsWith('data:') ? candidate : '';
+};
+
+const buildItemCalendarMap = (items) => {
+  const map = new Map();
+
+  items.forEach((item) => {
+    const dateKey = toDateKey(item.create_at);
+    if (!dateKey) return;
+    const currentItems = map.get(dateKey) || [];
+    currentItems.push(item);
+    map.set(dateKey, currentItems);
+  });
+
+  return map;
+};
+
+const buildCalendarDays = (visibleMonth, itemMap, selectedDateKey, todayKey) => {
+  const firstDayOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const firstWeekDay = (firstDayOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(firstDayOfMonth);
+  gridStart.setDate(firstDayOfMonth.getDate() - firstWeekDay);
+
+  return Array.from({ length: 35 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    const dateKey = toDateKey(date);
+    const dayItems = itemMap.get(dateKey) || [];
+
+    return {
+      date,
+      dateKey,
+      label: date.getDate(),
+      isCurrentMonth: date.getMonth() === visibleMonth.getMonth(),
+      isToday: dateKey === todayKey,
+      isSelected: dateKey === selectedDateKey,
+      itemCount: dayItems.length,
+    };
+  });
+};
+
+const getWindowPayload = (windowForm) => {
+  const start_time = toIsoDateTime(windowForm.startTime);
+  const end_time = toIsoDateTime(windowForm.endTime);
+
+  if (!start_time || !end_time) {
+    toast.error('Укажите корректные дату и время');
+    return null;
+  }
+
+  if (new Date(start_time) >= new Date(end_time)) {
+    toast.error('Время окончания должно быть позже времени начала');
+    return null;
+  }
+
+  return { start_time, end_time };
 };
 
 const Projects = () => {
-  const [activeResource, setActiveResource] = useState('microfons');
-  const [form, setForm] = useState(() => createInitialResourceForm());
+  const [activeResource, setActiveResource] = useState(resourceOrder[0]);
+  const [form, setForm] = useState(createInitialResourceForm);
   const [editingId, setEditingId] = useState(null);
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: 10,
-    totalPages: 1,
-    totalCount: 0,
-  });
-
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, totalPages: 1, totalCount: 0 });
   const [selectedItemId, setSelectedItemId] = useState(null);
-  const [freeTimeForm, setFreeTimeForm] = useState(() => createInitialWindowForm());
-  const [reserveForm, setReserveForm] = useState(() => createInitialWindowForm());
+  const [freeTimeForm, setFreeTimeForm] = useState(createInitialWindowForm);
+  const [reserveForm, setReserveForm] = useState(createInitialWindowForm);
   const [isSubmittingFreeTime, setIsSubmittingFreeTime] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
-
   const [images, setImages] = useState([]);
-  const [imageForm, setImageForm] = useState(() => createInitialImageForm());
+  const [imageForm, setImageForm] = useState(createInitialImageForm);
   const [imageInputKey, setImageInputKey] = useState(0);
   const [isImagesLoading, setIsImagesLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loadingImageId, setLoadingImageId] = useState(null);
   const [removingImageId, setRemovingImageId] = useState(null);
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
+  const [activeDateFilterKey, setActiveDateFilterKey] = useState(null);
 
   const currentResource = useMemo(() => resourceMeta[activeResource], [activeResource]);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
+
   const selectedItem = useMemo(
     () => items.find((item) => item.oid === selectedItemId) || null,
     [items, selectedItemId],
   );
 
-  const resetForm = () => {
+  const itemsByDate = useMemo(() => buildItemCalendarMap(items), [items]);
+  const calendarDays = useMemo(
+    () => buildCalendarDays(visibleMonth, itemsByDate, selectedDateKey, todayKey),
+    [itemsByDate, selectedDateKey, todayKey, visibleMonth],
+  );
+  const filteredItems = useMemo(
+    () => (activeDateFilterKey ? items.filter((item) => toDateKey(item.create_at) === activeDateFilterKey) : items),
+    [activeDateFilterKey, items],
+  );
+  const selectedDayItems = useMemo(
+    () => itemsByDate.get(activeDateFilterKey || selectedDateKey) || [],
+    [activeDateFilterKey, itemsByDate, selectedDateKey],
+  );
+
+  const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
     setEditingId(null);
-  };
+  }, []);
 
-  const resetManagementState = () => {
+  const resetManagementState = useCallback(() => {
     setSelectedItemId(null);
     setFreeTimeForm(createInitialWindowForm());
     setReserveForm(createInitialWindowForm());
@@ -273,38 +294,46 @@ const Projects = () => {
     setImageForm(createInitialImageForm());
     setImageInputKey((prev) => prev + 1);
     setSelectedImage(null);
-  };
+  }, []);
 
   const fetchItems = useCallback(async () => {
+    setLoading(true);
+
     try {
-      setLoading(true);
-      const data = await currentResource.list({
+      const response = await currentResource.list({
         page: pagination.page,
         pageSize: pagination.pageSize,
         sortBy: 'create_at',
         sortDir: 'desc',
       });
 
-      setItems(data.items || []);
+      setItems(response.items || []);
       setPagination((prev) => ({
         ...prev,
-        totalPages: data.pages || 1,
-        totalCount: data.total_count || 0,
+        totalPages: response.pages || 1,
+        totalCount: response.total_count || 0,
       }));
     } catch (error) {
-      toast.error(error.message || `Не удалось загрузить раздел «${currentResource.label}»`);
+      toast.error(error.message || `Не удалось загрузить ${currentResource.label.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
   }, [currentResource, pagination.page, pagination.pageSize]);
 
   const loadRequisiteImages = useCallback(async (requisiteId) => {
+    if (!requisiteId) {
+      setImages([]);
+      return;
+    }
+
+    setIsImagesLoading(true);
+
     try {
-      setIsImagesLoading(true);
-      const data = await listRequisiteImages(requisiteId);
-      setImages(data.items || []);
+      const response = await listRequisiteImages(requisiteId);
+      setImages(response.items || []);
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить изображения реквизита');
+      setImages([]);
     } finally {
       setIsImagesLoading(false);
     }
@@ -315,10 +344,14 @@ const Projects = () => {
   }, [fetchItems]);
 
   useEffect(() => {
-    if (selectedItemId && !items.some((item) => item.oid === selectedItemId)) {
+    if (!selectedItemId) {
+      return;
+    }
+
+    if (!items.some((item) => item.oid === selectedItemId)) {
       resetManagementState();
     }
-  }, [items, selectedItemId]);
+  }, [items, resetManagementState, selectedItemId]);
 
   useEffect(() => {
     if (activeResource !== 'requisites' || !selectedItem) {
@@ -330,6 +363,12 @@ const Projects = () => {
     loadRequisiteImages(selectedItem.oid);
   }, [activeResource, loadRequisiteImages, selectedItem]);
 
+  useEffect(() => {
+    if (activeDateFilterKey && !items.some((item) => toDateKey(item.create_at) === activeDateFilterKey)) {
+      setActiveDateFilterKey(null);
+    }
+  }, [activeDateFilterKey, items]);
+
   const switchResource = (nextResource) => {
     if (nextResource === activeResource) {
       return;
@@ -338,12 +377,10 @@ const Projects = () => {
     setActiveResource(nextResource);
     resetForm();
     resetManagementState();
-    setPagination((prev) => ({
-      ...prev,
-      page: 1,
-      totalPages: 1,
-      totalCount: 0,
-    }));
+    setPagination((prev) => ({ ...prev, page: 1, totalPages: 1, totalCount: 0 }));
+    setVisibleMonth(startOfMonth(new Date()));
+    setSelectedDateKey(toDateKey(new Date()));
+    setActiveDateFilterKey(null);
   };
 
   const handleChange = (event) => {
@@ -358,59 +395,39 @@ const Projects = () => {
 
   const handleImageFieldChange = (event) => {
     const { name, value, files } = event.target;
-
-    setImageForm((prev) => ({
-      ...prev,
-      [name]: name === 'file' ? files?.[0] || null : value,
-    }));
-  };
-
-  const getWindowPayload = (windowForm) => {
-    const startTime = toIsoDateTime(windowForm.startTime);
-    const endTime = toIsoDateTime(windowForm.endTime);
-
-    if (!startTime || !endTime) {
-      toast.error('Укажите корректные дату и время');
-      return null;
-    }
-
-    if (new Date(startTime) >= new Date(endTime)) {
-      toast.error('Время окончания должно быть позже времени начала');
-      return null;
-    }
-
-    return {
-      start_time: startTime,
-      end_time: endTime,
-    };
+    setImageForm((prev) => ({ ...prev, [name]: name === 'file' ? files?.[0] || null : value }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    const payload = currentResource.buildPayload(form);
+    if (!payload.title || !payload.description || !payload.type || (activeResource === 'requisites' && !payload.size)) {
+      toast.error('Заполните обязательные поля');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const payload = currentResource.buildPayload(form);
-
       if (editingId) {
         await currentResource.update(editingId, payload);
-        toast.success(`${currentResource.one} обновлен(а)`);
+        toast.success(`${currentResource.one} обновлен`);
       } else {
         await currentResource.create(payload);
-        toast.success(`${currentResource.one} добавлен(а)`);
+        toast.success(`${currentResource.one} добавлен`);
       }
 
       resetForm();
       await fetchItems();
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        toast.info('Запись не найдена. Список обновлен.');
+        toast.error('Объект не найден, список обновлен');
         resetForm();
         await fetchItems();
-        return;
+      } else {
+        toast.error(error.message || 'Не удалось сохранить данные');
       }
-
-      toast.error(error.message || 'Не удалось сохранить запись');
     } finally {
       setSubmitting(false);
     }
@@ -418,57 +435,46 @@ const Projects = () => {
 
   const handleEdit = (item) => {
     setEditingId(item.oid);
-    setSelectedItemId(item.oid);
     setForm({
       title: item.title || '',
       description: item.description || '',
       type: item.type || '',
       size: item.size || '',
     });
+    setSelectedItemId(item.oid);
   };
 
   const handleDelete = async (itemId) => {
-    const confirmed = window.confirm('Удалить запись?');
-
-    if (!confirmed) {
+    if (!window.confirm('Удалить выбранный объект?')) {
       return;
     }
 
+    setDeletingId(itemId);
+
     try {
-      setDeletingId(itemId);
       await currentResource.remove(itemId);
-      toast.success('Запись удалена');
+      toast.success(`${currentResource.one} удален`);
 
       if (selectedItemId === itemId) {
         resetManagementState();
       }
 
-      if (editingId === itemId) {
-        resetForm();
-      }
+      const isLastItemOnPage = items.length === 1 && pagination.page > 1;
+      setPagination((prev) => ({ ...prev, page: isLastItemOnPage ? prev.page - 1 : prev.page }));
 
-      if (items.length === 1 && pagination.page > 1) {
-        setPagination((prev) => ({ ...prev, page: prev.page - 1 }));
-      } else {
+      if (!isLastItemOnPage) {
         await fetchItems();
       }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        setItems((prev) => prev.filter((item) => item.oid !== itemId));
-
-        if (editingId === itemId) {
-          resetForm();
-        }
-
+        toast.error('Объект уже удален, список обновлен');
         if (selectedItemId === itemId) {
           resetManagementState();
         }
-
-        toast.info('Запись уже удалена на сервере');
-        return;
+        await fetchItems();
+      } else {
+        toast.error(error.message || 'Не удалось удалить объект');
       }
-
-      toast.error(error.message || 'Не удалось удалить запись');
     } finally {
       setDeletingId(null);
     }
@@ -478,6 +484,8 @@ const Projects = () => {
     setSelectedItemId(item.oid);
     setFreeTimeForm(createInitialWindowForm());
     setReserveForm(createInitialWindowForm());
+    setImageForm(createInitialImageForm());
+    setImageInputKey((prev) => prev + 1);
     setSelectedImage(null);
   };
 
@@ -485,21 +493,21 @@ const Projects = () => {
     event.preventDefault();
 
     if (!selectedItem) {
-      toast.info('Сначала выберите запись из списка');
+      toast.error('Сначала выберите объект из таблицы');
       return;
     }
 
     const payload = getWindowPayload(freeTimeForm);
-
     if (!payload) {
       return;
     }
 
+    setIsSubmittingFreeTime(true);
+
     try {
-      setIsSubmittingFreeTime(true);
       await currentResource.addFreeTime(selectedItem.oid, payload);
-      setFreeTimeForm(createInitialWindowForm());
       toast.success('Окно доступности добавлено');
+      setFreeTimeForm(createInitialWindowForm());
     } catch (error) {
       toast.error(error.message || 'Не удалось добавить окно доступности');
     } finally {
@@ -511,25 +519,25 @@ const Projects = () => {
     event.preventDefault();
 
     if (!selectedItem) {
-      toast.info('Сначала выберите запись из списка');
+      toast.error('Сначала выберите объект из таблицы');
       return;
     }
 
     const payload = getWindowPayload(reserveForm);
-
     if (!payload) {
       return;
     }
 
+    setIsSubmittingReservation(true);
+
     try {
-      setIsSubmittingReservation(true);
       await reserveAvailability({
         owner_id: selectedItem.user_id,
         obj_id: selectedItem.oid,
         ...payload,
       });
-      setReserveForm(createInitialWindowForm());
       toast.success('Бронирование отправлено');
+      setReserveForm(createInitialWindowForm());
     } catch (error) {
       toast.error(error.message || 'Не удалось забронировать окно');
     } finally {
@@ -541,26 +549,27 @@ const Projects = () => {
     event.preventDefault();
 
     if (!selectedItem) {
-      toast.info('Сначала выберите реквизит');
+      toast.error('Сначала выберите реквизит');
       return;
     }
 
-    if (!imageForm.file) {
-      toast.error('Выберите файл изображения');
+    if (!imageForm.file || !imageForm.title.trim() || !imageForm.description.trim()) {
+      toast.error('Заполните данные изображения и выберите файл');
       return;
     }
+
+    setIsUploadingImage(true);
 
     try {
-      setIsUploadingImage(true);
       await addRequisiteImage(selectedItem.oid, {
         file: imageForm.file,
         title: imageForm.title.trim(),
         description: imageForm.description.trim(),
       });
+      toast.success('Изображение загружено');
       setImageForm(createInitialImageForm());
       setImageInputKey((prev) => prev + 1);
       await loadRequisiteImages(selectedItem.oid);
-      toast.success('Изображение загружено');
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить изображение');
     } finally {
@@ -573,38 +582,30 @@ const Projects = () => {
       return;
     }
 
+    setLoadingImageId(imageId);
+
     try {
-      setLoadingImageId(imageId);
-      const data = await getRequisiteImage(selectedItem.oid, imageId);
-      setSelectedImage(data);
+      const image = await getRequisiteImage(selectedItem.oid, imageId);
+      setSelectedImage(image);
     } catch (error) {
-      toast.error(error.message || 'Не удалось загрузить метаданные изображения');
+      toast.error(error.message || 'Не удалось получить информацию об изображении');
     } finally {
       setLoadingImageId(null);
     }
   };
 
   const handleRemoveImage = async (imageId) => {
-    if (!selectedItem) {
+    if (!selectedItem || !window.confirm('Удалить изображение реквизита?')) {
       return;
     }
 
-    const confirmed = window.confirm('Удалить изображение?');
-
-    if (!confirmed) {
-      return;
-    }
+    setRemovingImageId(imageId);
 
     try {
-      setRemovingImageId(imageId);
       await removeRequisiteImage(selectedItem.oid, imageId);
-      setImages((prev) => prev.filter((image) => image.oid !== imageId));
-
-      if (selectedImage?.oid === imageId) {
-        setSelectedImage(null);
-      }
-
       toast.success('Изображение удалено');
+      setImages((prev) => prev.filter((image) => image.oid !== imageId));
+      setSelectedImage((prev) => (prev?.oid === imageId ? null : prev));
     } catch (error) {
       toast.error(error.message || 'Не удалось удалить изображение');
     } finally {
@@ -613,116 +614,445 @@ const Projects = () => {
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination((prev) => ({ ...prev, page: newPage }));
+    if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page) {
+      return;
     }
+
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
-  const submitButtonLabel = editingId ? 'Обновить' : 'Добавить';
-  const previewSource = getPreviewSource(selectedImage);
+  const handleCalendarDayClick = (dateKey, date) => {
+    setSelectedDateKey(dateKey);
+    setVisibleMonth(startOfMonth(date));
+    setActiveDateFilterKey((current) => (current === dateKey ? null : dateKey));
+  };
+
+  const activeDayLabel = activeDateFilterKey
+    ? selectedDateFormatter.format(new Date(`${activeDateFilterKey}T00:00:00`))
+    : null;
 
   return (
     <section className="projects-wrapper">
-      <div className="projects-page">
-        <h1>Рабочая зона</h1>
-        <p>
-          Здесь подключены все CRUD-ручки по оборудованию и реквизиту, а также добавление free-time,
-          резервирование и изображения реквизита.
-        </p>
+      <div className="projects-page projects-dashboard-layout">
+        <aside className="dashboard-panel projects-sidebar">
+          <div className="projects-sidebar-heading">
+            <span className="projects-panel-eyebrow">Категории</span>
+            <h1>Рабочая зона</h1>
+            <p>Кнопки категорий находятся слева, формы по центру, календарь и таблица справа.</p>
+          </div>
 
-        <div className="equipment-switcher" role="tablist" aria-label="Тип оборудования">
-          {Object.entries(resourceMeta).map(([resourceKey, meta]) => (
-            <button
-              key={resourceKey}
-              type="button"
-              className={`switcher-btn ${activeResource === resourceKey ? 'active' : ''}`}
-              onClick={() => switchResource(resourceKey)}
-            >
-              {meta.label}
-            </button>
-          ))}
+          <div className="projects-sidebar-nav" role="tablist" aria-label="Категории инвентаря">
+            {resourceOrder.map((resourceKey) => {
+              const resource = resourceMeta[resourceKey];
+              const isActive = resourceKey === activeResource;
+
+              return (
+                <button
+                  key={resourceKey}
+                  type="button"
+                  className={`projects-sidebar-button ${isActive ? 'is-active' : ''}`}
+                  onClick={() => switchResource(resourceKey)}
+                >
+                  <span>{resource.label}</span>
+                  <small>{resource.one}</small>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="projects-sidebar-note">
+            <strong>{currentResource.label}</strong>
+            <p>Всего записей: {pagination.totalCount}</p>
+            <p>Выберите строку в таблице, чтобы открыть управление доступностью и бронированием.</p>
+          </div>
+        </aside>
+
+        <div className="projects-center-column">
+          <section className="dashboard-panel">
+            <div className="section-heading">
+              <h2>{editingId ? `Редактирование: ${currentResource.one}` : `Новый объект: ${currentResource.one}`}</h2>
+              <p>Центральная панель отвечает за создание и редактирование элементов выбранной категории.</p>
+            </div>
+
+            <form className="stacked-form resource-form" onSubmit={handleSubmit}>
+              <label className="field-block">
+                <span>Название</span>
+                <input
+                  name="title"
+                  value={form.title}
+                  onChange={handleChange}
+                  placeholder={currentResource.placeholders.title}
+                />
+              </label>
+
+              <label className="field-block">
+                <span>Описание</span>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  placeholder={currentResource.placeholders.description}
+                  rows={4}
+                />
+              </label>
+
+              <div className="grid-two-columns">
+                <label className="field-block">
+                  <span>Тип</span>
+                  <input
+                    name="type"
+                    value={form.type}
+                    onChange={handleChange}
+                    placeholder={currentResource.placeholders.type}
+                  />
+                </label>
+
+                {activeResource === 'requisites' ? (
+                  <label className="field-block">
+                    <span>Размер</span>
+                    <input
+                      name="size"
+                      value={form.size}
+                      onChange={handleChange}
+                      placeholder={currentResource.placeholders.size}
+                    />
+                  </label>
+                ) : (
+                  <div className="projects-form-placeholder" aria-hidden="true" />
+                )}
+              </div>
+
+              <div className="inline-actions">
+                <button type="submit" className="profile-save-btn compact" disabled={submitting}>
+                  {submitting ? 'Сохраняем...' : editingId ? 'Сохранить изменения' : 'Добавить объект'}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={resetForm}
+                  disabled={submitting || (!editingId && !form.title && !form.description && !form.type && !form.size)}
+                >
+                  Очистить
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section className="dashboard-panel management-card">
+            <div className="section-heading">
+              <h2>Управление выбранным объектом</h2>
+              <p>
+                {selectedItem
+                  ? `Сейчас выбран: ${selectedItem.title}`
+                  : 'Выберите запись справа, чтобы открыть управление доступностью, бронированием и медиа.'}
+              </p>
+            </div>
+
+            {selectedItem ? (
+              <>
+                <div className="selected-entity-summary">
+                  <div>
+                    <strong>{selectedItem.title}</strong>
+                    <p>{selectedItem.description || 'Без описания'}</p>
+                  </div>
+
+                  <dl className="entity-meta-list">
+                    <div>
+                      <dt>Тип</dt>
+                      <dd>{selectedItem.type || '-'}</dd>
+                    </div>
+                    {activeResource === 'requisites' ? (
+                      <div>
+                        <dt>Размер</dt>
+                        <dd>{selectedItem.size || '-'}</dd>
+                      </div>
+                    ) : null}
+                    <div>
+                      <dt>Создано</dt>
+                      <dd>{formatDateTime(selectedItem.create_at)}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="management-grid projects-management-grid">
+                  <section className="management-panel">
+                    <h3>Добавить окно доступности</h3>
+                    <p className="helper-note">Для техники и реквизита API отдает только добавление окна, без списка истории.</p>
+                    <form className="stacked-form" onSubmit={handleAddFreeTime}>
+                      <label className="field-block">
+                        <span>Начало</span>
+                        <input
+                          type="datetime-local"
+                          name="startTime"
+                          value={freeTimeForm.startTime}
+                          onChange={handleWindowChange(setFreeTimeForm)}
+                        />
+                      </label>
+                      <label className="field-block">
+                        <span>Окончание</span>
+                        <input
+                          type="datetime-local"
+                          name="endTime"
+                          value={freeTimeForm.endTime}
+                          onChange={handleWindowChange(setFreeTimeForm)}
+                        />
+                      </label>
+                      <button type="submit" className="profile-save-btn compact" disabled={isSubmittingFreeTime}>
+                        {isSubmittingFreeTime ? 'Добавляем...' : 'Добавить окно'}
+                      </button>
+                    </form>
+                  </section>
+
+                  <section className="management-panel">
+                    <h3>Забронировать интервал</h3>
+                    <p className="helper-note">Бронь отправляется на общий endpoint `availability/reserve`.</p>
+                    <form className="stacked-form" onSubmit={handleReserve}>
+                      <label className="field-block">
+                        <span>Начало</span>
+                        <input
+                          type="datetime-local"
+                          name="startTime"
+                          value={reserveForm.startTime}
+                          onChange={handleWindowChange(setReserveForm)}
+                        />
+                      </label>
+                      <label className="field-block">
+                        <span>Окончание</span>
+                        <input
+                          type="datetime-local"
+                          name="endTime"
+                          value={reserveForm.endTime}
+                          onChange={handleWindowChange(setReserveForm)}
+                        />
+                      </label>
+                      <button type="submit" className="profile-save-btn compact" disabled={isSubmittingReservation}>
+                        {isSubmittingReservation ? 'Отправляем...' : 'Забронировать'}
+                      </button>
+                    </form>
+                  </section>
+                </div>
+
+                {currentResource.supportsImages ? (
+                  <section className="requisite-media-section">
+                    <div className="management-panel">
+                      <h3>Изображения реквизита</h3>
+                      <form className="stacked-form" onSubmit={handleImageSubmit}>
+                        <label className="field-block">
+                          <span>Файл</span>
+                          <input
+                            key={imageInputKey}
+                            type="file"
+                            name="file"
+                            accept="image/*"
+                            onChange={handleImageFieldChange}
+                          />
+                        </label>
+
+                        <div className="grid-two-columns">
+                          <label className="field-block">
+                            <span>Название</span>
+                            <input
+                              name="title"
+                              value={imageForm.title}
+                              onChange={handleImageFieldChange}
+                              placeholder="Основное фото"
+                            />
+                          </label>
+                          <label className="field-block">
+                            <span>Описание</span>
+                            <input
+                              name="description"
+                              value={imageForm.description}
+                              onChange={handleImageFieldChange}
+                              placeholder="Крупный план"
+                            />
+                          </label>
+                        </div>
+
+                        <button type="submit" className="profile-save-btn compact" disabled={isUploadingImage}>
+                          {isUploadingImage ? 'Загружаем...' : 'Загрузить изображение'}
+                        </button>
+                      </form>
+                    </div>
+
+                    <div className="media-grid">
+                      <section className="management-panel">
+                        <h3>Галерея</h3>
+                        <p className="helper-note">
+                          {isImagesLoading ? 'Загружаем изображения...' : `Всего изображений: ${images.length}`}
+                        </p>
+                        <div className="media-grid media-grid-compact">
+                          {images.map((image) => (
+                            <article key={image.oid} className="media-card">
+                              {getPreviewSource(image) ? (
+                                <img
+                                  className="requisite-image-preview"
+                                  src={getPreviewSource(image)}
+                                  alt={image.title}
+                                />
+                              ) : null}
+                              <h4>{image.title}</h4>
+                              <p>{image.description}</p>
+                              <div className="table-actions">
+                                <button
+                                  type="button"
+                                  className="ghost-action-btn"
+                                  onClick={() => handleImageDetails(image.oid)}
+                                  disabled={loadingImageId === image.oid}
+                                >
+                                  {loadingImageId === image.oid ? 'Загрузка...' : 'Детали'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost-action-btn danger"
+                                  onClick={() => handleRemoveImage(image.oid)}
+                                  disabled={removingImageId === image.oid}
+                                >
+                                  {removingImageId === image.oid ? 'Удаляем...' : 'Удалить'}
+                                </button>
+                              </div>
+                            </article>
+                          ))}
+
+                          {!isImagesLoading && images.length === 0 ? (
+                            <p className="helper-note">Изображения еще не добавлены.</p>
+                          ) : null}
+                        </div>
+                      </section>
+
+                      {selectedImage ? (
+                        <section className="image-details-card">
+                          <h3>Детали изображения</h3>
+                          {getPreviewSource(selectedImage) ? (
+                            <img
+                              className="requisite-image-preview"
+                              src={getPreviewSource(selectedImage)}
+                              alt={selectedImage.title}
+                            />
+                          ) : null}
+                          <dl className="details-list">
+                            <div>
+                              <dt>Название</dt>
+                              <dd>{selectedImage.title}</dd>
+                            </div>
+                            <div>
+                              <dt>Описание</dt>
+                              <dd>{selectedImage.description}</dd>
+                            </div>
+                            <div>
+                              <dt>MIME</dt>
+                              <dd>{selectedImage.mime_type}</dd>
+                            </div>
+                            <div>
+                              <dt>Размер файла</dt>
+                              <dd>{selectedImage.size}</dd>
+                            </div>
+                            <div>
+                              <dt>Storage key</dt>
+                              <dd>{selectedImage.storage_key}</dd>
+                            </div>
+                            <div>
+                              <dt>Создано</dt>
+                              <dd>{formatDateTime(selectedImage.create_at)}</dd>
+                            </div>
+                          </dl>
+                        </section>
+                      ) : null}
+                    </div>
+                  </section>
+                ) : null}
+              </>
+            ) : (
+              <div className="management-panel">
+                <p className="helper-note">После выбора строки здесь появятся быстрые действия для объекта.</p>
+              </div>
+            )}
+          </section>
         </div>
 
-        <p>Текущий раздел: {currentResource.label}</p>
+        <aside className="projects-right-column">
+          <section className="dashboard-panel profile-calendar-card projects-calendar-panel">
+            <div className="projects-calendar-header">
+              <div>
+                <span className="projects-panel-eyebrow">Календарь</span>
+                <h2>{currentResource.label}</h2>
+              </div>
+              <div className="profile-calendar-toolbar">
+                <button
+                  type="button"
+                  className="ghost-action-btn"
+                  onClick={() => setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                >
+                  ‹
+                </button>
+                <strong>{monthFormatter.format(visibleMonth)}</strong>
+                <button
+                  type="button"
+                  className="ghost-action-btn"
+                  onClick={() => setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
 
-        <form className="stacked-form resource-form" onSubmit={handleSubmit}>
-          <div className="grid-two-columns">
-            <label className="field-block" htmlFor="equipment-title">
-              <span>Название</span>
-              <input
-                id="equipment-title"
-                name="title"
-                value={form.title}
-                onChange={handleChange}
-                className="profile-input"
-                placeholder={currentResource.titlePlaceholder}
-                required
-              />
-            </label>
+            <div className="profile-weekdays">
+              {weekDayLabels.map((dayLabel) => (
+                <span key={dayLabel}>{dayLabel}</span>
+              ))}
+            </div>
 
-            <label className="field-block" htmlFor="equipment-type">
-              <span>Тип</span>
-              <input
-                id="equipment-type"
-                name="type"
-                value={form.type}
-                onChange={handleChange}
-                className="profile-input"
-                placeholder={currentResource.typePlaceholder}
-                required
-              />
-            </label>
-          </div>
+            <div className="profile-calendar-grid">
+              {calendarDays.map((day) => (
+                <button
+                  key={day.dateKey}
+                  type="button"
+                  className={[
+                    'calendar-day-btn',
+                    day.isCurrentMonth ? '' : 'is-muted',
+                    day.isToday ? 'is-today' : '',
+                    day.isSelected ? 'is-selected' : '',
+                    day.itemCount > 0 ? 'has-availability' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => handleCalendarDayClick(day.dateKey, day.date)}
+                >
+                  <span>{day.label}</span>
+                  {day.itemCount > 0 ? <small>{day.itemCount}</small> : null}
+                </button>
+              ))}
+            </div>
 
-          <label className="field-block" htmlFor="equipment-description">
-            <span>Описание</span>
-            <textarea
-              id="equipment-description"
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              className="profile-textarea"
-              placeholder={currentResource.descriptionPlaceholder}
-              rows={3}
-              required
-            />
-          </label>
+            <div className="projects-calendar-summary">
+              <p>
+                {activeDateFilterKey
+                  ? `Фильтр по дате: ${activeDayLabel}. Элементов: ${selectedDayItems.length}.`
+                  : 'Нажмите на день, чтобы отфильтровать таблицу по дате создания.'}
+              </p>
+              {activeDateFilterKey ? (
+                <button type="button" className="ghost-action-btn" onClick={() => setActiveDateFilterKey(null)}>
+                  Показать все
+                </button>
+              ) : null}
+            </div>
+          </section>
 
-          {currentResource.sizePlaceholder ? (
-            <label className="field-block" htmlFor="equipment-size">
-              <span>Размер</span>
-              <input
-                id="equipment-size"
-                name="size"
-                value={form.size}
-                onChange={handleChange}
-                className="profile-input"
-                placeholder={currentResource.sizePlaceholder}
-                required
-              />
-            </label>
-          ) : null}
-
-          <div className="inline-actions">
-            <button type="submit" className="profile-save-btn compact" disabled={submitting}>
-              {submitting ? 'Сохранение...' : submitButtonLabel}
-            </button>
-            {editingId ? (
-              <button type="button" className="secondary-btn" onClick={resetForm}>
-                Отмена
-              </button>
-            ) : null}
-          </div>
-        </form>
-
-        {loading ? (
-          <p>Загрузка...</p>
-        ) : (
-          <>
-            <p className="microfon-count">Всего записей: {pagination.totalCount}</p>
+          <section className="dashboard-panel projects-table-panel">
+            <div className="section-heading projects-table-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Таблица</span>
+                <h2>{currentResource.label}</h2>
+              </div>
+              <p>
+                {loading
+                  ? 'Загружаем список...'
+                  : activeDateFilterKey
+                    ? `Показаны записи за ${activeDayLabel}`
+                    : `Показана страница ${pagination.page} из ${pagination.totalPages}`}
+              </p>
+            </div>
 
             <div className="table-shell">
-              <table className="user-table microfon-table">
+              <table className="user-table">
                 <thead>
                   <tr>
                     {currentResource.columns.map((column) => (
@@ -732,34 +1062,21 @@ const Projects = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.length === 0 ? (
-                    <tr>
-                      <td colSpan={currentResource.columns.length + 1}>Список пока пуст</td>
-                    </tr>
-                  ) : (
-                    items.map((item) => (
-                      <tr
-                        key={item.oid}
-                        className={selectedItemId === item.oid ? 'table-row-selected' : ''}
-                      >
+                  {filteredItems.map((item) => {
+                    const isSelected = selectedItemId === item.oid;
+
+                    return (
+                      <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
                         {currentResource.columns.map((column) => (
                           <td key={column.key}>{getColumnValue(item, column)}</td>
                         ))}
                         <td>
                           <div className="table-actions">
-                            <button
-                              type="button"
-                              className="ghost-action-btn"
-                              onClick={() => handleEdit(item)}
-                            >
-                              Редактировать
+                            <button type="button" className="ghost-action-btn" onClick={() => handleEdit(item)}>
+                              Изменить
                             </button>
-                            <button
-                              type="button"
-                              className="ghost-action-btn"
-                              onClick={() => handleSelectItem(item)}
-                            >
-                              Управление
+                            <button type="button" className="ghost-action-btn" onClick={() => handleSelectItem(item)}>
+                              {isSelected ? 'Выбрано' : 'Выбрать'}
                             </button>
                             <button
                               type="button"
@@ -767,307 +1084,46 @@ const Projects = () => {
                               onClick={() => handleDelete(item.oid)}
                               disabled={deletingId === item.oid}
                             >
-                              {deletingId === item.oid ? 'Удаление...' : 'Удалить'}
+                              {deletingId === item.oid ? 'Удаляем...' : 'Удалить'}
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    );
+                  })}
                 </tbody>
               </table>
-            </div>
 
-            <div className="pagination">
-              <button
-                type="button"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-              >
-                Назад
-              </button>
-              <span>
-                Страница {pagination.page} из {pagination.totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.totalPages}
-              >
-                Вперед
-              </button>
-            </div>
-          </>
-        )}
-
-        <section className="profile-card management-card">
-          <div className="section-heading">
-            <div>
-              <h2>Управление доступностью</h2>
-              <p>
-                Выберите запись из таблицы, чтобы добавить свободное окно через `/free-times` и
-                отправить бронирование через `/availability/reserve`.
-              </p>
-            </div>
-          </div>
-
-          {selectedItem ? (
-            <>
-              <div className="selected-entity-summary">
-                <div>
-                  <strong>{selectedItem.title}</strong>
-                  <p>
-                    {selectedItem.description || 'Без описания'} · тип: {selectedItem.type || '-'}
-                  </p>
-                </div>
-                <div className="entity-meta-list">
-                  <span>owner_id: {selectedItem.user_id}</span>
-                  <span>obj_id: {selectedItem.oid}</span>
-                </div>
-              </div>
-
-              <p className="helper-note">
-                В текущей спецификации для окон техники и реквизита есть только `POST`, поэтому
-                интерфейс поддерживает добавление и бронирование, но не выводит историю этих окон.
-              </p>
-
-              <div className="management-grid">
-                <form className="stacked-form management-panel" onSubmit={handleAddFreeTime}>
-                  <h3>Добавить свободное окно</h3>
-
-                  <label className="field-block" htmlFor="free-time-start">
-                    <span>Начало</span>
-                    <input
-                      id="free-time-start"
-                      name="startTime"
-                      type="datetime-local"
-                      value={freeTimeForm.startTime}
-                      onChange={handleWindowChange(setFreeTimeForm)}
-                      className="profile-input"
-                      required
-                    />
-                  </label>
-
-                  <label className="field-block" htmlFor="free-time-end">
-                    <span>Окончание</span>
-                    <input
-                      id="free-time-end"
-                      name="endTime"
-                      type="datetime-local"
-                      value={freeTimeForm.endTime}
-                      onChange={handleWindowChange(setFreeTimeForm)}
-                      className="profile-input"
-                      required
-                    />
-                  </label>
-
-                  <button
-                    type="submit"
-                    className="profile-save-btn compact"
-                    disabled={isSubmittingFreeTime}
-                  >
-                    {isSubmittingFreeTime ? 'Отправка...' : 'Добавить окно'}
-                  </button>
-                </form>
-
-                <form className="stacked-form management-panel" onSubmit={handleReserve}>
-                  <h3>Забронировать окно</h3>
-
-                  <label className="field-block" htmlFor="reserve-start">
-                    <span>Начало брони</span>
-                    <input
-                      id="reserve-start"
-                      name="startTime"
-                      type="datetime-local"
-                      value={reserveForm.startTime}
-                      onChange={handleWindowChange(setReserveForm)}
-                      className="profile-input"
-                      required
-                    />
-                  </label>
-
-                  <label className="field-block" htmlFor="reserve-end">
-                    <span>Окончание брони</span>
-                    <input
-                      id="reserve-end"
-                      name="endTime"
-                      type="datetime-local"
-                      value={reserveForm.endTime}
-                      onChange={handleWindowChange(setReserveForm)}
-                      className="profile-input"
-                      required
-                    />
-                  </label>
-
-                  <button
-                    type="submit"
-                    className="profile-save-btn compact"
-                    disabled={isSubmittingReservation}
-                  >
-                    {isSubmittingReservation ? 'Отправка...' : 'Забронировать'}
-                  </button>
-                </form>
-              </div>
-
-              {currentResource.supportsImages ? (
-                <section className="requisite-media-section">
-                  <div className="section-heading">
-                    <div>
-                      <h3>Изображения реквизита</h3>
-                      <p>
-                        Здесь подключены `POST`, `GET list`, `GET item` и `DELETE` для
-                        `/requisites/:requisiteId/images`.
-                      </p>
-                    </div>
-                  </div>
-
-                  <form className="stacked-form management-panel" onSubmit={handleImageSubmit}>
-                    <div className="grid-two-columns">
-                      <label className="field-block" htmlFor="image-title">
-                        <span>Название изображения</span>
-                        <input
-                          id="image-title"
-                          name="title"
-                          value={imageForm.title}
-                          onChange={handleImageFieldChange}
-                          className="profile-input"
-                          placeholder="Например: front view"
-                          required
-                        />
-                      </label>
-
-                      <label className="field-block" htmlFor="image-file">
-                        <span>Файл</span>
-                        <input
-                          key={imageInputKey}
-                          id="image-file"
-                          name="file"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageFieldChange}
-                          className="profile-input"
-                          required
-                        />
-                      </label>
-                    </div>
-
-                    <label className="field-block" htmlFor="image-description">
-                      <span>Описание</span>
-                      <textarea
-                        id="image-description"
-                        name="description"
-                        value={imageForm.description}
-                        onChange={handleImageFieldChange}
-                        className="profile-textarea"
-                        rows={3}
-                        placeholder="Короткое описание изображения"
-                        required
-                      />
-                    </label>
-
-                    <button
-                      type="submit"
-                      className="profile-save-btn compact"
-                      disabled={isUploadingImage}
-                    >
-                      {isUploadingImage ? 'Загрузка...' : 'Загрузить изображение'}
-                    </button>
-                  </form>
-
-                  {isImagesLoading ? (
-                    <p>Загрузка изображений...</p>
-                  ) : images.length === 0 ? (
-                    <p>У этого реквизита пока нет изображений.</p>
-                  ) : (
-                    <div className="media-grid">
-                      {images.map((image) => (
-                        <article key={image.oid} className="media-card">
-                          <h4>{image.title}</h4>
-                          <p>{image.description}</p>
-                          <span>Размер: {image.size ?? '-'} байт</span>
-                          <span>Создано: {formatDateTime(image.create_at)}</span>
-                          <div className="table-actions">
-                            <button
-                              type="button"
-                              className="ghost-action-btn"
-                              onClick={() => handleImageDetails(image.oid)}
-                              disabled={loadingImageId === image.oid}
-                            >
-                              {loadingImageId === image.oid ? 'Загрузка...' : 'Подробнее'}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-action-btn danger"
-                              onClick={() => handleRemoveImage(image.oid)}
-                              disabled={removingImageId === image.oid}
-                            >
-                              {removingImageId === image.oid ? 'Удаление...' : 'Удалить'}
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-
-                  {selectedImage ? (
-                    <div className="image-details-card">
-                      <div className="section-heading">
-                        <div>
-                          <h3>Метаданные изображения</h3>
-                          <p>Загружено через `GET /requisites/:id/images/:imageId`.</p>
-                        </div>
-                      </div>
-
-                      {previewSource ? (
-                        <img
-                          src={previewSource}
-                          alt={selectedImage.title}
-                          className="requisite-image-preview"
-                        />
-                      ) : null}
-
-                      <dl className="details-list">
-                        <div>
-                          <dt>ID</dt>
-                          <dd>{selectedImage.oid}</dd>
-                        </div>
-                        <div>
-                          <dt>Файл</dt>
-                          <dd>{selectedImage.file}</dd>
-                        </div>
-                        <div>
-                          <dt>Bucket</dt>
-                          <dd>{selectedImage.bucket}</dd>
-                        </div>
-                        <div>
-                          <dt>Storage key</dt>
-                          <dd>{selectedImage.storage_key}</dd>
-                        </div>
-                        <div>
-                          <dt>MIME type</dt>
-                          <dd>{selectedImage.mime_type}</dd>
-                        </div>
-                        <div>
-                          <dt>Размер</dt>
-                          <dd>{selectedImage.size}</dd>
-                        </div>
-                        <div>
-                          <dt>Создано</dt>
-                          <dd>{formatDateTime(selectedImage.create_at)}</dd>
-                        </div>
-                      </dl>
-                    </div>
-                  ) : null}
-                </section>
+              {!loading && filteredItems.length === 0 ? (
+                <p className="helper-note projects-empty-state">
+                  {activeDateFilterKey
+                    ? 'На выбранную дату записей нет. Снимите фильтр или выберите другой день.'
+                    : 'Список пока пуст. Добавьте первый объект через центральную панель.'}
+                </p>
               ) : null}
-            </>
-          ) : (
-            <p className="helper-note">
-              Выберите запись из таблицы, чтобы управлять её доступностью. Для реквизита здесь же
-              откроется блок изображений.
-            </p>
-          )}
-        </section>
+            </div>
+
+            {!activeDateFilterKey ? (
+              <div className="pagination">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page <= 1 || loading}
+                >
+                  Назад
+                </button>
+                <span>Страница {pagination.page} из {pagination.totalPages}</span>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages || loading}
+                >
+                  Вперед
+                </button>
+              </div>
+            ) : null}
+          </section>
+        </aside>
       </div>
     </section>
   );
