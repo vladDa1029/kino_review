@@ -33,8 +33,18 @@ const createErrorMessage = (data) => {
 };
 
 const parseResponseData = async (response) => {
+  if (response.status === 204 || response.status === 205) {
+    return null;
+  }
+
   const contentType = response.headers.get('content-type') || '';
-  return contentType.includes('application/json') ? response.json() : response.text();
+  const rawText = await response.text();
+
+  if (!rawText) {
+    return null;
+  }
+
+  return contentType.includes('application/json') ? JSON.parse(rawText) : rawText;
 };
 
 const buildHeaders = ({

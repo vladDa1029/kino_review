@@ -105,6 +105,7 @@ const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', {
 
 const ProfilePage = ({ isOpen = false, onClose }) => {
   const [profile, setProfile] = useState(initialProfile);
+  const [savedProfile, setSavedProfile] = useState(initialProfile);
   const [descriptionId, setDescriptionId] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
@@ -120,7 +121,6 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
 
   const [visibleMonth, setVisibleMonth] = useState(() => startOfDay(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
-  const [isProfileFormVisible, setIsProfileFormVisible] = useState(false);
   const [isAvailabilityFormVisible, setIsAvailabilityFormVisible] = useState(false);
 
   const handleProfileChange = (event) => {
@@ -141,13 +141,20 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
   const loadDescription = useCallback(async () => {
     try {
       const data = await getUserDescription();
-      setDescriptionId(data.oid);
-      setProfile({
+      const nextProfile = {
         username: data.username || '',
         phone: data.phone || '',
-      });
+      };
+
+      setDescriptionId(data.oid);
+      setProfile(nextProfile);
+      setSavedProfile(nextProfile);
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 404) {
+      if (error instanceof ApiError && error.status === 404) {
+        setDescriptionId(null);
+        setProfile(initialProfile);
+        setSavedProfile(initialProfile);
+      } else {
         toast.error(error.message || 'Не удалось загрузить описание профиля');
       }
     } finally {
@@ -259,46 +266,12 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
     [availabilityMap, selectedDateKey],
   );
 
-  const nextWindow = spareTimes[0] || null;
-  const displayName = profile.username.trim() || 'Ваш профиль';
   const monthLabel = capitalize(monthFormatter.format(visibleMonth));
   const selectedDateLabel = selectedDateFormatter.format(fromDateKey(selectedDateKey));
   const completionPercent = [profile.username, profile.phone].filter((value) => value.trim()).length * 50;
-
-  const activityCards = [
-    {
-      title:
-        completionPercent === 100
-          ? 'Профиль готов к работе'
-          : 'Профиль можно усилить',
-      body:
-        completionPercent === 100
-          ? `Имя и телефон заполнены. Контакт: ${profile.phone}.`
-          : 'Добавьте имя и телефон, чтобы заявки и бронирование было проще подтверждать.',
-      meta: completionPercent === 100 ? 'Сейчас' : 'Нужно обновление',
-    },
-    {
-      title:
-        nextWindow
-          ? 'Есть активные окна доступности'
-          : 'Пока нет доступности в календаре',
-      body: nextWindow
-        ? `Ближайшее окно начинается ${formatDateTime(nextWindow.start_time)}.`
-        : 'Откройте форму ниже и добавьте первое окно доступности.',
-      meta: nextWindow ? nextWindow.status || 'active' : 'Ожидает настройки',
-    },
-    {
-      title:
-        selectedDateWindows.length > 0
-          ? `На ${selectedDateLabel} найдено ${selectedDateWindows.length} окно(а)`
-          : `На ${selectedDateLabel} окон нет`,
-      body:
-        selectedDateWindows.length > 0
-          ? `${formatDateTime(selectedDateWindows[0].start_time)} - ${formatDateTime(selectedDateWindows[0].end_time)}`
-          : 'Можно выбрать другой день в календаре или добавить новое окно.',
-      meta: `Месяц: ${monthLabel}`,
-    },
-  ];
+  const isProfileDirty =
+    profile.username.trim() !== savedProfile.username.trim() ||
+    profile.phone.trim() !== savedProfile.phone.trim();
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
@@ -317,7 +290,6 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
       }
 
       await loadDescription();
-      setIsProfileFormVisible(false);
       toast.success('Описание профиля сохранено');
     } catch (error) {
       toast.error(error.message || 'Не удалось сохранить описание профиля');
@@ -426,8 +398,8 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
     setIsAvailabilityFormVisible((prev) => !prev);
   };
 
-  const handleOpenProfileForm = () => {
-    setIsProfileFormVisible((prev) => !prev);
+  const handleCancelProfileEdit = () => {
+    setProfile(savedProfile);
   };
 
   if (!isOpen) {
@@ -452,7 +424,7 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
         </button>
 
         <div className="profile-modal-scroll profile-reference-scroll">
-          <section className="profile-hero-card">
+          <form className="profile-hero-card profile-hero-form" onSubmit={handleProfileSubmit}>
             <div className="profile-hero-avatar">
               <label
                 className={`profile-avatar-preview profile-reference-avatar ${avatarPreview ? '' : 'is-empty'}`}
@@ -471,27 +443,63 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
 
             <div className="profile-hero-content">
               <p className="profile-modal-kicker">Profile</p>
-              <h2 id="profile-modal-title">{displayName}</h2>
-              <p className="profile-hero-subtitle">
-                {profile.phone.trim() || 'Личный кабинет'}
-              </p>
+              <div className="profile-hero-inputs">
+                <input
+                  id="profile-modal-title"
+                  name="username"
+                  type="text"
+                  value={profile.username}
+                  onChange={handleProfileChange}
+                  placeholder="Введите ФИО"
+                  className="profile-hero-input profile-hero-name-input"
+                  required
+                />
+                <input
+                  name="phone"
+                  type="tel"
+                  value={profile.phone}
+                  onChange={handleProfileChange}
+                  placeholder="+79991234567"
+                  className="profile-hero-input profile-hero-phone-input"
+                  required
+                />
+              </div>
               <div className="profile-hero-meta">
                 <span>{monthlyWindows.length} окон в месяце</span>
                 <span>Заполнено: {completionPercent}%</span>
               </div>
             </div>
 
-            <button
-              type="button"
-              className="secondary-btn profile-hero-action"
-              onClick={handleOpenProfileForm}
-            >
-              {isProfileFormVisible ? 'Скрыть данные' : 'Редактировать'}
-            </button>
-          </section>
+            <div className="profile-hero-actions">
+              <button
+                type="submit"
+                className="profile-save-btn compact profile-hero-submit"
+                disabled={isSubmittingProfile || !isProfileDirty || isProfileLoading}
+              >
+                {isSubmittingProfile ? 'Сохранение...' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
+                className="secondary-btn profile-hero-action"
+                onClick={handleCancelProfileEdit}
+                disabled={!isProfileDirty || isSubmittingProfile}
+              >
+                Сбросить
+              </button>
+              {!isProfileDirty ? (
+                <button
+                  type="button"
+                  className="profile-hero-hint-btn"
+                  disabled
+                >
+                  Редактируйте прямо здесь
+                </button>
+              ) : null}
+            </div>
+          </form>
 
-          <section className="profile-reference-layout">
-            <div className="profile-reference-column profile-calendar-column">
+          <section className="profile-reference-layout profile-reference-layout-single">
+            <div className="profile-reference-column">
               <div className="profile-panel-header">
                 <div>
                   <h3>Calendar</h3>
@@ -603,70 +611,6 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
                   Окна на выбранный день появятся здесь.
                 </div>
               )}
-            </div>
-
-            <div className="profile-reference-column profile-messages-column">
-              <div className="profile-panel-header">
-                <div>
-                  <h3>Messages</h3>
-                  <p>Системные подсказки и быстрый статус</p>
-                </div>
-              </div>
-
-              <div className="profile-message-list">
-                {activityCards.map((card) => (
-                  <article key={card.title} className="profile-message-card">
-                    <p>{card.title}</p>
-                    <span>{card.body}</span>
-                    <small>{card.meta}</small>
-                  </article>
-                ))}
-              </div>
-
-              {isProfileFormVisible ? (
-                <form className="profile-editor-card" onSubmit={handleProfileSubmit}>
-                  <div className="profile-editor-head">
-                    <h4>Данные профиля</h4>
-                    <p>Обновите имя и контакт прямо в этом окне.</p>
-                  </div>
-
-                  {isProfileLoading ? (
-                    <p>Загрузка профиля...</p>
-                  ) : (
-                    <>
-                      <div className="profile-fields">
-                        <label htmlFor="profile-username">Имя пользователя</label>
-                        <input
-                          id="profile-username"
-                          name="username"
-                          type="text"
-                          value={profile.username}
-                          onChange={handleProfileChange}
-                          placeholder="Например: Иван Петров"
-                          className="profile-input"
-                          required
-                        />
-
-                        <label htmlFor="profile-phone">Телефон</label>
-                        <input
-                          id="profile-phone"
-                          name="phone"
-                          type="tel"
-                          value={profile.phone}
-                          onChange={handleProfileChange}
-                          placeholder="+79991234567"
-                          className="profile-input"
-                          required
-                        />
-                      </div>
-
-                      <button type="submit" className="profile-save-btn" disabled={isSubmittingProfile}>
-                        {isSubmittingProfile ? 'Сохранение...' : 'Сохранить'}
-                      </button>
-                    </>
-                  )}
-                </form>
-              ) : null}
 
               {isAvailabilityFormVisible ? (
                 <form className="profile-editor-card" onSubmit={handleSpareTimeSubmit}>
@@ -728,10 +672,10 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
                 </form>
               ) : null}
 
-              {!isProfileFormVisible && !isAvailabilityFormVisible ? (
+              {!isAvailabilityFormVisible ? (
                 <div className="profile-empty-card subtle">
-                  Используйте кнопки сверху, чтобы открыть редактирование данных или форму
-                  доступности.
+                  ФИО и телефон редактируются прямо в верхней карточке. Здесь можно открыть только
+                  форму доступности.
                 </div>
               ) : null}
             </div>
