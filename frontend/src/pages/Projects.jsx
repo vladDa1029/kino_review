@@ -255,6 +255,7 @@ const Projects = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loadingImageId, setLoadingImageId] = useState(null);
   const [removingImageId, setRemovingImageId] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
   const [activeDateFilterKey, setActiveDateFilterKey] = useState(null);
@@ -633,12 +634,32 @@ const Projects = () => {
 
   return (
     <section className="projects-wrapper">
-      <div className="projects-page projects-dashboard-layout">
-        <aside className="dashboard-panel projects-sidebar">
+      <div className={`projects-page projects-dashboard-layout${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
+        <div className="dashboard-panel projects-layout-toolbar">
+          <button
+            type="button"
+            className="secondary-btn projects-layout-toggle"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            aria-expanded={!isSidebarCollapsed}
+            aria-controls="projects-categories-panel"
+          >
+            <span className="projects-layout-toggle-icon" aria-hidden="true">
+              {isSidebarCollapsed ? '→' : '←'}
+            </span>
+            <span>{isSidebarCollapsed ? 'Показать категории' : 'Скрыть категории'}</span>
+          </button>
+
+          <p className="projects-layout-toolbar-note">
+            {isSidebarCollapsed
+              ? `Категории скрыты. Сейчас активна секция: ${currentResource.label}.`
+              : 'Левую панель можно убрать, чтобы освободить больше места под форму и таблицу.'}
+          </p>
+        </div>
+
+        <aside id="projects-categories-panel" className="dashboard-panel projects-sidebar">
           <div className="projects-sidebar-heading">
-            <span className="projects-panel-eyebrow">Категории</span>
-            <h1>Рабочая зона</h1>
-            <p>Кнопки категорий находятся слева, формы по центру, календарь и таблица справа.</p>
+            <span className="projects-panel-eyebrow">Навигация</span>
+            <h1>Категории</h1>
           </div>
 
           <div className="projects-sidebar-nav" role="tablist" aria-label="Категории инвентаря">
@@ -654,7 +675,6 @@ const Projects = () => {
                   onClick={() => switchResource(resourceKey)}
                 >
                   <span>{resource.label}</span>
-                  <small>{resource.one}</small>
                 </button>
               );
             })}
@@ -662,8 +682,7 @@ const Projects = () => {
 
           <div className="projects-sidebar-note">
             <strong>{currentResource.label}</strong>
-            <p>Всего записей: {pagination.totalCount}</p>
-            <p>Выберите строку в таблице, чтобы открыть управление доступностью и бронированием.</p>
+            <span>{pagination.totalCount} позиций</span>
           </div>
         </aside>
 
