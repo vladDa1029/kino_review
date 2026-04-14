@@ -103,7 +103,7 @@ const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
 });
 
-const ProfilePage = ({ isOpen = false, onClose }) => {
+const ProfilePage = () => {
   const [profile, setProfile] = useState(initialProfile);
   const [savedProfile, setSavedProfile] = useState(initialProfile);
   const [descriptionId, setDescriptionId] = useState(null);
@@ -190,10 +190,6 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
   };
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const today = startOfDay(new Date());
     setVisibleMonth(today);
     setSelectedDateKey(toDateKey(today));
@@ -201,22 +197,7 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
     setIsSpareTimesLoading(true);
     loadDescription();
     loadSpareTimes();
-  }, [isOpen, loadDescription, loadSpareTimes]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        onClose?.();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [loadDescription, loadSpareTimes]);
 
   const availabilityMap = useMemo(() => buildAvailabilityMap(spareTimes), [spareTimes]);
   const todayKey = toDateKey(new Date());
@@ -381,12 +362,6 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
     }
   };
 
-  const handleBackdropMouseDown = (event) => {
-    if (event.target === event.currentTarget) {
-      onClose?.();
-    }
-  };
-
   const handleMonthChange = (direction) => {
     setVisibleMonth(
       (prev) => new Date(prev.getFullYear(), prev.getMonth() + direction, 1),
@@ -402,28 +377,10 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
     setProfile(savedProfile);
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="auth-modal profile-modal-backdrop open" onMouseDown={handleBackdropMouseDown}>
-      <div
-        className="profile-modal-shell profile-reference-shell"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-modal-title"
-      >
-        <button
-          type="button"
-          className="close-btn profile-modal-close"
-          onClick={() => onClose?.()}
-          aria-label="Закрыть профиль"
-        >
-          &times;
-        </button>
-
-        <div className="profile-modal-scroll profile-reference-scroll">
+    <section className="profile-route-page">
+      <div className="profile-modal-shell profile-reference-shell profile-route-shell">
+        <div className="profile-modal-scroll profile-reference-scroll profile-route-scroll">
           <form className="profile-hero-card profile-hero-form" onSubmit={handleProfileSubmit}>
             <div className="profile-hero-avatar">
               <label
@@ -682,7 +639,7 @@ const ProfilePage = ({ isOpen = false, onClose }) => {
           </section>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

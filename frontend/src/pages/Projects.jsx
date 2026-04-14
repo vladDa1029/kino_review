@@ -1054,95 +1054,95 @@ const Projects = () => {
               ) : null}
             </div>
           </section>
-
-          <section className="dashboard-panel projects-table-panel">
-            <div className="section-heading projects-table-heading">
-              <div>
-                <span className="projects-panel-eyebrow">Таблица</span>
-                <h2>{currentResource.label}</h2>
-              </div>
-              <p>
-                {loading
-                  ? 'Загружаем список...'
-                  : activeDateFilterKey
-                    ? `Показаны записи за ${activeDayLabel}`
-                    : `Показана страница ${pagination.page} из ${pagination.totalPages}`}
-              </p>
-            </div>
-
-            <div className="table-shell">
-              <table className="user-table">
-                <thead>
-                  <tr>
-                    {currentResource.columns.map((column) => (
-                      <th key={column.key}>{column.label}</th>
-                    ))}
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => {
-                    const isSelected = selectedItemId === item.oid;
-
-                    return (
-                      <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
-                        {currentResource.columns.map((column) => (
-                          <td key={column.key}>{getColumnValue(item, column)}</td>
-                        ))}
-                        <td>
-                          <div className="table-actions">
-                            <button type="button" className="ghost-action-btn" onClick={() => handleEdit(item)}>
-                              Изменить
-                            </button>
-                            <button type="button" className="ghost-action-btn" onClick={() => handleSelectItem(item)}>
-                              {isSelected ? 'Выбрано' : 'Выбрать'}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-action-btn danger"
-                              onClick={() => handleDelete(item.oid)}
-                              disabled={deletingId === item.oid}
-                            >
-                              {deletingId === item.oid ? 'Удаляем...' : 'Удалить'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {!loading && filteredItems.length === 0 ? (
-                <p className="helper-note projects-empty-state">
-                  {activeDateFilterKey
-                    ? 'На выбранную дату записей нет. Снимите фильтр или выберите другой день.'
-                    : 'Список пока пуст. Добавьте первый объект через центральную панель.'}
-                </p>
-              ) : null}
-            </div>
-
-            {!activeDateFilterKey ? (
-              <div className="pagination">
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page <= 1 || loading}
-                >
-                  Назад
-                </button>
-                <span>Страница {pagination.page} из {pagination.totalPages}</span>
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.totalPages || loading}
-                >
-                  Вперед
-                </button>
-              </div>
-            ) : null}
-          </section>
         </aside>
+
+        <section className="dashboard-panel projects-table-panel projects-table-full">
+          <div className="section-heading projects-table-heading">
+            <div>
+              <span className="projects-panel-eyebrow">Таблица</span>
+              <h2>{currentResource.label}</h2>
+            </div>
+            <p>
+              {loading
+                ? 'Загружаем список...'
+                : activeDateFilterKey
+                  ? `Показаны записи за ${activeDayLabel}`
+                  : `Показана страница ${pagination.page} из ${pagination.totalPages}`}
+            </p>
+          </div>
+
+          <div className="table-shell">
+            <table className="user-table">
+              <thead>
+                <tr>
+                  {currentResource.columns.map((column) => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item) => {
+                  const isSelected = selectedItemId === item.oid;
+
+                  return (
+                    <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
+                      {currentResource.columns.map((column) => (
+                        <td key={column.key}>{getColumnValue(item, column)}</td>
+                      ))}
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="ghost-action-btn" onClick={() => handleEdit(item)}>
+                            Изменить
+                          </button>
+                          <button type="button" className="ghost-action-btn" onClick={() => handleSelectItem(item)}>
+                            {isSelected ? 'Выбрано' : 'Выбрать'}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleDelete(item.oid)}
+                            disabled={deletingId === item.oid}
+                          >
+                            {deletingId === item.oid ? 'Удаляем...' : 'Удалить'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {!loading && filteredItems.length === 0 ? (
+              <p className="helper-note projects-empty-state">
+                {activeDateFilterKey
+                  ? 'На выбранную дату записей нет. Снимите фильтр или выберите другой день.'
+                  : 'Список пока пуст. Добавьте первый объект через центральную панель.'}
+              </p>
+            ) : null}
+          </div>
+
+          {!activeDateFilterKey ? (
+            <div className="pagination">
+              <button
+                type="button"
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page <= 1 || loading}
+              >
+                Назад
+              </button>
+              <span>Страница {pagination.page} из {pagination.totalPages}</span>
+              <button
+                type="button"
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages || loading}
+              >
+                Вперед
+              </button>
+            </div>
+          ) : null}
+        </section>
       </div>
     </section>
   );

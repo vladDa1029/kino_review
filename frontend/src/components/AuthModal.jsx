@@ -107,7 +107,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
       }
 
       if (response?.access_token) {
-        navigate('/projects');
+        navigate('/profile');
       }
 
       setFormData({ email: '', password: '' });

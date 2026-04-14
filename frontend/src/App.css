@@ -163,6 +163,15 @@ body:not(.dark-theme) {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+.menu-trigger-btn {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.header-controls.is-authenticated > .profile-trigger-btn,
+.header-controls.is-authenticated > .auth-btn {
+  display: none;
+}
+
 .auth-btn:hover,
 .primary-btn:hover,
 .profile-save-btn:hover,
@@ -590,6 +599,22 @@ body:not(.dark-theme) {
   width: min(860px, 96vw);
 }
 
+.profile-route-page {
+  width: min(1200px, 94vw);
+  margin: 2rem auto 3rem;
+  padding: 0 0 2rem;
+}
+
+.profile-route-shell {
+  width: 100%;
+  max-height: none;
+}
+
+.profile-route-scroll {
+  max-height: none;
+  padding: 1.6rem;
+}
+
 .profile-modal-scroll {
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
@@ -627,6 +652,135 @@ body:not(.dark-theme) {
 
 .profile-modal-close {
   z-index: 2;
+}
+
+.app-drawer-backdrop {
+  z-index: 92;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.app-drawer-shell {
+  width: min(400px, 92vw);
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, transparent), color-mix(in srgb, var(--surface) 96%, transparent));
+  box-shadow: var(--shadow-lg);
+  animation: slideDrawerIn 0.24s ease;
+}
+
+.app-drawer-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.1rem 1rem 1rem;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1.2rem;
+}
+
+.app-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.45rem 3rem 0.7rem 0.25rem;
+}
+
+.app-drawer-brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-drawer-brand-copy h2 {
+  margin: 0.2rem 0 0;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+.app-drawer-brand-copy p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.app-drawer-close {
+  z-index: 2;
+  background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+}
+
+.app-drawer-nav {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.app-drawer-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.app-drawer-link svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.app-drawer-link span {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.app-drawer-link:hover {
+  transform: translateX(2px);
+  background: color-mix(in srgb, var(--surface-strong) 78%, transparent);
+  border-color: color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+.app-drawer-link.is-active {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.app-drawer-link.is-active svg {
+  color: var(--accent);
+}
+
+.app-drawer-footer {
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.app-drawer-link.is-danger:hover {
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffb4b4;
+}
+
+.app-drawer-link.is-danger:hover svg {
+  color: #ff8e8e;
 }
 
 .profile-reference-scroll {
@@ -1523,13 +1677,16 @@ body:not(.dark-theme) {
   top: 5.4rem;
   overflow: hidden;
   z-index: 0;
+  transform-origin: top left;
+  will-change: transform, opacity, filter;
   transition:
-    opacity 0.28s ease,
-    transform 0.32s ease,
-    padding 0.28s ease,
-    margin 0.28s ease,
-    border-color 0.28s ease,
-    box-shadow 0.28s ease;
+    opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+    margin 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.36s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .projects-dashboard-layout .projects-sidebar {
@@ -1540,8 +1697,24 @@ body:not(.dark-theme) {
 
 .projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar {
   opacity: 0;
-  transform: translateX(calc(-100% - 1rem));
+  filter: blur(8px);
+  transform: translateX(calc(-100% - 1.25rem)) scale(0.985);
   pointer-events: none;
+}
+
+.projects-sidebar-heading,
+.projects-sidebar-nav,
+.projects-sidebar-note {
+  transition:
+    opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar-heading,
+.projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar-nav,
+.projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar-note {
+  opacity: 0;
+  transform: translateX(-10px);
 }
 
 .projects-center-column {
@@ -1883,6 +2056,10 @@ body:not(.dark-theme) {
   margin-top: 0.3rem;
 }
 
+.projects-table-full {
+  grid-column: 1 / -1;
+}
+
 .projects-empty-state {
   margin: 0.8rem 0 0;
 }
@@ -1909,6 +2086,15 @@ body:not(.dark-theme) {
 
 .entity-meta-list dd {
   margin: 0;
+}
+
+@keyframes slideDrawerIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 @keyframes drawLine {
