@@ -115,6 +115,12 @@ class BrokerUserRegistered(BaseModel):
     create_at: datetime = Field(examples=["2026-01-10T09:30:00Z"])
 
 
+class BrokerUserExistenceRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    user_id: UUID
+
+
 class BrokerShiftParticipantReservationCheckRequested(BaseModel):
     request_id: UUID
     project_id: UUID
@@ -182,6 +188,53 @@ class BrokerShiftResourceRequestReservationRequested(BaseModel):
     resource_id: UUID
     start_time: datetime
     end_time: datetime
+
+
+class BrokerShiftParticipantApprovalStateReply(BaseModel):
+    correlation_id: UUID
+    response_type: Literal[
+        "shift.participant_approval_state_provided",
+        "shift.participant_approval_state_failed",
+    ]
+    participant_id: UUID | None = None
+    request_id: UUID | None = None
+    project_id: UUID | None = None
+    project_title: str | None = None
+    shift_id: UUID | None = None
+    shift_title: str | None = None
+    user_id: UUID | None = None
+    role: str | None = None
+    time_from: datetime | None = None
+    time_to: datetime | None = None
+    status: int | None = None
+    status_name: str | None = None
+    user_reservation_id: UUID | None = None
+    reserve_failure_reason: str | None = None
+    reason: str | None = None
+
+
+class BrokerShiftResourceRequestApprovalStateReply(BaseModel):
+    correlation_id: UUID
+    response_type: Literal[
+        "shift.resource_request_approval_state_provided",
+        "shift.resource_request_approval_state_failed",
+    ]
+    resource_request_id: UUID | None = None
+    request_id: UUID | None = None
+    project_id: UUID | None = None
+    project_title: str | None = None
+    shift_id: UUID | None = None
+    shift_title: str | None = None
+    owner_user_id: UUID | None = None
+    resource_id: UUID | None = None
+    resource_type: str | None = None
+    time_from: datetime | None = None
+    time_to: datetime | None = None
+    status: int | None = None
+    status_name: str | None = None
+    resource_reservation_id: UUID | None = None
+    reserve_failure_reason: str | None = None
+    reason: str | None = None
 
 
 class EquipmentListQuery(BaseModel):

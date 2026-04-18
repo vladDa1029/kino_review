@@ -267,3 +267,37 @@ def test_confirm_reservation_handler_returns_already_processed_for_non_reserving
         assert reserve_handler.commands == []
 
     asyncio.run(scenario())
+
+
+def test_confirm_reservation_handler_returns_error_when_approval_state_lookup_fails() -> None:
+    class FailingProjectApprovalStates:
+        async def get_participant_approval_state(self, *, participant_id):
+            raise RuntimeError("broker timeout")
+
+        async def get_resource_approval_state(self, *, resource_request_id):
+            raise AssertionError("resource flow not used")
+
+    async def scenario() -> None:
+        settings = _settings()
+        token_service = JWTConfirmationTokenService(settings)
+        token = token_service.issue_participant_token(
+            request_id=uuid4(),
+            project_id=uuid4(),
+            shift_id=uuid4(),
+            participant_id=uuid4(),
+            user_id=uuid4(),
+            time_from=now_utc(),
+            time_to=now_utc() + timedelta(hours=1),
+        )
+        handler = ConfirmReservationByTokenHandler(
+            confirmation_tokens=token_service,
+            project_approval_states=FailingProjectApprovalStates(),
+            reserve_availability=FakeReserveAvailabilityHandler(uuid4()),
+            publisher=FakePublisher(),
+        )
+
+        result = await handler(token)
+
+        assert result.page == "error"
+
+    asyncio.run(scenario())

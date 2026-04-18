@@ -108,12 +108,7 @@ class ImageSettings(ConfigABC):
 
 
 class ProjectService(ConfigABC):
-    base_url: str = Field(alias="PROJECT_SERVICE_BASE_URL", default="http://project:8003")
     timeout_seconds: float = Field(alias="PROJECT_SERVICE_TIMEOUT_SECONDS", default=10.0)
-    internal_api_key: str = Field(
-        alias="PROJECT_SERVICE_INTERNAL_API_KEY",
-        default="kino-internal-dev-key",
-    )
 
 
 class ConfirmationSettings(ConfigABC):

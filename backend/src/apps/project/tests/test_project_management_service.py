@@ -7,6 +7,8 @@ import pytest
 from app.application.commands.participants import (
     ConfirmShiftParticipantCommand,
     ConfirmShiftParticipantHandler,
+    InviteShiftParticipantCommand,
+    InviteShiftParticipantHandler,
 )
 from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
 from app.application.commands.projects import (
@@ -16,6 +18,8 @@ from app.application.commands.projects import (
     CreateProjectHandler,
     DeleteProjectCommand,
     DeleteProjectHandler,
+    InviteProjectMemberCommand,
+    InviteProjectMemberHandler,
     RemoveProjectMemberCommand,
     RemoveProjectMemberHandler,
     UpdateProjectCommand,
@@ -341,7 +345,6 @@ def build_context(
         clock=clock,
         id_generator=id_generator or FakeIdGenerator(),
         publisher=publisher,
-        user_service=user_service,
         projects=projects,
         project_members=members,
         membership_service=ProjectMembershipService(),
@@ -385,7 +388,7 @@ def test_create_project_commits_and_publishes_event() -> None:
             _,
             tx,
             publisher,
-            _,
+            user_service,
             projects,
             members,
             _,
@@ -409,6 +412,7 @@ def test_create_project_commits_and_publishes_event() -> None:
         assert owner_member.role == ProjectRole.DIRECTOR
         assert owner_member.status == ProjectMemberStatus.ACTIVE
         assert publisher.events[0][0] == "project.created"
+        assert user_service.existing_users == set()
 
     asyncio.run(scenario())
 
@@ -447,6 +451,127 @@ def test_create_project_uses_injected_id_generator() -> None:
         assert expected_project_id in projects.data
         owner_member = members.data[(expected_project_id, owner_id)]
         assert owner_member.oid == expected_member_id
+
+    asyncio.run(scenario())
+
+
+def test_invite_project_member_still_checks_invited_user_exists() -> None:
+    async def scenario():
+        (
+            create_project_handler,
+            _,
+            _,
+            tx,
+            publisher,
+            user_service,
+            projects,
+            members,
+            _,
+            _,
+            _,
+            _,
+        ) = build_context()
+        owner_id = uuid4()
+        invited_user_id = uuid4()
+        project = await create_project_handler(
+            CreateProjectCommand(
+                owner_id=owner_id,
+                title="Invite members",
+                description="Desc",
+            )
+        )
+        handler = InviteProjectMemberHandler(
+            transaction_manager=tx,
+            clock=SystemClock(),
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=members,
+            projects=projects,
+            membership_service=ProjectMembershipService(),
+        )
+
+        member = await handler(
+            InviteProjectMemberCommand(
+                project_id=project.oid,
+                actor_user_id=owner_id,
+                invited_user_id=invited_user_id,
+                role=ProjectRole.CAMERA,
+            )
+        )
+
+        assert member.user_id == invited_user_id
+        assert member.status == ProjectMemberStatus.INVITED
+        assert invited_user_id in user_service.existing_users
+
+    asyncio.run(scenario())
+
+
+def test_invite_shift_participant_still_checks_participant_user_exists() -> None:
+    async def scenario():
+        (
+            create_project_handler,
+            _,
+            _,
+            tx,
+            publisher,
+            user_service,
+            _,
+            members,
+            shifts,
+            participants,
+            _,
+            _,
+        ) = build_context()
+        owner_id = uuid4()
+        participant_user_id = uuid4()
+        project = await create_project_handler(
+            CreateProjectCommand(
+                owner_id=owner_id,
+                title="Invite participants",
+                description="Desc",
+            )
+        )
+        now = now_utc()
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project.oid,
+            title="Morning shift",
+            description="Desc",
+            start_time=now,
+            end_time=now + timedelta(hours=3),
+            status=ShiftStatus.DRAFT,
+            created_by=owner_id,
+            created_at=now,
+            updated_at=now,
+        )
+        await shifts.add(shift)
+        handler = InviteShiftParticipantHandler(
+            transaction_manager=tx,
+            clock=SystemClock(),
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=members,
+            shifts=shifts,
+            shift_participants=participants,
+            shift_participant_service=ShiftParticipantService(),
+        )
+
+        participant = await handler(
+            InviteShiftParticipantCommand(
+                shift_id=shift.oid,
+                actor_user_id=owner_id,
+                participant_user_id=participant_user_id,
+                role=ProjectRole.CAMERA,
+                time_from=now + timedelta(minutes=15),
+                time_to=now + timedelta(hours=1),
+            )
+        )
+
+        assert participant.user_id == participant_user_id
+        assert participant.status == ShiftParticipantStatus.INVITED
+        assert participant_user_id in user_service.existing_users
 
     asyncio.run(scenario())
 

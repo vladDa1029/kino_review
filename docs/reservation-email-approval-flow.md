@@ -24,16 +24,16 @@ Responsibilities:
 - own project, shift, participant, and resource-request state
 - move participant/resource request into `RESERVING`
 - publish approval-request domain events
-- expose internal read endpoints for current approval state
+- answer approval-state request/reply messages for current workflow state
 - apply final reservation result events from `user`
 
 Implemented now:
 - publishes:
   - `shift.participant_approval_requested`
   - `shift.resource_request_approval_requested`
-- exposes internal endpoints:
-  - `GET /internal/participants/{participant_id}/approval-state`
-  - `GET /internal/resource-requests/{request_id}/approval-state`
+- consumes:
+  - `shift.participant_approval_state_requested`
+  - `shift.resource_request_approval_state_requested`
 - consumes final events from `user` and updates state to `RESERVED` or `RESERVE_FAILED`
 
 ### `user`
@@ -42,7 +42,7 @@ Responsibilities:
 - own availability and actual reservation records
 - generate signed confirmation tokens
 - build public confirmation links
-- recheck current approval state from `project`
+- recheck current approval state from `project` through broker request/reply
 - perform final reserve after link click
 - publish final reservation result back to `project`
 
@@ -102,7 +102,8 @@ sequenceDiagram
     N->>S: send reservation_confirmation email
     S-->>A: user clicks confirmation link
     A->>U: GET /user/confirmations/{token}
-    U->>P: read current approval-state via internal HTTP
+    U->>P: approval-state request via AMQP
+    P->>U: approval-state reply via caller-specific reply topic
     U->>U: reserve availability/resource time
     U->>P: final event reserved / reserve_failed
     P->>P: update entity status
@@ -163,6 +164,18 @@ Payload includes:
 
 ### `user -> project`
 
+Approval-state request/reply:
+- request topics:
+  - `shift.participant_approval_state_requested`
+  - `shift.resource_request_approval_state_requested`
+- reply payloads are published to caller-specific reply topics:
+  - `user.reply.<instance_id>`
+- reply payload includes `response_type` with one of:
+  - `shift.participant_approval_state_provided`
+  - `shift.participant_approval_state_failed`
+  - `shift.resource_request_approval_state_provided`
+  - `shift.resource_request_approval_state_failed`
+
 Final participant events:
 - `shift.participant_reserved.user`
 - `shift.participant_reserve_failed`
@@ -175,10 +188,6 @@ Final resource events:
 
 Public:
 - `GET /user/confirmations/{token}` via gateway
-
-Internal:
-- `GET /internal/participants/{participant_id}/approval-state`
-- `GET /internal/resource-requests/{request_id}/approval-state`
 
 ## What Is Verified Now
 

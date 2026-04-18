@@ -31,8 +31,10 @@ from app.infrastructure.adapters.broker import (
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
     USER_EVENTS_EXCHANGE,
     USER_REGISTERED_EXCHANGE,
+    USER_EXISTENCE_REQUESTED_QUEUE,
     USER_REGISTERED_QUEUE,
 )
+from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
 from app.infrastructure.adapters.orm import start_mappers
 from app.presentation import handlers
 from app.presentation.api import router as web_router
@@ -45,11 +47,14 @@ log = structlog.get_logger(__file__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
+    reply_inbox = cast(BrokerReplyInbox, app.state.reply_inbox)
     await broker.start()
     await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
     await broker.declare_exchange(USER_REGISTERED_EXCHANGE)
     await broker.declare_exchange(USER_EVENTS_EXCHANGE)
+    await broker.declare_queue(build_reply_queue(reply_inbox))
     await broker.declare_queue(USER_REGISTERED_QUEUE)
+    await broker.declare_queue(USER_EXISTENCE_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE)
@@ -72,7 +77,9 @@ def start_app_dev() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log)
     broker = RabbitBroker(url=settings.rabbitmq.url)
+    reply_inbox = BrokerReplyInbox(service_name="user")
     app.state._broker = broker
+    app.state.reply_inbox = reply_inbox
     container: AsyncContainer = make_async_container(
         *setup_providers(),
         context={
@@ -84,10 +91,11 @@ def start_app_dev() -> FastAPI:
             ImageSettings: settings.image,
             ProjectService: settings.project_service,
             ConfirmationSettings: settings.confirmation,
+            BrokerReplyInbox: reply_inbox,
             RabbitBroker: broker,
         },
     )
-    broker.include_router(create_broker_router(container))
+    broker.include_router(create_broker_router(container, reply_inbox))
     setup_dishka(container=container, app=app)
 
     app.add_exception_handler(ApplicationError, handlers.application_error_handler)

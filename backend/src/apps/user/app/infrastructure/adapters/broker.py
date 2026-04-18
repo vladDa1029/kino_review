@@ -26,6 +26,12 @@ USER_EVENTS_EXCHANGE = RabbitExchange(
     durable=True,
 )
 
+USER_EXISTENCE_REQUESTED_QUEUE = RabbitQueue(
+    name="user.existence_requested.user",
+    durable=True,
+    routing_key="user.existence_requested",
+)
+
 SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE = RabbitQueue(
     name="shift.participant_reservation_check_requested.user",
     durable=True,

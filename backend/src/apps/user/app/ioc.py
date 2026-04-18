@@ -158,12 +158,13 @@ from app.infrastructure.adapters.repository import (
     UserSqlAlchemyRepository,
 )
 from app.infrastructure.adapters.broker import RabbitPublisher
+from app.infrastructure.adapters.request_reply import BrokerReplyInbox
 from app.infrastructure.adapters.storage import create_file_storage
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.security.confirmation_token import JWTConfirmationTokenService
 from app.infrastructure.transactions import TransactionManagerAlchemy
-from app.presentation.http.project_service import ProjectApprovalStateHttpClient
+from app.presentation.http.project_service import ProjectApprovalStateBrokerClient
 
 
 def settings_provider() -> Provider:
@@ -176,6 +177,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=ImageSettings)
     provider.from_context(provides=ProjectService)
     provider.from_context(provides=ConfirmationSettings)
+    provider.from_context(provides=BrokerReplyInbox)
     return provider
 
 
@@ -184,7 +186,7 @@ def broker_provider() -> Provider:
     provider.from_context(provides=RabbitBroker)
     provider.provide(source=RabbitPublisher, provides=EventPublisher, scope=Scope.APP)
     provider.provide(
-        source=ProjectApprovalStateHttpClient,
+        source=ProjectApprovalStateBrokerClient,
         provides=ProjectApprovalStatePort,
         scope=Scope.APP,
     )

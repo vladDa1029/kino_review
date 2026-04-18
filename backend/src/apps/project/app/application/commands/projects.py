@@ -33,7 +33,6 @@ class CreateProjectHandler:
         clock: ClockPort,
         id_generator: IdGeneratorPort,
         publisher: EventPublisher,
-        user_service: UserServicePort,
         projects: ProjectRepository,
         project_members: ProjectMemberRepository,
         membership_service: ProjectMembershipService,
@@ -42,7 +41,6 @@ class CreateProjectHandler:
         self._clock = clock
         self._id_generator = id_generator
         self._publisher = publisher
-        self._user_service = user_service
         self._projects = projects
         self._project_members = project_members
         self._membership_service = membership_service
@@ -50,7 +48,6 @@ class CreateProjectHandler:
     async def __call__(self, command: CreateProjectCommand) -> Project:
         now = self._clock.now()
         try:
-            await self._user_service.ensure_user_exists(command.owner_id)
             project, owner_member = self._membership_service.create_project(
                 project_id=self._id_generator(),
                 owner_membership_id=self._id_generator(),

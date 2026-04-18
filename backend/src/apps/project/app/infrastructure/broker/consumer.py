@@ -59,3 +59,15 @@ SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE = RabbitQueue(
     durable=True,
     routing_key="shift.resource_request_reserve_failed",
 )
+
+SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE = RabbitQueue(
+    name="shift.participant_approval_state_requested.project",
+    durable=True,
+    routing_key="shift.participant_approval_state_requested",
+)
+
+SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE = RabbitQueue(
+    name="shift.resource_request_approval_state_requested.project",
+    durable=True,
+    routing_key="shift.resource_request_approval_state_requested",
+)

@@ -26,10 +26,12 @@ from app.domain.errors.base import ApplicationError
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.broker.consumer import (
     PROJECT_MEMBER_APPROVED_QUEUE,
+    SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE,
     SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE,
@@ -37,6 +39,7 @@ from app.infrastructure.broker.consumer import (
     USER_EVENTS_EXCHANGE,
 )
 from app.infrastructure.broker.publisher import PROJECT_EVENTS_EXCHANGE
+from app.infrastructure.broker.request_reply import BrokerReplyInbox, build_reply_queue
 from app.ioc import setup_providers
 from app.presentation import handlers
 from app.presentation.api import router as api_router
@@ -49,6 +52,7 @@ log = structlog.get_logger(__file__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
+    reply_inbox = cast(BrokerReplyInbox, app.state.reply_inbox)
     poll_task: asyncio.Task | None = None
 
     broker_started = False
@@ -57,10 +61,13 @@ async def lifespan(app: FastAPI):
         await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
         await broker.declare_exchange(USER_EVENTS_EXCHANGE)
         await broker.declare_queue(PROJECT_MEMBER_APPROVED_QUEUE)
+        await broker.declare_queue(build_reply_queue(reply_inbox))
+        await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE)
         await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE)
         await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE)
         await broker.declare_queue(SHIFT_PARTICIPANT_RESERVED_QUEUE)
         await broker.declare_queue(SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE)
+        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE)
         await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE)
         await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE)
         await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE)
@@ -153,7 +160,9 @@ def start_app_dev() -> FastAPI:
         return response
 
     broker = RabbitBroker(url=settings.rabbitmq.url)
+    reply_inbox = BrokerReplyInbox(service_name="project")
     app.state._broker = broker
+    app.state.reply_inbox = reply_inbox
     app.state.reservation_outbox = settings.reservation_outbox
 
     container: AsyncContainer = make_async_container(
@@ -164,12 +173,13 @@ def start_app_dev() -> FastAPI:
             SQLAlchemySettings: settings.alchemy,
             Rabbitmq: settings.rabbitmq,
             UserService: settings.user_service,
+            BrokerReplyInbox: reply_inbox,
             ReservationOutbox: settings.reservation_outbox,
             Minio: settings.minio,
             RabbitBroker: broker,
         },
     )
-    broker.include_router(create_broker_router(container))
+    broker.include_router(create_broker_router(container, reply_inbox))
     setup_dishka(container=container, app=app)
     start_mappers()
 
@@ -188,7 +198,6 @@ def start_app_dev() -> FastAPI:
             "Accept",
             "Cache-Control",
             "X-User-Id",
-            "X-Internal-Api-Key",
         ],
     )
 

@@ -1,6 +1,6 @@
 from app.presentation.http.project_service import (
+    ProjectApprovalStateBrokerClient,
     ProjectApprovalStateError,
-    ProjectApprovalStateHttpClient,
 )
 
-__all__ = ["ProjectApprovalStateError", "ProjectApprovalStateHttpClient"]
+__all__ = ["ProjectApprovalStateBrokerClient", "ProjectApprovalStateError"]

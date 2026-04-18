@@ -2,172 +2,134 @@
 
 ## Purpose
 
-`notificate` is a delivery-only service. It is responsible for transporting notification requests to email recipients, but it does not own business rules for reservation approval.
+`notificate` is a delivery-only service for outbound notifications.
 
-Current bounded context:
-- consume email notification requests
-- schedule background delivery
-- send email through SMTP
-
-Out of scope:
-- building reservation state
-- validating whether reservation is still allowed
-- generating confirmation tokens
-- moving domain entities to `RESERVED` or `RESERVE_FAILED`
-
-## Layered Structure
-
-### Presentation
-
-Files:
-- [api.py](../app/presentation/api.py)
-- [broker.py](../app/presentation/broker.py)
-- [tasks.py](../app/presentation/tasks.py)
-- [schemas.py](../app/presentation/schemas.py)
-
-Responsibilities:
-- expose health endpoint
-- accept broker messages from `user.events`
-- define taskiq task entrypoints
-- validate incoming event payloads
-
-### Application
-
-Files:
-- [schedule_notifications.py](../app/application/commands/schedule_notifications.py)
-- [send_email.py](../app/application/commands/send_email.py)
-- [tasks.py](../app/application/ports/tasks.py)
-- [email.py](../app/application/ports/email.py)
-
-Responsibilities:
-- orchestrate scheduling of background jobs
-- convert use case input into delivery operations
-- express dependencies via ports
-
-### Infrastructure
-
-Files:
-- [smtp.py](../app/infrastructure/email/smtp.py)
-- [dispatcher.py](../app/infrastructure/taskiq/dispatcher.py)
-- [broker.py](../app/infrastructure/taskiq/broker.py)
-- [queues.py](../app/infrastructure/broker/queues.py)
-
-Responsibilities:
-- integrate with SMTP server
-- integrate with taskiq broker
-- provide broker/exchange/queue declarations
-
-### Composition Root
-
-Files:
-- [bootstrap.py](../app/bootstrap.py)
-- [ioc.py](../app/ioc.py)
-- [main.py](../main.py)
-- [worker.py](../worker.py)
-
-Responsibilities:
-- create shared DI container
-- create FastStream broker
-- create Taskiq broker
-- register tasks and middlewares
-- wire Dishka for both FastAPI and Taskiq
+It consumes notification requests, schedules background delivery, and sends email through SMTP. It does not generate tokens, validate reservation state, or move any domain entity to a new workflow status.
 
 ## Runtime Model
 
-The service has two processes:
+The service has two runtime processes built from the same composition root.
 
-1. HTTP and broker process
-   - runs FastAPI
-   - starts FastStream consumer
-   - consumes `notification.email_requested`
-   - invokes application scheduling handler
+### Runtime Processes
 
-2. Taskiq worker process
-   - executes `notificate.send_notification_email`
-   - resolves dependencies via `dishka.integrations.taskiq`
-   - sends SMTP email
+| Process | Entrypoint | Responsibilities |
+| --- | --- | --- |
+| Web and broker process | [main.py](../main.py) | Expose health API, start FastStream broker, accept email-request events, dispatch background jobs |
+| Task worker process | [worker.py](../worker.py) | Execute `taskiq` jobs, resolve dependencies through Dishka, send email through SMTP |
 
-## Event Flow
+Both processes depend on:
 
-```mermaid
-flowchart LR
-    U["user service"] -->|"notification.email_requested"| N["notificate consumer"]
-    N -->|"ScheduleNotificationEmailHandler"| D["Taskiq dispatcher"]
-    D -->|"notificate.send_notification_email"| W["Taskiq worker"]
-    W -->|"SendNotificationEmailHandler"| S["SMTP adapter"]
-    S --> M["MailHog / SMTP server"]
-```
+- RabbitMQ for broker consumption and task transport;
+- SMTP server for email delivery;
+- shared configuration from [app/config.py](../app/config.py).
 
-## Current Contracts
+## Composition Root
 
-Consumed routing key:
-- `notification.email_requested`
+Primary entrypoints:
 
-Consumed exchange:
-- `user.events`
+- [main.py](../main.py)
+- [worker.py](../worker.py)
+- [app/bootstrap.py](../app/bootstrap.py)
+- [app/ioc.py](../app/ioc.py)
 
-Current template:
-- `reservation_confirmation`
+Core adapters:
 
-Required payload:
-- `notification_id`
-- `recipient_email`
-- `subject`
-- `template`
-- `payload.confirm_url`
-- `payload.project_title`
-- `payload.shift_title`
-- `payload.time_from`
-- `payload.time_to`
-- `payload.role` or `payload.resource_type`
+- [app/presentation/broker.py](../app/presentation/broker.py)
+- [app/presentation/tasks.py](../app/presentation/tasks.py)
+- [app/infrastructure/taskiq/dispatcher.py](../app/infrastructure/taskiq/dispatcher.py)
+- [app/infrastructure/taskiq/broker.py](../app/infrastructure/taskiq/broker.py)
+- [app/infrastructure/email/smtp.py](../app/infrastructure/email/smtp.py)
 
-## Taskiq Design
+## Owned Data
 
-Current `taskiq` concepts in use:
-- dedicated worker factory in [worker.py](../worker.py)
-- shared broker factory in [bootstrap.py](../app/bootstrap.py)
-- central task registration
-- `SmartRetryMiddleware`
-- `dishka.integrations.taskiq.inject`
-- worker lifecycle hooks through `TaskiqEvents`
+`notificate` intentionally owns no durable business data in the current design.
 
-This replaced the older approach where the task created a runtime container lazily on each execution.
+| Area | Ownership | Notes |
+| --- | --- | --- |
+| Notification request payload | transient only | Consumed from broker and forwarded to worker |
+| Email body rendering | owned by `notificate` | Presentation concern only |
+| Delivery state persistence | not implemented | No local history or audit table yet |
 
-## Configuration
+## Inbound Interfaces
 
-Main config groups in [config.py](../app/config.py):
-- `Log`
-- `Rabbitmq`
-- `SMTP`
-- `TaskIQ`
+### HTTP Surface
 
-Important env vars:
-- `RABBITMQ_HOST`
-- `RABBITMQ_PORT`
-- `RABBITMQ_DEFAULT_USER`
-- `RABBITMQ_DEFAULT_PASS`
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_FROM_EMAIL`
-- `SMTP_FROM_NAME`
-- `TASKIQ_DEFAULT_RETRY_COUNT`
-- `TASKIQ_DEFAULT_RETRY_DELAY_SECONDS`
+| Path | Authentication | Purpose |
+| --- | --- | --- |
+| `/health` | public/internal | Liveness and service identity check |
 
-## Current Implementation Status
+### Consumed Events
 
-Implemented:
-- broker consumer for `notification.email_requested`
-- background dispatch to taskiq
-- SMTP email sending
-- reservation confirmation email body rendering
-- MailHog-ready local environment
-- health endpoint
-- unit and interservice smoke coverage
+| Routing key | Exchange | Queue | Producer | Purpose |
+| --- | --- | --- | --- | --- |
+| `notification.email_requested` | `user.events` | `notification.email_requested.notificate` | `user` | Request email delivery |
 
-Not implemented:
-- multiple notification channels
-- template storage/versioning
-- delivery status persistence
-- dead-letter queue strategy
-- structured bounce handling
-- retry policy per template or recipient
+## Outbound Interfaces
+
+### Template Payload Contract
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `notification_id` | yes | Correlation identifier from producer |
+| `recipient_email` | yes | Target email |
+| `subject` | yes | Rendered subject supplied by producer |
+| `template` | yes | Current value is `reservation_confirmation` |
+| `payload.confirm_url` | yes | Public confirmation link |
+| `payload.project_title` | yes | Used in email body |
+| `payload.shift_title` | yes | Used in email body |
+| `payload.time_from` | yes | ISO string for email body |
+| `payload.time_to` | yes | ISO string for email body |
+| `payload.role` | conditional | Present for participant approval emails |
+| `payload.resource_type` | conditional | Present for resource-owner approval emails |
+
+### Outbound Delivery Interfaces
+
+| Interface | Adapter | Purpose |
+| --- | --- | --- |
+| Task dispatch | [app/infrastructure/taskiq/dispatcher.py](../app/infrastructure/taskiq/dispatcher.py) | Move delivery work off the broker consumer path |
+| SMTP delivery | [app/infrastructure/email/smtp.py](../app/infrastructure/email/smtp.py) | Send final email to SMTP server or MailHog |
+
+## Key Flows
+
+### Email delivery flow
+
+1. `user` emits `notification.email_requested`.
+2. `notificate` consumes the event through FastStream.
+3. Application logic validates the payload and enqueues a `taskiq` task.
+4. The worker executes the task and sends email through the SMTP adapter.
+
+### Local development flow
+
+1. RabbitMQ delivers the message.
+2. The worker sends SMTP traffic to MailHog or another configured SMTP server.
+3. Developers inspect delivered messages without changing domain services.
+
+## Change Playbooks
+
+- If you change the template payload schema, update the event schema, consumer, task signature, renderer, and tests together.
+- If you change the `taskiq` task contract, update both the dispatcher and the worker registration. Do not assume argument names are informal.
+- If you add a new notification template, add one schema path, one rendering path, and one test path. Keep delivery-only boundaries intact.
+- If you change FastStream queue bindings, update queue declarations in [app/infrastructure/broker/queues.py](../app/infrastructure/broker/queues.py) and any interservice tests that publish the event.
+- If you add delivery persistence later, keep it operational. Do not let notification storage become a source of truth for project or user workflow state.
+
+## Known Traps
+
+- Do not turn `notificate` into a domain workflow bridge.
+- Do not generate confirmation links or tokens here.
+- Do not perform SMTP delivery directly inside the broker consumer; keep it in the worker path.
+- Do not reinterpret notification payload semantics. `notificate` should render and deliver, not decide business meaning.
+- Do not add producer-specific branching unless the contract requires it and is documented.
+
+## Validation / Testing Focus
+
+- Run service tests covering broker consumption, task dispatch, and SMTP adapter behavior in [tests](../tests).
+- Recheck MailHog smoke after changes to template rendering or SMTP config.
+- Recheck worker registration after task name or bootstrap changes.
+- Recheck the consumed event schema after any producer-side payload change.
+
+## Current Limitations
+
+- Only email delivery is implemented.
+- Only one template, `reservation_confirmation`, is implemented.
+- There is no delivery persistence, bounce handling, or dead-letter strategy.
+- Retry policy is generic and not template-specific.

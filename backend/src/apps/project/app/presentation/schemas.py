@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -368,6 +369,14 @@ class BrokerProjectMemberInvitationApproved(BaseModel):
     approved_by_user_id: UUID | None = None
 
 
+class BrokerUserExistenceReply(BaseModel):
+    correlation_id: UUID
+    response_type: Literal["user.existence_provided", "user.existence_failed"]
+    user_id: UUID
+    exists: bool | None = None
+    reason: str | None = None
+
+
 class BrokerShiftParticipantReservationCheckSucceeded(BaseModel):
     request_id: UUID
     project_id: UUID
@@ -440,3 +449,15 @@ class BrokerShiftResourceRequestReserveFailed(BaseModel):
     owner_user_id: UUID
     resource_id: UUID
     reason: str
+
+
+class BrokerShiftParticipantApprovalStateRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    participant_id: UUID
+
+
+class BrokerShiftResourceRequestApprovalStateRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    resource_request_id: UUID

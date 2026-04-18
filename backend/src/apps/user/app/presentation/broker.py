@@ -19,6 +19,7 @@ from app.application.commands.user_registered import (
     UserRegisteredCommand,
     UserRegisteredHandler,
 )
+from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
 from app.application.ports.broker import EventPublisher
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.broker import (
@@ -30,10 +31,13 @@ from app.infrastructure.adapters.broker import (
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
     USER_EVENTS_EXCHANGE,
+    USER_EXISTENCE_REQUESTED_QUEUE,
     USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
 )
+from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
 from app.presentation.schemas import (
+    BrokerUserExistenceRequested,
     BrokerShiftParticipantApprovalRequested,
     BrokerShiftParticipantReservationCheckRequested,
     BrokerShiftParticipantReservationRequested,
@@ -44,7 +48,7 @@ from app.presentation.schemas import (
 )
 
 
-def create_broker_router(container: AsyncContainer) -> RabbitRouter:
+def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbox) -> RabbitRouter:
     router = RabbitRouter()
 
     @router.subscriber(USER_REGISTERED_QUEUE, exchange=USER_REGISTERED_EXCHANGE)
@@ -60,6 +64,40 @@ def create_broker_router(container: AsyncContainer) -> RabbitRouter:
         async with container() as request_container:
             handler = await request_container.get(UserRegisteredHandler)
             await handler(command)
+
+    @router.subscriber(USER_EXISTENCE_REQUESTED_QUEUE, exchange=PROJECT_EVENTS_EXCHANGE)
+    async def handle_user_existence_requested(event: BrokerUserExistenceRequested) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(GetUserExistsHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                exists = await handler(GetUserExistsQuery(user_id=BaseId(event.user_id)))
+            except Exception as exc:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "user.existence_failed",
+                        "user_id": str(event.user_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "user.existence_provided",
+                        "user_id": str(event.user_id),
+                        "exists": exists,
+                    },
+                )
+
+    @router.subscriber(build_reply_queue(reply_inbox), exchange=PROJECT_EVENTS_EXCHANGE)
+    async def handle_project_reply(event: dict) -> None:
+        correlation_id = event.get("correlation_id")
+        if isinstance(correlation_id, str):
+            reply_inbox.resolve(correlation_id, event)
 
     @router.subscriber(
         SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,

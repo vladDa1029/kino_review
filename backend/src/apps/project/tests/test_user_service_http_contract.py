@@ -2,7 +2,11 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import pytest
+
 from app.config import UserService
+from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
+from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.presentation.http.user_service import UserServiceHttpClient
 
 
@@ -14,6 +18,138 @@ class FakePublisher:
         self.events.append((topic, payload))
 
 
+class ReplyingPublisher(FakePublisher):
+    def __init__(self, inbox: BrokerReplyInbox, responder=None) -> None:
+        super().__init__()
+        self._inbox = inbox
+        self._responder = responder
+
+    async def publish(self, topic: str, payload: dict) -> None:
+        await super().publish(topic, payload)
+        if self._responder is None:
+            return
+        reply = self._responder(topic, payload)
+        if reply is not None:
+            self._inbox.resolve(payload["correlation_id"], reply)
+
+
+def _settings(timeout_seconds: float = 1.0) -> UserService:
+    return UserService(
+        USER_SERVICE_BASE_URL="http://user.test",
+        USER_SERVICE_TIMEOUT_SECONDS=timeout_seconds,
+    )
+
+
+def test_ensure_user_exists_publishes_existence_request_and_waits_for_reply() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(
+            inbox=inbox,
+            responder=lambda topic, payload: {
+                "correlation_id": payload["correlation_id"],
+                "response_type": "user.existence_provided",
+                "user_id": payload["user_id"],
+                "exists": True,
+            },
+        )
+        client = UserServiceHttpClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        await client.ensure_user_exists(user_id)
+
+        assert publisher.events[0][0] == "user.existence_requested"
+        assert publisher.events[0][1]["reply_topic"] == inbox.reply_topic
+        assert publisher.events[0][1]["user_id"] == str(user_id)
+
+    asyncio.run(scenario())
+
+
+def test_ensure_user_exists_raises_not_found_when_reply_reports_missing_user() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(
+            inbox=inbox,
+            responder=lambda topic, payload: {
+                "correlation_id": payload["correlation_id"],
+                "response_type": "user.existence_provided",
+                "user_id": payload["user_id"],
+                "exists": False,
+            },
+        )
+        client = UserServiceHttpClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        with pytest.raises(EntityNotFoundError):
+            await client.ensure_user_exists(user_id)
+
+    asyncio.run(scenario())
+
+
+def test_ensure_user_exists_raises_external_error_on_failed_reply() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(
+            inbox=inbox,
+            responder=lambda topic, payload: {
+                "correlation_id": payload["correlation_id"],
+                "response_type": "user.existence_failed",
+                "user_id": payload["user_id"],
+                "reason": "broker failure",
+            },
+        )
+        client = UserServiceHttpClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        with pytest.raises(ExternalServiceError):
+            await client.ensure_user_exists(user_id)
+
+    asyncio.run(scenario())
+
+
+def test_ensure_user_exists_raises_external_error_on_timeout_and_cleans_waiter() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(inbox=inbox)
+        client = UserServiceHttpClient(
+            settings=_settings(timeout_seconds=0.01),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        with pytest.raises(ExternalServiceError):
+            await client.ensure_user_exists(user_id)
+
+        assert inbox._futures == {}
+
+    asyncio.run(scenario())
+
+
+def test_resolve_ignores_duplicate_and_unknown_replies() -> None:
+    async def scenario() -> None:
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        inbox.register("corr-1")
+        assert inbox.resolve("corr-1", {"correlation_id": "corr-1"}) is True
+        assert inbox.resolve("corr-1", {"correlation_id": "corr-1"}) is False
+        await inbox.wait_for("corr-1", timeout=0.1)
+        assert inbox.resolve("corr-1", {"correlation_id": "corr-1"}) is False
+        assert inbox.resolve("unknown", {"correlation_id": "unknown"}) is False
+
+    asyncio.run(scenario())
+
+
 def test_reserve_user_time_publishes_participant_check_event() -> None:
     user_id = uuid4()
     project_id = uuid4()
@@ -21,11 +157,11 @@ def test_reserve_user_time_publishes_participant_check_event() -> None:
     participant_id = uuid4()
     request_id = uuid4()
     publisher = FakePublisher()
-    settings = UserService(
-        USER_SERVICE_BASE_URL="http://user.test",
-        USER_SERVICE_TIMEOUT_SECONDS=1,
+    client = UserServiceHttpClient(
+        settings=_settings(),
+        publisher=publisher,
+        reply_inbox=BrokerReplyInbox(service_name="project", instance_id="test-instance"),
     )
-    client = UserServiceHttpClient(settings=settings, publisher=publisher)
     time_from = datetime.now(tz=UTC)
     time_to = time_from + timedelta(hours=2)
 
@@ -65,11 +201,11 @@ def test_reserve_resource_time_publishes_resource_check_event() -> None:
     resource_id = uuid4()
     request_id = uuid4()
     publisher = FakePublisher()
-    settings = UserService(
-        USER_SERVICE_BASE_URL="http://user.test",
-        USER_SERVICE_TIMEOUT_SECONDS=1,
+    client = UserServiceHttpClient(
+        settings=_settings(),
+        publisher=publisher,
+        reply_inbox=BrokerReplyInbox(service_name="project", instance_id="test-instance"),
     )
-    client = UserServiceHttpClient(settings=settings, publisher=publisher)
     time_from = datetime.now(tz=UTC)
     time_to = time_from + timedelta(hours=1)
 

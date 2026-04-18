@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 
@@ -11,7 +11,13 @@ from app.application.ports.domain import (
     UserServicePort,
 )
 from app.config import UserService
+from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
+from app.presentation.schemas import BrokerUserExistenceReply
+
+USER_EXISTENCE_REQUESTED_TOPIC = "user.existence_requested"
+USER_EXISTENCE_PROVIDED = "user.existence_provided"
+USER_EXISTENCE_FAILED = "user.existence_failed"
 
 
 class UserServiceHttpClient(UserServicePort):
@@ -37,19 +43,55 @@ class UserServiceHttpClient(UserServicePort):
     }
     _log = logging.getLogger(__name__)
 
-    def __init__(self, settings: UserService, publisher: EventPublisher) -> None:
+    def __init__(
+        self,
+        settings: UserService,
+        publisher: EventPublisher,
+        reply_inbox: BrokerReplyInbox | None = None,
+    ) -> None:
         self._settings = settings
         self._publisher = publisher
+        self._reply_inbox = reply_inbox or BrokerReplyInbox(service_name="project")
 
     async def ensure_user_exists(self, user_id: UUID) -> None:
-        data = await self._request(
-            "GET",
-            f"/users/{user_id}",
-            headers={"X-User-Id": str(user_id)},
-        )
-        exists = data.get("exists", True)
-        if not exists:
+        correlation_id = str(uuid4())
+        self._reply_inbox.register(correlation_id)
+        try:
+            await self._publisher.publish(
+                USER_EXISTENCE_REQUESTED_TOPIC,
+                {
+                    "correlation_id": correlation_id,
+                    "reply_topic": self._reply_inbox.reply_topic,
+                    "user_id": str(user_id),
+                },
+            )
+        except Exception as exc:
+            self._reply_inbox.discard(correlation_id)
+            raise ExternalServiceError(f"User-service existence request publish failed: {exc}") from exc
+
+        try:
+            payload = await self._reply_inbox.wait_for(
+                correlation_id,
+                timeout=self._settings.timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise ExternalServiceError("User-service existence reply timed out.") from exc
+
+        try:
+            event = BrokerUserExistenceReply.model_validate(payload)
+        except Exception as exc:
+            raise ExternalServiceError("User-service existence reply payload is invalid.") from exc
+
+        if str(event.correlation_id) != correlation_id:
+            raise ExternalServiceError("User-service existence reply correlation mismatch.")
+        if event.response_type == USER_EXISTENCE_FAILED:
+            raise ExternalServiceError(
+                event.reason or "User-service existence request failed."
+            )
+        if event.exists is False:
             raise EntityNotFoundError(f"User {user_id} does not exist.")
+        if event.exists is not True:
+            raise ExternalServiceError("User-service existence reply is missing 'exists'.")
 
     async def list_user_resources(
         self,

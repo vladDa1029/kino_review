@@ -93,11 +93,24 @@ from app.infrastructure.adapters.domain_repositories import (
     SqlAlchemyShiftRepository,
 )
 from app.infrastructure.broker.publisher import RabbitPublisher
+from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import GenerationUUID
 from app.infrastructure.storage.minio import MinioDocumentStorage
 from app.infrastructure.transactions import TransactionManagerAlchemy
 from app.presentation.http.user_service import UserServiceHttpClient
+
+
+def make_user_service_http_client(
+    settings: UserService,
+    publisher: EventPublisher,
+    reply_inbox: BrokerReplyInbox,
+) -> UserServicePort:
+    return UserServiceHttpClient(
+        settings=settings,
+        publisher=publisher,
+        reply_inbox=reply_inbox,
+    )
 
 
 def make_director_member_policy(
@@ -114,6 +127,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=Rabbitmq)
     provider.from_context(provides=RabbitBroker)
     provider.from_context(provides=UserService)
+    provider.from_context(provides=BrokerReplyInbox)
     provider.from_context(provides=ReservationOutbox)
     provider.from_context(provides=Minio)
     return provider
@@ -132,7 +146,11 @@ def adapters_provider() -> Provider:
     provider.provide(source=TransactionManagerAlchemy, provides=TransactionManager)
     provider.provide(source=GenerationUUID, provides=IdGeneratorPort, scope=Scope.APP)
     provider.provide(source=RabbitPublisher, provides=EventPublisher, scope=Scope.APP)
-    provider.provide(source=UserServiceHttpClient, provides=UserServicePort, scope=Scope.APP)
+    provider.provide(
+        source=make_user_service_http_client,
+        provides=UserServicePort,
+        scope=Scope.APP,
+    )
     provider.provide(
         source=MinioDocumentStorage,
         provides=DocumentStoragePort,

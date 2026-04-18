@@ -2,95 +2,103 @@
 
 ## Purpose
 
-`apigetaway` is the public HTTP edge of the backend. It does not own business data. Its job is to:
+`apigetaway` is the public HTTP edge of the backend.
 
-- terminate external HTTP traffic;
-- validate JWT on protected routes;
-- inject trusted user headers for downstream services;
-- proxy requests to `auth`, `user`, and `project`;
-- expose a unified documentation hub with patched downstream OpenAPI specs.
+It owns:
 
-Out of scope:
+- JWT validation for external traffic;
+- trusted identity header construction;
+- proxying to downstream services;
+- public vs protected path enforcement;
+- patched downstream OpenAPI exposure.
 
-- domain rules of auth, user, or project;
-- persistence and migrations;
-- asynchronous messaging and background work;
-- reservation orchestration.
+It does not own:
+
+- business state from `auth`, `user`, `project`, or `notificate`;
+- persistence or migrations;
+- broker consumers or background jobs.
 
 ## Runtime Model
 
-The service is a single FastAPI process created in [main.py](../main.py).
+The service runs as a single FastAPI process from [main.py](../main.py).
 
-At startup it:
+Startup responsibilities:
 
-- loads downstream service addresses and JWT settings from [app/config.py](../app/config.py);
-- creates one shared `httpx.AsyncClient` through [app/ioc.py](../app/ioc.py);
-- wires Dishka into FastAPI;
-- installs CORS and auth middleware from [app/setup.py](../app/setup.py);
-- mounts route groups for `auth`, `user`, `admin/user`, `project`, and docs.
+- load downstream service URLs and auth settings from [app/config.py](../app/config.py);
+- build a shared `httpx.AsyncClient` via [app/ioc.py](../app/ioc.py);
+- wire Dishka into FastAPI;
+- install CORS and auth middleware from [app/setup.py](../app/setup.py);
+- register route groups for `auth`, `user`, `admin/user`, `project`, and docs.
 
-There is no database, no broker, and no worker process in this service.
+There is no database and no broker runtime in this service.
 
 ## Composition Root
 
-Main composition files:
+Primary files:
 
 - [main.py](../main.py)
 - [app/config.py](../app/config.py)
 - [app/ioc.py](../app/ioc.py)
 - [app/setup.py](../app/setup.py)
 
-These files define the edge contract of the service:
+These files define:
 
 - which downstream services exist;
-- which routes are protected;
-- which JWT claim names are trusted;
-- which middleware is active for every request.
+- which JWT claims are trusted;
+- which paths are public or protected;
+- how proxy requests are executed.
 
-## Layered Structure
+## Owned Data
 
-### Presentation
+| Area | Ownership |
+| --- | --- |
+| JWT validation config | Local config only |
+| Downstream service addresses | Local config only |
+| Trusted user headers | Derived per request, never persisted |
+| Domain state | None |
 
-Files:
+## Inbound Interfaces
 
-- [app/presentation/api/v1/routes/auth.py](../app/presentation/api/v1/routes/auth.py)
-- [app/presentation/api/v1/routes/users.py](../app/presentation/api/v1/routes/users.py)
-- [app/presentation/api/v1/routes/projects.py](../app/presentation/api/v1/routes/projects.py)
-- [app/presentation/api/v1/routes/docs.py](../app/presentation/api/v1/routes/docs.py)
-- [app/presentation/middleware/auth.py](../app/presentation/middleware/auth.py)
+### Public HTTP entrypoints
 
-Responsibilities:
+| Surface | Purpose | Backing module |
+| --- | --- | --- |
+| `/auth/*` | Proxy to auth service | [auth.py](../app/presentation/api/v1/routes/auth.py) |
+| `/user/*` | Proxy to user service | [users.py](../app/presentation/api/v1/routes/users.py) |
+| `/admin/user/*` | Admin-only proxy to user service | [users.py](../app/presentation/api/v1/routes/users.py) |
+| `/project/*` | Proxy to project service | [projects.py](../app/presentation/api/v1/routes/projects.py) |
+| `/{service}/docs`, `/{service}/redoc` | Docs hub pages | [docs.py](../app/presentation/api/v1/routes/docs.py) |
 
-- expose proxy endpoints under `/auth`, `/user`, `/admin/user`, `/project`;
-- render documentation pages through Jinja templates;
-- enforce admin-only access for `/admin/user/*`;
-- perform user-path rewrites such as `/users/me`.
+### Public path exceptions
 
-### Application
+| Path pattern | Why it is public |
+| --- | --- |
+| `/admin/user/openapi.json` | Admin user docs schema |
+| `/admin/user/docs` | Admin user docs UI |
+| `/admin/user/redoc` | Admin user ReDoc UI |
+| `/user/confirmations/*` | One-click reservation confirmation from email |
 
-Files:
+## Outbound Interfaces
 
-- [app/application/errors.py](../app/application/errors.py)
+### Trusted headers forwarded downstream
 
-Responsibilities:
+| Header | Source | Consumers |
+| --- | --- | --- |
+| `X-User-Id` | JWT `sub` claim | `user`, `project`, admin user routes |
+| `X-User-Token-Type` | JWT `type` claim | `auth`, `user`, `project` |
+| `X-User-Is-Superuser` | JWT payload | `auth`, admin user routes |
 
-- define service-level exceptions used by middleware and route handlers.
+### Downstream proxy routes
 
-The application layer here is intentionally thin. This service is an edge adapter, not a business domain.
+| Downstream service | Base config | Notes |
+| --- | --- | --- |
+| `auth` | `AUTH_URL` | Standard proxy and patched OpenAPI |
+| `user` | `USER_URL` | Supports `/users/me` rewrite and admin proxy |
+| `project` | `PROJECT_URL` | Standard proxy and patched OpenAPI |
 
-### Infrastructure
+## Key Flows
 
-Files:
-
-- [app/infrastructure/security/jwt_validator.py](../app/infrastructure/security/jwt_validator.py)
-- [app/key/public_key.pem](../app/key/public_key.pem)
-
-Responsibilities:
-
-- validate bearer tokens using the configured public key;
-- isolate JWT parsing from route code.
-
-## Request Pipeline
+### Protected request flow
 
 ```mermaid
 flowchart LR
@@ -98,139 +106,50 @@ flowchart LR
     CORS --> AUTH["AuthGatewayMiddleware"]
     AUTH --> ROUTE["Proxy route"]
     ROUTE --> HTTP["Shared httpx.AsyncClient"]
-    HTTP --> A["auth"]
-    HTTP --> U["user"]
-    HTTP --> P["project"]
+    HTTP --> S["Downstream service"]
 ```
 
-### Protected request flow
+Flow:
 
-1. A request hits FastAPI and passes through CORS middleware.
-2. [AuthGatewayMiddleware](../app/presentation/middleware/auth.py) checks whether the path is public, protected, or ignored.
-3. For protected paths it extracts `Authorization: Bearer ...`.
-4. The middleware validates the token with `JWTValidator`.
-5. It writes trusted headers and decoded payload into `request.state`.
-6. The selected proxy route forwards the request to the downstream service with rewritten headers.
+1. Request enters FastAPI.
+2. Middleware checks whether the path is public or protected.
+3. For protected paths, bearer token is extracted and validated.
+4. Trusted headers are derived from JWT payload.
+5. Proxy route forwards the request with rebuilt headers.
 
-### Public request flow
+### OpenAPI patch flow
 
-The middleware bypasses token validation for:
+1. Gateway fetches downstream `/openapi.json`.
+2. Paths are prefixed under `/auth`, `/user`, `/admin/user`, or `/project`.
+3. Internal transport headers are stripped from visible schema parameters.
+4. Protected operations receive `bearerAuth`.
+5. User-specific paths may be rewritten to `/users/me`.
 
-- explicit public docs endpoints;
-- `OPTIONS`;
-- `/user/confirmations/*`, which must stay public for one-click reservation confirmation from email.
+## Change Playbooks
 
-## Proxy Topology
+- Public path change: update middleware public-path list, docs expectations, and gateway tests.
+- Trusted header or JWT-claim change: update middleware, proxy forwarding, downstream expectations, and tests.
+- Proxy path rewrite change: keep runtime rewrite and patched OpenAPI rewrite aligned.
+- New proxied route or service: update route module, config, protected-path handling, and docs.
 
-### Auth proxy
+## Known Traps
 
-Route module:
+- Trusting incoming `x-user-*` headers from clients.
+- Breaking `/users/me` proxy rewriting while OpenAPI still advertises old paths.
+- Forgetting to patch OpenAPI when adding or reshaping routes.
+- Weakening admin-only routing by changing payload or header assumptions.
 
-- [app/presentation/api/v1/routes/auth.py](../app/presentation/api/v1/routes/auth.py)
+## Validation / Testing Focus
 
-Responsibilities:
-
-- forward auth traffic to the `auth` service;
-- patch OpenAPI under `/auth/openapi.json`;
-- remove internal trusted headers from proxied docs.
-
-### User proxy
-
-Route module:
-
-- [app/presentation/api/v1/routes/users.py](../app/presentation/api/v1/routes/users.py)
-
-Responsibilities:
-
-- proxy all regular user traffic under `/user/*`;
-- rewrite `/user/users/me/...` to the real `user_id` from JWT;
-- expose `/admin/user/*` for admin-only operations;
-- keep `/user/confirmations/*` public;
-- patch both user and admin-user OpenAPI documents.
-
-### Project proxy
-
-Route module:
-
-- [app/presentation/api/v1/routes/projects.py](../app/presentation/api/v1/routes/projects.py)
-
-Responsibilities:
-
-- proxy project traffic under `/project/*`;
-- forward trusted user headers to `project`;
-- patch project OpenAPI and mark protected operations.
-
-### Documentation hub
-
-Route module:
-
-- [app/presentation/api/v1/routes/docs.py](../app/presentation/api/v1/routes/docs.py)
-
-Responsibilities:
-
-- render HTML pages for Swagger/ReDoc wrappers;
-- present downstream docs behind one gateway host.
-
-## Security Model
-
-The gateway is the only service that should trust external bearer tokens directly.
-
-It passes downstream identity through trusted headers:
-
-- `X-User-Id`
-- `X-User-Token-Type`
-- `X-User-Is-Superuser`
-
-Important implications:
-
-- downstream services can validate identity from trusted headers instead of parsing JWT themselves;
-- external clients must not be allowed to spoof these headers, so the gateway strips and rebuilds them;
-- admin routes are checked against the decoded JWT payload before proxying.
-
-## OpenAPI Aggregation Strategy
-
-Each downstream service keeps its own native OpenAPI schema. The gateway does not build a schema from local code. Instead it:
-
-1. fetches downstream `/openapi.json`;
-2. prefixes every path with `/auth`, `/user`, `/admin/user`, or `/project`;
-3. rewrites user-specific paths like `/users/{user_id}` to `/users/me` where appropriate;
-4. strips internal transport headers from visible schema parameters;
-5. injects `bearerAuth` into operations matched by `PROTECTED_PATH_PATTERNS`.
-
-This keeps service docs close to source while still presenting a single public entrypoint.
-
-## Configuration
-
-Main config groups in [app/config.py](../app/config.py):
-
-- `Services`
-- `AuthGatewaySettings`
-- `ProtectedPathsSettings`
-
-Important env vars:
-
-- `AUTH_URL`
-- `USER_URL`
-- `PROJECT_URL`
-- `AUTH_ALGORITHM`
-- `AUTH_PUBLIC_KEY_PATH`
-- `AUTH_USER_ID_CLAIM`
-- `AUTH_TOKEN_TYPE_CLAIM`
-- `PROTECTED_PATH_PATTERNS`
-
-## Testing Focus
-
-Current tests in [tests](../tests) cover the edge-specific behavior:
-
-- trusted header propagation;
-- access-denied handling;
-- OpenAPI patching;
-- public confirmation path bypass.
+- [tests/test_auth_headers.py](../tests/test_auth_headers.py)
+- [tests/test_auth_openapi_patch.py](../tests/test_auth_openapi_patch.py)
+- [tests/test_public_confirmation_path.py](../tests/test_public_confirmation_path.py)
+- [tests/test_access_denied_handler.py](../tests/test_access_denied_handler.py)
 
 ## Current Limitations
 
-- no rate limiting or throttling;
-- no circuit breaker or retry policy for downstream HTTP calls;
+- no rate limiting;
+- no circuit breaker or retry policy for downstream HTTP;
 - no response aggregation across services;
 - no service discovery beyond static config;
-- docs are patched on demand, not cached as a build artifact.
+- OpenAPI patching is request-time, not precomputed.
