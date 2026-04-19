@@ -1607,7 +1607,7 @@ body:not(.dark-theme) {
   width: min(1500px, 96vw);
   margin-top: 1.35rem;
   display: grid;
-  grid-template-columns: minmax(220px, 0.62fr) minmax(430px, 1.2fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
   gap: 1rem;
   align-items: start;
   --projects-panel-bg: linear-gradient(
@@ -1731,18 +1731,18 @@ body:not(.dark-theme) {
 }
 
 .projects-sidebar {
-  grid-column: 1 / 2;
+  grid-column: 1 / -1;
   grid-row: 2;
-  position: sticky;
-  top: 5.4rem;
+  position: relative;
   overflow: hidden;
   z-index: 0;
-  transform-origin: top left;
+  transform-origin: top center;
   will-change: transform, opacity, filter;
   transition:
     opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     padding 0.36s cubic-bezier(0.22, 1, 0.36, 1),
     margin 0.36s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.36s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1750,16 +1750,22 @@ body:not(.dark-theme) {
 }
 
 .projects-dashboard-layout .projects-sidebar {
-  padding: 1rem;
+  padding: 1rem 1.1rem;
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
 }
 
 .projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar {
   opacity: 0;
-  filter: blur(8px);
-  transform: translateX(calc(-100% - 1.25rem)) scale(0.985);
+  max-height: 0;
+  filter: blur(6px);
+  transform: translateY(-0.7rem) scale(0.99);
   pointer-events: none;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: -1rem;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .projects-sidebar-heading,
@@ -1774,27 +1780,29 @@ body:not(.dark-theme) {
 .projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar-nav,
 .projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-sidebar-note {
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateY(-6px);
 }
 
 .projects-center-column {
-  grid-column: 2 / 3;
-  grid-row: 2;
+  grid-column: 1 / 2;
+  grid-row: 3;
 }
 
 .projects-page.projects-dashboard-layout.is-sidebar-collapsed .projects-center-column {
-  grid-column: 1 / 3;
+  grid-column: 1 / 2;
 }
 
 .projects-right-column {
-  grid-column: 3 / 4;
-  grid-row: 2;
+  grid-column: 2 / 3;
+  grid-row: 3;
 }
 
 .projects-sidebar-heading {
-  display: grid;
-  gap: 0.18rem;
-  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .projects-sidebar-heading h1 {
@@ -1813,17 +1821,18 @@ body:not(.dark-theme) {
 
 .projects-sidebar-nav {
   display: grid;
-  gap: 0.28rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
 }
 
 .projects-sidebar-button {
   width: 100%;
-  min-height: 58px;
+  min-height: 76px;
   display: grid;
   align-content: center;
   gap: 0.18rem;
   position: relative;
-  padding: 0.78rem 0.95rem 0.78rem 1.1rem;
+  padding: 0.95rem 1rem 0.95rem 1.15rem;
   text-align: left;
   border-radius: var(--radius-md);
   border: 1px solid transparent;
@@ -1837,13 +1846,15 @@ body:not(.dark-theme) {
 .projects-sidebar-button::before {
   content: '';
   position: absolute;
-  left: 0.38rem;
-  top: 50%;
-  width: 2px;
-  height: 55%;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.62rem;
+  width: auto;
+  height: 3px;
   border-radius: 999px;
   background: var(--accent);
-  transform: translateY(-50%) scaleY(0.2);
+  transform: scaleX(0.2);
+  transform-origin: left center;
   opacity: 0;
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
@@ -2059,14 +2070,14 @@ body:not(.dark-theme) {
 }
 
 .projects-sidebar-button.is-active::before {
-  transform: translateY(-50%) scaleY(1);
+  transform: scaleX(1);
   opacity: 1;
 }
 
 .projects-sidebar-note {
-  margin-top: 0.4rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--line);
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -670,15 +670,15 @@ const Projects = () => {
             aria-controls="projects-categories-panel"
           >
             <span className="projects-layout-toggle-icon" aria-hidden="true">
-              {isSidebarCollapsed ? '→' : '←'}
+              {isSidebarCollapsed ? '↓' : '↑'}
             </span>
-            <span>{isSidebarCollapsed ? 'Категории' : 'Скрыть'}</span>
+            <span>{isSidebarCollapsed ? 'Показать категории' : 'Скрыть категории'}</span>
           </button>
         </div>
 
         <aside id="projects-categories-panel" className="dashboard-panel projects-sidebar">
           <div className="projects-sidebar-heading">
-            <span className="projects-panel-eyebrow">Навигация</span>
+            <span className="projects-panel-eyebrow">Разделы инвентаря</span>
             <h1>Категории</h1>
           </div>
 
