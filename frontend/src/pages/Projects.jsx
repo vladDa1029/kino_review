@@ -631,11 +631,37 @@ const Projects = () => {
   const activeDayLabel = activeDateFilterKey
     ? selectedDateFormatter.format(new Date(`${activeDateFilterKey}T00:00:00`))
     : null;
+  const activeResourcePosition = resourceOrder.indexOf(activeResource) + 1;
 
   return (
     <section className="projects-wrapper">
       <div className={`projects-page projects-dashboard-layout${isSidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
-        <div className="dashboard-panel projects-layout-toolbar">
+        <div className="dashboard-panel projects-overview-panel">
+          <div className="projects-overview-copy">
+            <span className="projects-panel-eyebrow">Рабочая область</span>
+            <h1>{currentResource.label}</h1>
+            <p>
+              {activeDateFilterKey
+                ? `Таблица отфильтрована по дате: ${activeDayLabel}.`
+                : 'Добавляйте инвентарь, выбирайте объект и управляйте доступностью в одном экране.'}
+            </p>
+          </div>
+
+          <div className="projects-overview-stats" aria-label="Сводка рабочей области">
+            <div className="projects-stat-card">
+              <span>Категория</span>
+              <strong>{activeResourcePosition}/{resourceOrder.length}</strong>
+            </div>
+            <div className="projects-stat-card">
+              <span>Всего</span>
+              <strong>{pagination.totalCount}</strong>
+            </div>
+            <div className="projects-stat-card">
+              <span>{activeDateFilterKey ? 'В фильтре' : 'На экране'}</span>
+              <strong>{filteredItems.length}</strong>
+            </div>
+          </div>
+
           <button
             type="button"
             className="secondary-btn projects-layout-toggle"
@@ -646,14 +672,8 @@ const Projects = () => {
             <span className="projects-layout-toggle-icon" aria-hidden="true">
               {isSidebarCollapsed ? '→' : '←'}
             </span>
-            <span>{isSidebarCollapsed ? 'Показать категории' : 'Скрыть категории'}</span>
+            <span>{isSidebarCollapsed ? 'Категории' : 'Скрыть'}</span>
           </button>
-
-          <p className="projects-layout-toolbar-note">
-            {isSidebarCollapsed
-              ? `Категории скрыты. Сейчас активна секция: ${currentResource.label}.`
-              : 'Левую панель можно убрать, чтобы освободить больше места под форму и таблицу.'}
-          </p>
         </div>
 
         <aside id="projects-categories-panel" className="dashboard-panel projects-sidebar">
@@ -675,6 +695,7 @@ const Projects = () => {
                   onClick={() => switchResource(resourceKey)}
                 >
                   <span>{resource.label}</span>
+                  <small>{isActive ? `${pagination.totalCount} позиций` : 'Открыть'}</small>
                 </button>
               );
             })}
@@ -1088,9 +1109,9 @@ const Projects = () => {
                   return (
                     <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
                       {currentResource.columns.map((column) => (
-                        <td key={column.key}>{getColumnValue(item, column)}</td>
+                        <td key={column.key} data-label={column.label}>{getColumnValue(item, column)}</td>
                       ))}
-                      <td>
+                      <td data-label="Действия">
                         <div className="table-actions">
                           <button type="button" className="ghost-action-btn" onClick={() => handleEdit(item)}>
                             Изменить
