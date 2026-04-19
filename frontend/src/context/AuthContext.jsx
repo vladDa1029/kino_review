@@ -86,8 +86,16 @@ export const AuthProvider = ({ children }) => {
           setIsAuthModalOpen(false);
           return response;
         }
-        toast.success('Регистрация завершена. Выполните вход.');
-        return response;
+
+        const loginResponse = await authApi.login(email, password);
+        if (loginResponse?.access_token) {
+          applyToken(loginResponse.access_token, loginResponse.token_type);
+          toast.success('Регистрация и вход выполнены успешно');
+          setIsAuthModalOpen(false);
+          return loginResponse;
+        }
+
+        throw new Error('Аккаунт создан, но сервер не вернул токен входа');
       } catch (error) {
         toast.error(error.message || 'Ошибка регистрации');
         throw error;

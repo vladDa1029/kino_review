@@ -101,9 +101,6 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
         response = await handleLogin(formData.email, formData.password);
       } else {
         response = await handleRegister(formData.email, formData.password);
-        if (!response?.access_token) {
-          setIsLogin(true);
-        }
       }
 
       if (response?.access_token) {
