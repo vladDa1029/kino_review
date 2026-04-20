@@ -1485,6 +1485,25 @@ body:not(.dark-theme) {
   flex-wrap: wrap;
 }
 
+.requisite-photo-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.32rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 78%, transparent);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.requisite-photo-status.has-photo {
+  border-color: color-mix(in srgb, var(--success) 44%, var(--line));
+  background: color-mix(in srgb, var(--success) 11%, transparent);
+  color: var(--success);
+}
+
 .ghost-action-btn {
   border: 1px solid var(--line);
   background: transparent;

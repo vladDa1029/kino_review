@@ -316,6 +316,7 @@ const Projects = () => {
   const [isSubmittingFreeTime, setIsSubmittingFreeTime] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [images, setImages] = useState([]);
+  const [requisiteTableImagesById, setRequisiteTableImagesById] = useState({});
   const [imageForm, setImageForm] = useState(createInitialImageForm);
   const [imageInputKey, setImageInputKey] = useState(0);
   const [isImagesLoading, setIsImagesLoading] = useState(false);
@@ -386,6 +387,7 @@ const Projects = () => {
     setIsSelectedItemFreeTimesLoading(false);
     setReserveForm(createInitialWindowForm());
     setImages([]);
+    setRequisiteTableImagesById({});
     setImageForm(createInitialImageForm());
     setImageInputKey((prev) => prev + 1);
     setSelectedImage(null);
@@ -442,21 +444,48 @@ const Projects = () => {
   const loadRequisiteImages = useCallback(async (requisiteId) => {
     if (!requisiteId) {
       setImages([]);
-      return;
+      return [];
     }
 
     setIsImagesLoading(true);
 
     try {
       const response = await listRequisiteImages(requisiteId);
-      setImages(response.items || []);
+      const nextImages = response.items || [];
+      setImages(nextImages);
+      return nextImages;
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить изображения реквизита');
       setImages([]);
+      return [];
     } finally {
       setIsImagesLoading(false);
     }
   }, []);
+
+  const loadRequisiteTableImages = useCallback(async (requisites) => {
+    if (activeResource !== 'requisites' || requisites.length === 0) {
+      setRequisiteTableImagesById({});
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      requisites.map(async (item) => {
+        const response = await listRequisiteImages(item.oid);
+        return [item.oid, response.items || []];
+      }),
+    );
+
+    const nextImagesById = {};
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const [requisiteId, nextImages] = result.value;
+        nextImagesById[requisiteId] = nextImages;
+      }
+    });
+
+    setRequisiteTableImagesById(nextImagesById);
+  }, [activeResource]);
 
   useEffect(() => {
     fetchItems();
@@ -490,6 +519,10 @@ const Projects = () => {
 
     loadRequisiteImages(selectedItem.oid);
   }, [activeResource, loadRequisiteImages, selectedItem]);
+
+  useEffect(() => {
+    loadRequisiteTableImages(items);
+  }, [items, loadRequisiteTableImages]);
 
   useEffect(() => {
     if (activeDateFilterKey && !items.some((item) => toDateKey(item.create_at) === activeDateFilterKey)) {
@@ -745,7 +778,8 @@ const Projects = () => {
       toast.success('Изображение загружено');
       setImageForm(createInitialImageForm());
       setImageInputKey((prev) => prev + 1);
-      await loadRequisiteImages(selectedItem.oid);
+      const nextImages = await loadRequisiteImages(selectedItem.oid);
+      setRequisiteTableImagesById((prev) => ({ ...prev, [selectedItem.oid]: nextImages }));
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить изображение');
     } finally {
@@ -781,6 +815,10 @@ const Projects = () => {
       await removeRequisiteImage(selectedItem.oid, imageId);
       toast.success('Изображение удалено');
       setImages((prev) => prev.filter((image) => image.oid !== imageId));
+      setRequisiteTableImagesById((prev) => ({
+        ...prev,
+        [selectedItem.oid]: (prev[selectedItem.oid] || []).filter((image) => image.oid !== imageId),
+      }));
       setSelectedImage((prev) => (prev?.oid === imageId ? null : prev));
     } catch (error) {
       toast.error(error.message || 'Не удалось удалить изображение');
@@ -1300,6 +1338,7 @@ const Projects = () => {
             <table className="user-table">
               <thead>
                 <tr>
+                  {activeResource === 'requisites' ? <th>Фото</th> : null}
                   {currentResource.columns.map((column) => (
                     <th key={column.key}>{column.label}</th>
                   ))}
@@ -1312,6 +1351,18 @@ const Projects = () => {
 
                   return (
                     <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
+                      {activeResource === 'requisites' ? (
+                        <td data-label="Фото">
+                          <span
+                            className={[
+                              'requisite-photo-status',
+                              (requisiteTableImagesById[item.oid] || []).length > 0 ? 'has-photo' : '',
+                            ].filter(Boolean).join(' ')}
+                          >
+                            {(requisiteTableImagesById[item.oid] || []).length > 0 ? 'Фото есть' : 'Нет фото'}
+                          </span>
+                        </td>
+                      ) : null}
                       {currentResource.columns.map((column) => (
                         <td key={column.key} data-label={column.label}>{getColumnValue(item, column)}</td>
                       ))}
