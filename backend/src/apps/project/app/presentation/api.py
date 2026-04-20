@@ -80,15 +80,59 @@ from app.presentation.schemas import (
     to_project_role_input,
 )
 
-router = APIRouter(tags=["project"], route_class=DishkaRoute)
+PROJECT_API_DESCRIPTION = """
+Project service owns project planning, membership, shifts, participants, resource requests,
+document metadata, and reservation workflow orchestration.
+
+Notes:
+- Final availability and reserve facts are owned by `user`.
+- Confirmation email delivery is owned by `notificate`.
+- Member resource discovery remains the legacy V2 HTTP-backed read path.
+""".strip()
+
+PROJECT_OPENAPI_TAGS = [
+    {"name": "system", "description": "Health and service-level endpoints."},
+    {"name": "projects", "description": "Project aggregate management endpoints."},
+    {
+        "name": "members",
+        "description": "Project membership invitation, listing, role management, and removal endpoints.",
+    },
+    {
+        "name": "member-resources",
+        "description": "Authorized member resource reads through the legacy V2 integration path.",
+    },
+    {"name": "shifts", "description": "Shift planning and approval endpoints."},
+    {
+        "name": "participants",
+        "description": "Participant invitation and confirmation workflow endpoints.",
+    },
+    {"name": "documents", "description": "Shift document upload and download-url endpoints."},
+    {
+        "name": "resource-requests",
+        "description": "Resource request creation and owner decision endpoints.",
+    },
+]
+
+router = APIRouter(route_class=DishkaRoute)
 
 
-@router.get("/health", summary="Health check")
+@router.get(
+    "/health",
+    tags=["system"],
+    summary="Health check",
+    description="Returns a lightweight health payload for liveness and readiness probes.",
+)
 async def healthcheck(handler: FromDishka[HealthHandler]) -> dict:
     return await handler(HealthQuery())
 
 
-@router.post("/projects", response_model=ProjectResponse, summary="Create project")
+@router.post(
+    "/projects",
+    response_model=ProjectResponse,
+    tags=["projects"],
+    summary="Create project",
+    description="Creates a new active project and adds the caller as the owning director.",
+)
 async def create_project(
     payload: ProjectCreateRequest,
     handler: FromDishka[CreateProjectHandler],
@@ -104,7 +148,13 @@ async def create_project(
     return ProjectResponse.from_entity(project)
 
 
-@router.get("/projects", response_model=ProjectListResponse, summary="List my projects")
+@router.get(
+    "/projects",
+    response_model=ProjectListResponse,
+    tags=["projects"],
+    summary="List actor projects",
+    description="Returns projects visible to the caller. Archived projects are excluded unless explicitly requested.",
+)
 async def list_projects(
     handler: FromDishka[ListActorProjectsHandler],
     x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
@@ -119,7 +169,13 @@ async def list_projects(
     return ProjectListResponse(items=[ProjectResponse.from_entity(project) for project in projects])
 
 
-@router.get("/projects/{project_id}", response_model=ProjectResponse, summary="Get project")
+@router.get(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    tags=["projects"],
+    summary="Get project",
+    description="Returns a single project visible to the caller.",
+)
 async def get_project(
     project_id: UUID,
     handler: FromDishka[GetProjectHandler],
@@ -134,7 +190,13 @@ async def get_project(
     return ProjectResponse.from_entity(project)
 
 
-@router.patch("/projects/{project_id}", response_model=ProjectResponse, summary="Update project")
+@router.patch(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    tags=["projects"],
+    summary="Update project",
+    description="Updates editable project fields such as title and description.",
+)
 async def update_project(
     project_id: UUID,
     payload: ProjectUpdateRequest,
@@ -155,7 +217,9 @@ async def update_project(
 @router.delete(
     "/projects/{project_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["projects"],
     summary="Archive project",
+    description="Archives the project instead of removing project-owned data from persistence.",
 )
 async def delete_project(
     project_id: UUID,
@@ -174,7 +238,9 @@ async def delete_project(
 @router.post(
     "/projects/{project_id}/members",
     response_model=ProjectMemberResponse,
+    tags=["members"],
     summary="Invite member to project",
+    description="Invites a user into the project with the selected role. Invited-user existence is validated through the V1 broker request/reply flow.",
 )
 async def invite_project_member(
     project_id: UUID,
@@ -196,7 +262,9 @@ async def invite_project_member(
 @router.get(
     "/projects/{project_id}/members",
     response_model=ProjectMemberListResponse,
+    tags=["members"],
     summary="List project members",
+    description="Lists project members visible to the caller. Inactive invitations can be included when requested.",
 )
 async def list_project_members(
     project_id: UUID,
@@ -232,7 +300,9 @@ async def list_project_members(
 @router.get(
     "/projects/{project_id}/members/{target_user_id}",
     response_model=ProjectMemberResponse,
+    tags=["members"],
     summary="Get project member",
+    description="Returns a single project member by target user id.",
 )
 async def get_project_member(
     project_id: UUID,
@@ -264,7 +334,9 @@ async def get_project_member(
 @router.patch(
     "/projects/{project_id}/members/{target_user_id}/role",
     response_model=ProjectMemberResponse,
+    tags=["members"],
     summary="Change project member role",
+    description="Changes the role of an existing project member.",
 )
 async def change_project_member_role(
     project_id: UUID,
@@ -287,7 +359,9 @@ async def change_project_member_role(
 @router.delete(
     "/projects/{project_id}/members/{target_user_id}",
     response_model=ProjectMemberResponse,
+    tags=["members"],
     summary="Remove project member",
+    description="Removes a member from the project while preserving workflow history.",
 )
 async def remove_project_member(
     project_id: UUID,
@@ -308,7 +382,9 @@ async def remove_project_member(
 @router.get(
     "/projects/{project_id}/members/{target_user_id}/resources",
     response_model=ProjectUserResourcesResponse,
+    tags=["member-resources"],
     summary="Get project member resources by access role",
+    description="Returns resources owned by the target user after project-side authorization. This endpoint still uses the legacy V2 HTTP-backed integration path to `user`.",
 )
 async def get_project_user_resources(
     project_id: UUID,
@@ -353,7 +429,9 @@ async def get_project_user_resources(
 @router.post(
     "/projects/{project_id}/shifts",
     response_model=ShiftResponse,
+    tags=["shifts"],
     summary="Create shift",
+    description="Creates a draft shift inside the specified project.",
 )
 async def create_shift(
     project_id: UUID,
@@ -374,7 +452,13 @@ async def create_shift(
     return ShiftResponse.from_entity(shift)
 
 
-@router.post("/shifts/{shift_id}/approve", response_model=ShiftResponse, summary="Approve shift")
+@router.post(
+    "/shifts/{shift_id}/approve",
+    response_model=ShiftResponse,
+    tags=["shifts"],
+    summary="Approve shift",
+    description="Approves a draft shift and applies the project workflow rules for approved shifts.",
+)
 async def approve_shift(
     shift_id: UUID,
     handler: FromDishka[ApproveShiftHandler],
@@ -392,7 +476,9 @@ async def approve_shift(
 @router.post(
     "/shifts/{shift_id}/participants",
     response_model=ShiftParticipantResponse,
+    tags=["participants"],
     summary="Invite shift participant",
+    description="Invites a participant to the shift for the specified time window.",
 )
 async def invite_shift_participant(
     shift_id: UUID,
@@ -416,7 +502,9 @@ async def invite_shift_participant(
 @router.post(
     "/participants/{participant_id}/confirm",
     response_model=ShiftParticipantResponse,
+    tags=["participants"],
     summary="Confirm shift participation",
+    description="Confirms participant acceptance and starts asynchronous reservation orchestration.",
 )
 async def confirm_shift_participant(
     participant_id: UUID,
@@ -435,7 +523,9 @@ async def confirm_shift_participant(
 @router.post(
     "/participants/{participant_id}/decline",
     response_model=ShiftParticipantResponse,
+    tags=["participants"],
     summary="Decline shift participation",
+    description="Declines an invited shift participation request.",
 )
 async def decline_shift_participant(
     participant_id: UUID,
@@ -454,7 +544,9 @@ async def decline_shift_participant(
 @router.post(
     "/shifts/{shift_id}/documents",
     response_model=DocumentUploadResponse,
+    tags=["documents"],
     summary="Upload shift document",
+    description="Uploads a project document for the shift and stores the binary in object storage.",
 )
 async def upload_document(
     shift_id: UUID,
@@ -487,7 +579,9 @@ async def upload_document(
 @router.get(
     "/documents/{document_id}/download-url",
     response_model=DocumentDownloadUrlResponse,
+    tags=["documents"],
     summary="Get document download url",
+    description="Returns a temporary download URL for a previously uploaded shift document.",
 )
 async def get_document_download_url(
     document_id: UUID,
@@ -506,7 +600,9 @@ async def get_document_download_url(
 @router.post(
     "/shifts/{shift_id}/resource-requests",
     response_model=ShiftResourceRequestResponse,
+    tags=["resource-requests"],
     summary="Create shift resource request",
+    description="Creates a resource request for a user-owned resource in the specified shift time window.",
 )
 async def create_resource_request(
     shift_id: UUID,
@@ -531,7 +627,9 @@ async def create_resource_request(
 @router.post(
     "/resource-requests/{request_id}/approve",
     response_model=ShiftResourceRequestResponse,
+    tags=["resource-requests"],
     summary="Approve resource request",
+    description="Approves a resource request as the resource owner and starts asynchronous reservation orchestration.",
 )
 async def approve_resource_request(
     request_id: UUID,
@@ -550,7 +648,9 @@ async def approve_resource_request(
 @router.post(
     "/resource-requests/{request_id}/reject",
     response_model=ShiftResourceRequestResponse,
+    tags=["resource-requests"],
     summary="Reject resource request",
+    description="Rejects a resource request as the resource owner and stores the rejection reason.",
 )
 async def reject_resource_request(
     request_id: UUID,
@@ -566,4 +666,3 @@ async def reject_resource_request(
         )
     )
     return ShiftResourceRequestResponse.from_entity(request)
-

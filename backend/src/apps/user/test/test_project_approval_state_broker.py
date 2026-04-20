@@ -12,6 +12,8 @@ from app.presentation.http.project_service import (
     PARTICIPANT_APPROVAL_STATE_REQUESTED_TOPIC,
     ProjectApprovalStateBrokerClient,
     ProjectApprovalStateError,
+    RESOURCE_APPROVAL_STATE_PROVIDED,
+    RESOURCE_APPROVAL_STATE_REQUESTED_TOPIC,
 )
 
 
@@ -123,6 +125,54 @@ def test_get_participant_approval_state_raises_failed_reply() -> None:
 
         with pytest.raises(ProjectApprovalStateError):
             await client.get_participant_approval_state(participant_id=uuid4())
+
+    asyncio.run(scenario())
+
+
+def test_get_resource_approval_state_publishes_request_and_returns_state() -> None:
+    async def scenario() -> None:
+        now = now_utc()
+        inbox = BrokerReplyInbox(service_name="user", instance_id="test-instance")
+
+        def responder(topic: str, payload: dict) -> dict:
+            return {
+                "correlation_id": payload["correlation_id"],
+                "response_type": RESOURCE_APPROVAL_STATE_PROVIDED,
+                "request_id": str(uuid4()),
+                "project_id": str(uuid4()),
+                "project_title": "Feature film",
+                "shift_id": str(uuid4()),
+                "shift_title": "Night shoot",
+                "resource_request_id": payload["resource_request_id"],
+                "owner_user_id": str(uuid4()),
+                "resource_id": str(uuid4()),
+                "resource_type": "camera",
+                "time_from": now.isoformat(),
+                "time_to": (now + timedelta(hours=1)).isoformat(),
+                "status": 15,
+                "status_name": "RESERVING",
+                "resource_reservation_id": None,
+                "reserve_failure_reason": None,
+            }
+
+        publisher = ReplyingPublisher(inbox=inbox, responder=responder)
+        client = ProjectApprovalStateBrokerClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+        resource_request_id = uuid4()
+
+        state = await client.get_resource_approval_state(
+            resource_request_id=resource_request_id
+        )
+
+        assert publisher.events[0][0] == RESOURCE_APPROVAL_STATE_REQUESTED_TOPIC
+        assert publisher.events[0][1]["resource_request_id"] == str(resource_request_id)
+        assert publisher.events[0][1]["reply_topic"] == inbox.reply_topic
+        assert state.resource_request_id == resource_request_id
+        assert state.resource_type == "camera"
+        assert state.status_name == "RESERVING"
 
     asyncio.run(scenario())
 

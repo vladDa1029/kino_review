@@ -27,3 +27,8 @@ package-mode = false
 [tool.poetry.group.dev.dependencies]
 ipython = "^9.4.0"
 
+[tool.pytest.ini_options]
+markers = [
+    "e2e: live cross-service end-to-end tests",
+]
+
