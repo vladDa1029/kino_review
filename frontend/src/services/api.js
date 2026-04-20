@@ -83,6 +83,11 @@ const buildRequisiteListParams = ({
 const createEquipmentFreeTimeHelper = (resourcePath) => async (itemId, payload) =>
   createJsonRequest(`/user/users/me/${resourcePath}/${itemId}/free-times`, 'POST', payload);
 
+const createEquipmentFreeTimeListHelper = (resourcePath) => async (itemId) =>
+  apiClient(`/user/users/me/${resourcePath}/${itemId}/free-times`, {
+    method: 'GET',
+  });
+
 const createImageUploadFormData = (payload) => {
   if (payload instanceof FormData) {
     return payload;
@@ -146,6 +151,11 @@ export const getUsers = async (page = 1, pageSize = 5) =>
     },
   );
 
+export const checkCurrentUserExists = async () =>
+  apiClient('/user/users/me', {
+    method: 'GET',
+  });
+
 export const createUserDescription = async (payload) =>
   createJsonRequest('/user/users/me/description', 'POST', payload);
 
@@ -186,42 +196,49 @@ export const listMicrofons = microfonsApi.list;
 export const updateMicrofon = microfonsApi.update;
 export const deleteMicrofon = microfonsApi.remove;
 export const addMicrofonFreeTime = createEquipmentFreeTimeHelper('microfons');
+export const listMicrofonFreeTimes = createEquipmentFreeTimeListHelper('microfons');
 
 export const createCamera = camerasApi.create;
 export const listCameras = camerasApi.list;
 export const updateCamera = camerasApi.update;
 export const deleteCamera = camerasApi.remove;
 export const addCameraFreeTime = createEquipmentFreeTimeHelper('cameras');
+export const listCameraFreeTimes = createEquipmentFreeTimeListHelper('cameras');
 
 export const createCameraTripod = cameraTripodsApi.create;
 export const listCameraTripods = cameraTripodsApi.list;
 export const updateCameraTripod = cameraTripodsApi.update;
 export const deleteCameraTripod = cameraTripodsApi.remove;
 export const addCameraTripodFreeTime = createEquipmentFreeTimeHelper('camera-tripods');
+export const listCameraTripodFreeTimes = createEquipmentFreeTimeListHelper('camera-tripods');
 
 export const createLight = lightsApi.create;
 export const listLights = lightsApi.list;
 export const updateLight = lightsApi.update;
 export const deleteLight = lightsApi.remove;
 export const addLightFreeTime = createEquipmentFreeTimeHelper('lights');
+export const listLightFreeTimes = createEquipmentFreeTimeListHelper('lights');
 
 export const createLightTripod = lightTripodsApi.create;
 export const listLightTripods = lightTripodsApi.list;
 export const updateLightTripod = lightTripodsApi.update;
 export const deleteLightTripod = lightTripodsApi.remove;
 export const addLightTripodFreeTime = createEquipmentFreeTimeHelper('light-tripods');
+export const listLightTripodFreeTimes = createEquipmentFreeTimeListHelper('light-tripods');
 
 export const createSound = soundsApi.create;
 export const listSounds = soundsApi.list;
 export const updateSound = soundsApi.update;
 export const deleteSound = soundsApi.remove;
 export const addSoundFreeTime = createEquipmentFreeTimeHelper('sounds');
+export const listSoundFreeTimes = createEquipmentFreeTimeListHelper('sounds');
 
 export const createRequisite = requisitesApi.create;
 export const listRequisites = requisitesApi.list;
 export const updateRequisite = requisitesApi.update;
 export const deleteRequisite = requisitesApi.remove;
 export const addRequisiteFreeTime = createEquipmentFreeTimeHelper('requisites');
+export const listRequisiteFreeTimes = createEquipmentFreeTimeListHelper('requisites');
 
 export const addRequisiteImage = async (requisiteId, payload) =>
   apiClient(`/user/users/me/requisites/${requisiteId}/images`, {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../constants';
 import { ApiError } from '../services/httpClient';
 import {
   addCameraFreeTime,
@@ -25,13 +26,20 @@ import {
   deleteRequisite,
   deleteSound,
   getRequisiteImage,
+  listCameraFreeTimes,
   listCameras,
+  listCameraTripodFreeTimes,
   listCameraTripods,
+  listLightFreeTimes,
   listLights,
+  listLightTripodFreeTimes,
   listLightTripods,
+  listMicrofonFreeTimes,
   listMicrofons,
+  listRequisiteFreeTimes,
   listRequisiteImages,
   listRequisites,
+  listSoundFreeTimes,
   listSounds,
   removeRequisiteImage,
   reserveAvailability,
@@ -49,6 +57,7 @@ const resourceOrder = ['microfons', 'cameras', 'camera-tripods', 'lights', 'ligh
 
 const createInitialResourceForm = () => ({ title: '', description: '', type: '', size: '' });
 const createInitialWindowForm = () => ({ startTime: '', endTime: '' });
+const createDefaultTimeWindowForm = () => ({ startTime: '09:00', endTime: '18:00' });
 const createInitialImageForm = () => ({ file: null, title: '', description: '' });
 
 const tableColumns = {
@@ -76,6 +85,7 @@ const resourceMeta = {
     update: updateMicrofon,
     remove: deleteMicrofon,
     addFreeTime: addMicrofonFreeTime,
+    listFreeTimes: listMicrofonFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'Rode NTG5', description: 'Пушка для съемок на площадке', type: 'shotgun' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -88,6 +98,7 @@ const resourceMeta = {
     update: updateCamera,
     remove: deleteCamera,
     addFreeTime: addCameraFreeTime,
+    listFreeTimes: listCameraFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'Sony A7S III', description: 'Основная камера для съемочного дня', type: 'mirrorless' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -100,6 +111,7 @@ const resourceMeta = {
     update: updateCameraTripod,
     remove: deleteCameraTripod,
     addFreeTime: addCameraTripodFreeTime,
+    listFreeTimes: listCameraTripodFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'Manfrotto 190', description: 'Штатив для статичных планов', type: 'tripod' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -112,6 +124,7 @@ const resourceMeta = {
     update: updateLight,
     remove: deleteLight,
     addFreeTime: addLightFreeTime,
+    listFreeTimes: listLightFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'Aputure 300D', description: 'Постоянный свет для ключевой сцены', type: 'led' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -124,6 +137,7 @@ const resourceMeta = {
     update: updateLightTripod,
     remove: deleteLightTripod,
     addFreeTime: addLightTripodFreeTime,
+    listFreeTimes: listLightTripodFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'C-Stand', description: 'Стойка для световых приборов', type: 'stand' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -136,6 +150,7 @@ const resourceMeta = {
     update: updateSound,
     remove: deleteSound,
     addFreeTime: addSoundFreeTime,
+    listFreeTimes: listSoundFreeTimes,
     columns: tableColumns.equipment,
     placeholders: { title: 'Zoom F6', description: 'Рекордер для полевого звука', type: 'recorder' },
     buildPayload: (form) => ({ title: form.title.trim(), description: form.description.trim(), type: form.type.trim() }),
@@ -148,6 +163,7 @@ const resourceMeta = {
     update: updateRequisite,
     remove: deleteRequisite,
     addFreeTime: addRequisiteFreeTime,
+    listFreeTimes: listRequisiteFreeTimes,
     columns: tableColumns.requisites,
     supportsImages: true,
     placeholders: { title: 'Винтажная лампа', description: 'Декоративная лампа в теплых тонах', type: 'decor', size: 'm' },
@@ -165,6 +181,16 @@ const toDateKey = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
+const fromDateKey = (dateKey) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+const buildLocalDateTime = (dateKey, timeValue) => {
+  const [hours, minutes] = timeValue.split(':').map(Number);
+  const date = fromDateKey(dateKey);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+};
 const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
 const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
@@ -175,7 +201,16 @@ const getColumnValue = (item, column) => (typeof column.render === 'function' ? 
 
 const getPreviewSource = (image) => {
   const candidate = image?.file || image?.storage_key || '';
-  return /^https?:\/\//i.test(candidate) || candidate.startsWith('data:') ? candidate : '';
+
+  if (!candidate) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(candidate) || candidate.startsWith('data:')) {
+    return candidate;
+  }
+
+  return `${API_BASE_URL}/${candidate.replace(/^\/+/, '')}`;
 };
 
 const buildItemCalendarMap = (items) => {
@@ -191,6 +226,35 @@ const buildItemCalendarMap = (items) => {
 
   return map;
 };
+
+const buildAvailabilityMap = (items) => {
+  const map = new Map();
+
+  items.forEach((item) => {
+    const start = new Date(item.start_time);
+    const end = new Date(item.end_time);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return;
+    }
+
+    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const lastDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+    while (cursor <= lastDay) {
+      const key = toDateKey(cursor);
+      const currentItems = map.get(key) || [];
+      currentItems.push(item);
+      map.set(key, currentItems);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  });
+
+  return map;
+};
+
+const rangesOverlap = (leftStart, leftEnd, rightStart, rightEnd) =>
+  !(leftEnd < rightStart || leftStart > rightEnd);
 
 const buildCalendarDays = (visibleMonth, itemMap, selectedDateKey, todayKey) => {
   const firstDayOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
@@ -243,7 +307,11 @@ const Projects = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, totalPages: 1, totalCount: 0 });
   const [selectedItemId, setSelectedItemId] = useState(null);
-  const [freeTimeForm, setFreeTimeForm] = useState(createInitialWindowForm);
+  const [freeTimeForm, setFreeTimeForm] = useState(createDefaultTimeWindowForm);
+  const [selectedFreeTimeDateKeys, setSelectedFreeTimeDateKeys] = useState([]);
+  const [addedFreeTimeDateKeysByItem, setAddedFreeTimeDateKeysByItem] = useState({});
+  const [selectedItemFreeTimes, setSelectedItemFreeTimes] = useState([]);
+  const [isSelectedItemFreeTimesLoading, setIsSelectedItemFreeTimesLoading] = useState(false);
   const [reserveForm, setReserveForm] = useState(createInitialWindowForm);
   const [isSubmittingFreeTime, setIsSubmittingFreeTime] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
@@ -281,6 +349,29 @@ const Projects = () => {
     () => itemsByDate.get(activeDateFilterKey || selectedDateKey) || [],
     [activeDateFilterKey, itemsByDate, selectedDateKey],
   );
+  const selectedFreeTimeDateSet = useMemo(
+    () => new Set(selectedFreeTimeDateKeys),
+    [selectedFreeTimeDateKeys],
+  );
+  const selectedItemFreeTimesByDate = useMemo(
+    () => buildAvailabilityMap(selectedItemFreeTimes),
+    [selectedItemFreeTimes],
+  );
+  const addedFreeTimeDateSet = useMemo(
+    () =>
+      new Set([
+        ...selectedItemFreeTimesByDate.keys(),
+        ...(selectedItemId ? addedFreeTimeDateKeysByItem[selectedItemId] || [] : []),
+      ]),
+    [addedFreeTimeDateKeysByItem, selectedItemFreeTimesByDate, selectedItemId],
+  );
+  const selectedFreeTimeDatesLabel = useMemo(
+    () =>
+      selectedFreeTimeDateKeys
+        .map((dateKey) => selectedDateFormatter.format(fromDateKey(dateKey)))
+        .join(', '),
+    [selectedFreeTimeDateKeys],
+  );
 
   const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
@@ -289,7 +380,10 @@ const Projects = () => {
 
   const resetManagementState = useCallback(() => {
     setSelectedItemId(null);
-    setFreeTimeForm(createInitialWindowForm());
+    setFreeTimeForm(createDefaultTimeWindowForm());
+    setSelectedFreeTimeDateKeys([]);
+    setSelectedItemFreeTimes([]);
+    setIsSelectedItemFreeTimesLoading(false);
     setReserveForm(createInitialWindowForm());
     setImages([]);
     setImageForm(createInitialImageForm());
@@ -297,13 +391,13 @@ const Projects = () => {
     setSelectedImage(null);
   }, []);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async ({ page = pagination.page, pageSize = pagination.pageSize } = {}) => {
     setLoading(true);
 
     try {
       const response = await currentResource.list({
-        page: pagination.page,
-        pageSize: pagination.pageSize,
+        page,
+        pageSize,
         sortBy: 'create_at',
         sortDir: 'desc',
       });
@@ -311,6 +405,8 @@ const Projects = () => {
       setItems(response.items || []);
       setPagination((prev) => ({
         ...prev,
+        page,
+        pageSize,
         totalPages: response.pages || 1,
         totalCount: response.total_count || 0,
       }));
@@ -320,6 +416,28 @@ const Projects = () => {
       setLoading(false);
     }
   }, [currentResource, pagination.page, pagination.pageSize]);
+
+  const loadSelectedItemFreeTimes = useCallback(
+    async (itemId) => {
+      if (!itemId) {
+        setSelectedItemFreeTimes([]);
+        return;
+      }
+
+      setIsSelectedItemFreeTimesLoading(true);
+
+      try {
+        const response = await currentResource.listFreeTimes(itemId);
+        setSelectedItemFreeTimes(response.items || []);
+      } catch (error) {
+        setSelectedItemFreeTimes([]);
+        toast.error(error.message || 'Не удалось загрузить окна доступности объекта');
+      } finally {
+        setIsSelectedItemFreeTimesLoading(false);
+      }
+    },
+    [currentResource],
+  );
 
   const loadRequisiteImages = useCallback(async (requisiteId) => {
     if (!requisiteId) {
@@ -353,6 +471,15 @@ const Projects = () => {
       resetManagementState();
     }
   }, [items, resetManagementState, selectedItemId]);
+
+  useEffect(() => {
+    if (!selectedItemId) {
+      setSelectedItemFreeTimes([]);
+      return;
+    }
+
+    loadSelectedItemFreeTimes(selectedItemId);
+  }, [loadSelectedItemFreeTimes, selectedItemId]);
 
   useEffect(() => {
     if (activeResource !== 'requisites' || !selectedItem) {
@@ -420,16 +547,15 @@ const Projects = () => {
       }
 
       resetForm();
-      await fetchItems();
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         toast.error('Объект не найден, список обновлен');
         resetForm();
-        await fetchItems();
       } else {
         toast.error(error.message || 'Не удалось сохранить данные');
       }
     } finally {
+      await fetchItems();
       setSubmitting(false);
     }
   };
@@ -461,21 +587,20 @@ const Projects = () => {
       }
 
       const isLastItemOnPage = items.length === 1 && pagination.page > 1;
-      setPagination((prev) => ({ ...prev, page: isLastItemOnPage ? prev.page - 1 : prev.page }));
-
-      if (!isLastItemOnPage) {
-        await fetchItems();
-      }
+      const nextPage = isLastItemOnPage ? pagination.page - 1 : pagination.page;
+      setPagination((prev) => ({ ...prev, page: nextPage }));
+      await fetchItems({ page: nextPage });
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         toast.error('Объект уже удален, список обновлен');
         if (selectedItemId === itemId) {
           resetManagementState();
         }
-        await fetchItems();
       } else {
         toast.error(error.message || 'Не удалось удалить объект');
       }
+      const nextPage = items.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page;
+      await fetchItems({ page: nextPage });
     } finally {
       setDeletingId(null);
     }
@@ -483,7 +608,8 @@ const Projects = () => {
 
   const handleSelectItem = (item) => {
     setSelectedItemId(item.oid);
-    setFreeTimeForm(createInitialWindowForm());
+    setFreeTimeForm(createDefaultTimeWindowForm());
+    setSelectedFreeTimeDateKeys([selectedDateKey]);
     setReserveForm(createInitialWindowForm());
     setImageForm(createInitialImageForm());
     setImageInputKey((prev) => prev + 1);
@@ -498,17 +624,65 @@ const Projects = () => {
       return;
     }
 
-    const payload = getWindowPayload(freeTimeForm);
-    if (!payload) {
+    if (selectedFreeTimeDateKeys.length === 0) {
+      toast.error('Выберите хотя бы один день на календаре');
+      return;
+    }
+
+    const firstStart = buildLocalDateTime(selectedFreeTimeDateKeys[0], freeTimeForm.startTime);
+    const firstEnd = buildLocalDateTime(selectedFreeTimeDateKeys[0], freeTimeForm.endTime);
+
+    if (Number.isNaN(firstStart.getTime()) || Number.isNaN(firstEnd.getTime())) {
+      toast.error('Укажите корректное время');
+      return;
+    }
+
+    if (firstStart >= firstEnd) {
+      toast.error('Время окончания должно быть позже времени начала');
+      return;
+    }
+
+    const conflictingDateKeys = selectedFreeTimeDateKeys.filter((dateKey) => {
+      const start = buildLocalDateTime(dateKey, freeTimeForm.startTime);
+      const end = buildLocalDateTime(dateKey, freeTimeForm.endTime);
+      const dayWindows = selectedItemFreeTimesByDate.get(dateKey) || [];
+
+      return dayWindows.some((window) =>
+        rangesOverlap(start, end, new Date(window.start_time), new Date(window.end_time)),
+      );
+    });
+
+    if (conflictingDateKeys.length > 0) {
+      toast.error(
+        `Интервал пересекается с уже добавленными окнами: ${
+          conflictingDateKeys.map((dateKey) => selectedDateFormatter.format(fromDateKey(dateKey))).join(', ')
+        }`,
+      );
       return;
     }
 
     setIsSubmittingFreeTime(true);
 
     try {
-      await currentResource.addFreeTime(selectedItem.oid, payload);
-      toast.success('Окно доступности добавлено');
-      setFreeTimeForm(createInitialWindowForm());
+      await Promise.all(
+        selectedFreeTimeDateKeys.map((dateKey) => {
+          const start = buildLocalDateTime(dateKey, freeTimeForm.startTime);
+          const end = buildLocalDateTime(dateKey, freeTimeForm.endTime);
+          return currentResource.addFreeTime(selectedItem.oid, {
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+          });
+        }),
+      );
+      setAddedFreeTimeDateKeysByItem((prev) => {
+        const currentKeys = new Set(prev[selectedItem.oid] || []);
+        selectedFreeTimeDateKeys.forEach((dateKey) => currentKeys.add(dateKey));
+        return { ...prev, [selectedItem.oid]: [...currentKeys].sort() };
+      });
+      toast.success(`Окна доступности добавлены: ${selectedFreeTimeDateKeys.length}`);
+      setFreeTimeForm(createDefaultTimeWindowForm());
+      setSelectedFreeTimeDateKeys([]);
+      await loadSelectedItemFreeTimes(selectedItem.oid);
     } catch (error) {
       toast.error(error.message || 'Не удалось добавить окно доступности');
     } finally {
@@ -533,6 +707,7 @@ const Projects = () => {
 
     try {
       await reserveAvailability({
+        request_id: crypto.randomUUID(),
         owner_id: selectedItem.user_id,
         obj_id: selectedItem.oid,
         ...payload,
@@ -625,6 +800,19 @@ const Projects = () => {
   const handleCalendarDayClick = (dateKey, date) => {
     setSelectedDateKey(dateKey);
     setVisibleMonth(startOfMonth(date));
+
+    if (selectedItem) {
+      setActiveDateFilterKey(null);
+      setSelectedFreeTimeDateKeys((prev) => {
+        if (prev.includes(dateKey)) {
+          return prev.filter((key) => key !== dateKey);
+        }
+
+        return [...prev, dateKey].sort();
+      });
+      return;
+    }
+
     setActiveDateFilterKey((current) => (current === dateKey ? null : dateKey));
   };
 
@@ -817,12 +1005,20 @@ const Projects = () => {
                 <div className="management-grid projects-management-grid">
                   <section className="management-panel">
                     <h3>Добавить окно доступности</h3>
-                    <p className="helper-note">Для техники и реквизита API отдает только добавление окна, без списка истории.</p>
+                    <p className="helper-note">
+                      {isSelectedItemFreeTimesLoading
+                        ? 'Загружаем уже добавленные окна объекта...'
+                        : 'Выберите один или несколько дней в календаре и задайте общий интервал времени.'}
+                    </p>
                     <form className="stacked-form" onSubmit={handleAddFreeTime}>
+                      <div className="profile-selected-days">
+                        <span>Выбрано дней: {selectedFreeTimeDateKeys.length}</span>
+                        <p>{selectedFreeTimeDatesLabel || 'Нажмите на даты в календаре справа.'}</p>
+                      </div>
                       <label className="field-block">
                         <span>Начало</span>
                         <input
-                          type="datetime-local"
+                          type="time"
                           name="startTime"
                           value={freeTimeForm.startTime}
                           onChange={handleWindowChange(setFreeTimeForm)}
@@ -831,14 +1027,14 @@ const Projects = () => {
                       <label className="field-block">
                         <span>Окончание</span>
                         <input
-                          type="datetime-local"
+                          type="time"
                           name="endTime"
                           value={freeTimeForm.endTime}
                           onChange={handleWindowChange(setFreeTimeForm)}
                         />
                       </label>
                       <button type="submit" className="profile-save-btn compact" disabled={isSubmittingFreeTime}>
-                        {isSubmittingFreeTime ? 'Добавляем...' : 'Добавить окно'}
+                        {isSubmittingFreeTime ? 'Добавляем...' : `Добавить на ${selectedFreeTimeDateKeys.length || 0} дн.`}
                       </button>
                     </form>
                   </section>
@@ -1053,6 +1249,8 @@ const Projects = () => {
                     day.isToday ? 'is-today' : '',
                     day.isSelected ? 'is-selected' : '',
                     day.itemCount > 0 ? 'has-availability' : '',
+                    addedFreeTimeDateSet.has(day.dateKey) ? 'has-workspace-availability' : '',
+                    selectedFreeTimeDateSet.has(day.dateKey) ? 'is-pending-availability' : '',
                   ].filter(Boolean).join(' ')}
                   onClick={() => handleCalendarDayClick(day.dateKey, day.date)}
                 >
@@ -1064,11 +1262,17 @@ const Projects = () => {
 
             <div className="projects-calendar-summary">
               <p>
-                {activeDateFilterKey
+                {selectedItem
+                  ? 'Кликайте по дням, чтобы добавить или убрать их из нового окна доступности.'
+                  : activeDateFilterKey
                   ? `Фильтр по дате: ${activeDayLabel}. Элементов: ${selectedDayItems.length}.`
                   : 'Нажмите на день, чтобы отфильтровать таблицу по дате создания.'}
               </p>
-              {activeDateFilterKey ? (
+              {selectedItem && selectedFreeTimeDateKeys.length > 0 ? (
+                <button type="button" className="ghost-action-btn" onClick={() => setSelectedFreeTimeDateKeys([])}>
+                  Очистить выбор
+                </button>
+              ) : activeDateFilterKey ? (
                 <button type="button" className="ghost-action-btn" onClick={() => setActiveDateFilterKey(null)}>
                   Показать все
                 </button>

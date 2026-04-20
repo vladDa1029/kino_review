@@ -23,6 +23,11 @@ const initialSpareTimeForm = {
   endTime: '',
 };
 
+const defaultMultiDayForm = {
+  startTime: '09:00',
+  endTime: '18:00',
+};
+
 const weekDayLabels = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
 
 const pad = (value) => String(value).padStart(2, '0');
@@ -33,6 +38,13 @@ const toDateKey = (date) =>
 const fromDateKey = (dateKey) => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day);
+};
+
+const buildLocalDateTime = (dateKey, timeValue) => {
+  const [hours, minutes] = timeValue.split(':').map(Number);
+  const date = fromDateKey(dateKey);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
 };
 
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -121,6 +133,7 @@ const ProfilePage = () => {
 
   const [visibleMonth, setVisibleMonth] = useState(() => startOfDay(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
+  const [selectedAvailabilityDateKeys, setSelectedAvailabilityDateKeys] = useState([]);
   const [isAvailabilityFormVisible, setIsAvailabilityFormVisible] = useState(false);
 
   const handleProfileChange = (event) => {
@@ -136,6 +149,7 @@ const ProfilePage = () => {
   const resetSpareTimeForm = () => {
     setSpareTimeForm(initialSpareTimeForm);
     setEditingSpareTimeId(null);
+    setSelectedAvailabilityDateKeys([]);
   };
 
   const loadDescription = useCallback(async () => {
@@ -246,6 +260,17 @@ const ProfilePage = () => {
     () => sortSpareTimes(availabilityMap.get(selectedDateKey) || []),
     [availabilityMap, selectedDateKey],
   );
+  const selectedAvailabilityDateSet = useMemo(
+    () => new Set(selectedAvailabilityDateKeys),
+    [selectedAvailabilityDateKeys],
+  );
+  const selectedAvailabilityDatesLabel = useMemo(
+    () =>
+      selectedAvailabilityDateKeys
+        .map((dateKey) => selectedDateFormatter.format(fromDateKey(dateKey)))
+        .join(', '),
+    [selectedAvailabilityDateKeys],
+  );
 
   const monthLabel = capitalize(monthFormatter.format(visibleMonth));
   const selectedDateLabel = selectedDateFormatter.format(fromDateKey(selectedDateKey));
@@ -282,11 +307,15 @@ const ProfilePage = () => {
   const handleSpareTimeSubmit = async (event) => {
     event.preventDefault();
 
-    const startTime = toIsoDateTime(spareTimeForm.startTime);
-    const endTime = toIsoDateTime(spareTimeForm.endTime);
+    const startTime = editingSpareTimeId
+      ? toIsoDateTime(spareTimeForm.startTime)
+      : toIsoDateTime(buildLocalDateTime(selectedDateKey, spareTimeForm.startTime));
+    const endTime = editingSpareTimeId
+      ? toIsoDateTime(spareTimeForm.endTime)
+      : toIsoDateTime(buildLocalDateTime(selectedDateKey, spareTimeForm.endTime));
 
     if (!startTime || !endTime) {
-      toast.error('Укажите корректные дату и время');
+      toast.error(editingSpareTimeId ? 'Укажите корректные дату и время' : 'Укажите корректное время');
       return;
     }
 
@@ -295,17 +324,30 @@ const ProfilePage = () => {
       return;
     }
 
+    if (!editingSpareTimeId && selectedAvailabilityDateKeys.length === 0) {
+      toast.error('Выберите хотя бы один день на календаре');
+      return;
+    }
+
     setIsSubmittingSpareTime(true);
 
     try {
-      const payload = { start_time: startTime, end_time: endTime };
-
       if (editingSpareTimeId) {
+        const payload = { start_time: startTime, end_time: endTime };
         await updateSpareTime(editingSpareTimeId, payload);
         toast.success('Окно доступности обновлено');
       } else {
-        await createSpareTime(payload);
-        toast.success('Окно доступности добавлено');
+        await Promise.all(
+          selectedAvailabilityDateKeys.map((dateKey) => {
+            const start = buildLocalDateTime(dateKey, spareTimeForm.startTime);
+            const end = buildLocalDateTime(dateKey, spareTimeForm.endTime);
+            return createSpareTime({
+              start_time: start.toISOString(),
+              end_time: end.toISOString(),
+            });
+          }),
+        );
+        toast.success(`Окна доступности добавлены: ${selectedAvailabilityDateKeys.length}`);
       }
 
       resetSpareTimeForm();
@@ -328,6 +370,7 @@ const ProfilePage = () => {
         startTime: toDateTimeLocalValue(data.start_time),
         endTime: toDateTimeLocalValue(data.end_time),
       });
+      setSelectedAvailabilityDateKeys([]);
       setSelectedDateKey(toDateKey(new Date(data.start_time)));
       setVisibleMonth(startOfDay(new Date(data.start_time)));
       setIsAvailabilityFormVisible(true);
@@ -370,7 +413,30 @@ const ProfilePage = () => {
 
   const handleCreateAvailability = () => {
     resetSpareTimeForm();
-    setIsAvailabilityFormVisible((prev) => !prev);
+    setIsAvailabilityFormVisible((prev) => {
+      const nextVisible = !prev;
+      if (nextVisible) {
+        setSpareTimeForm(defaultMultiDayForm);
+        setSelectedAvailabilityDateKeys([selectedDateKey]);
+      }
+      return nextVisible;
+    });
+  };
+
+  const handleCalendarDaySelect = (dateKey) => {
+    setSelectedDateKey(dateKey);
+
+    if (!isAvailabilityFormVisible || editingSpareTimeId) {
+      return;
+    }
+
+    setSelectedAvailabilityDateKeys((prev) => {
+      if (prev.includes(dateKey)) {
+        return prev.filter((key) => key !== dateKey);
+      }
+
+      return [...prev, dateKey].sort();
+    });
   };
 
   const handleCancelProfileEdit = () => {
@@ -509,10 +575,11 @@ const ProfilePage = () => {
                         day.isToday ? 'is-today' : '',
                         day.isSelected ? 'is-selected' : '',
                         day.availabilityCount > 0 ? 'has-availability' : '',
+                        selectedAvailabilityDateSet.has(day.dateKey) ? 'is-pending-availability' : '',
                       ]
                         .filter(Boolean)
                         .join(' ')}
-                      onClick={() => setSelectedDateKey(day.dateKey)}
+                      onClick={() => handleCalendarDaySelect(day.dateKey)}
                     >
                       <span>{day.label}</span>
                       {day.availabilityCount > 0 ? (
@@ -573,8 +640,19 @@ const ProfilePage = () => {
                 <form className="profile-editor-card" onSubmit={handleSpareTimeSubmit}>
                   <div className="profile-editor-head">
                     <h4>{editingSpareTimeId ? 'Редактирование окна' : 'Новое окно доступности'}</h4>
-                    <p>Добавьте диапазон времени, который попадёт в личный календарь.</p>
+                    <p>
+                      {editingSpareTimeId
+                        ? 'Измените точные дату и время для выбранного окна.'
+                        : 'Выберите один или несколько дней в календаре и задайте общий интервал времени.'}
+                    </p>
                   </div>
+
+                  {!editingSpareTimeId ? (
+                    <div className="profile-selected-days">
+                      <span>Выбрано дней: {selectedAvailabilityDateKeys.length}</span>
+                      <p>{selectedAvailabilityDatesLabel || 'Нажмите на даты в календаре.'}</p>
+                    </div>
+                  ) : null}
 
                   <div className="grid-two-columns">
                     <label className="field-block" htmlFor="spare-time-start">
@@ -582,7 +660,7 @@ const ProfilePage = () => {
                       <input
                         id="spare-time-start"
                         name="startTime"
-                        type="datetime-local"
+                        type={editingSpareTimeId ? 'datetime-local' : 'time'}
                         value={spareTimeForm.startTime}
                         onChange={handleSpareTimeChange}
                         className="profile-input"
@@ -595,7 +673,7 @@ const ProfilePage = () => {
                       <input
                         id="spare-time-end"
                         name="endTime"
-                        type="datetime-local"
+                        type={editingSpareTimeId ? 'datetime-local' : 'time'}
                         value={spareTimeForm.endTime}
                         onChange={handleSpareTimeChange}
                         className="profile-input"
@@ -614,7 +692,7 @@ const ProfilePage = () => {
                         ? 'Сохранение...'
                         : editingSpareTimeId
                           ? 'Обновить окно'
-                          : 'Добавить окно'}
+                          : `Добавить на ${selectedAvailabilityDateKeys.length || 0} дн.`}
                     </button>
                     {editingSpareTimeId ? (
                       <button

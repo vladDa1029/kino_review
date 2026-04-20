@@ -1010,6 +1010,7 @@ body:not(.dark-theme) {
 }
 
 .calendar-day-btn {
+  position: relative;
   min-height: 54px;
   padding: 0.35rem 0.2rem;
   border: 1px solid transparent;
@@ -1038,6 +1039,24 @@ body:not(.dark-theme) {
 
 .calendar-day-btn.has-availability {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.calendar-day-btn.is-pending-availability {
+  border-color: color-mix(in srgb, var(--success) 58%, transparent);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.calendar-day-btn.has-workspace-availability::after {
+  content: '';
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 14%, transparent);
 }
 
 .calendar-day-btn.is-today {
@@ -1104,6 +1123,28 @@ body:not(.dark-theme) {
 .profile-editor-card {
   display: grid;
   gap: 0.9rem;
+}
+
+.profile-selected-days {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--success) 32%, var(--line));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.profile-selected-days span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--success);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.profile-selected-days p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .profile-empty-card.subtle {
