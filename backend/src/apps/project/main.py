@@ -42,7 +42,11 @@ from app.infrastructure.broker.publisher import PROJECT_EVENTS_EXCHANGE
 from app.infrastructure.broker.request_reply import BrokerReplyInbox, build_reply_queue
 from app.ioc import setup_providers
 from app.presentation import handlers
-from app.presentation.api import router as api_router
+from app.presentation.api import (
+    PROJECT_API_DESCRIPTION,
+    PROJECT_OPENAPI_TAGS,
+    router as api_router,
+)
 from app.presentation.broker import create_broker_router
 from app.set_log import configure_logging
 
@@ -114,6 +118,9 @@ def start_app_dev() -> FastAPI:
         lifespan=lifespan,
         debug=True,
         title="Project service",
+        version="0.1.0",
+        description=PROJECT_API_DESCRIPTION,
+        openapi_tags=PROJECT_OPENAPI_TAGS,
     )
 
     @app.middleware("http")
