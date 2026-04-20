@@ -1,6 +1,7 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
+import { useProjectContext } from '../context/useProjectContext';
 import PasswordStrength from './PasswordStrength';
 import { checkPasswordStrength } from '../utils/passwordValidator';
 
@@ -31,13 +32,7 @@ const EyeOffIcon = () => (
     xmlns="http://www.w3.org/2000/svg"
     aria-hidden="true"
   >
-    <path
-      d="M2 2L22 22"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <path d="M2 2L22 22" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     <path
       d="M9.88 9.88C9.34 10.42 9 11.17 9 12C9 13.66 10.34 15 12 15C12.83 15 13.58 14.66 14.12 14.12"
       stroke="currentColor"
@@ -64,11 +59,16 @@ const EyeOffIcon = () => (
 
 const AuthModal = ({ showAuth, setShowAuth }) => {
   const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
+  const {
+    projects,
+    activeProjectId,
+    isProjectsLoading,
+    refreshProjects,
+    setActiveProjectId,
+  } = useProjectContext();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [step, setStep] = useState('auth');
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [passwordRequirements, setPasswordRequirements] = useState({
     length: false,
@@ -78,8 +78,8 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
   });
   const [passwordStrength, setPasswordStrength] = useState(0);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === 'password' && !isLogin) {
@@ -89,98 +89,159 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (!isLogin && passwordStrength < 3) {
       return;
     }
 
     try {
-      let response;
-      if (isLogin) {
-        response = await handleLogin(formData.email, formData.password);
-      } else {
-        response = await handleRegister(formData.email, formData.password);
-      }
+      const response = isLogin
+        ? await handleLogin(formData.email, formData.password)
+        : await handleRegister(formData.email, formData.password);
 
       if (response?.access_token) {
-        navigate('/profile');
+        setFormData({ email: '', password: '' });
+        setStep('projects');
+        await refreshProjects();
       }
-
-      setFormData({ email: '', password: '' });
     } catch {
-      // Обработка ошибок выполняется внутри auth-методов.
+      // Ошибки уже показаны в auth-методах.
     }
+  };
+
+  const handleClose = () => {
+    setShowAuth(false);
+    setStep('auth');
+  };
+
+  const handleChooseProject = (projectId) => {
+    setActiveProjectId(projectId);
+    setShowAuth(false);
+    setStep('auth');
+    navigate('/projects');
+  };
+
+  const handleCreateProject = () => {
+    setShowAuth(false);
+    setStep('auth');
+    navigate('/my-projects');
   };
 
   return (
     showAuth && (
       <div className="auth-modal open">
-        <div className="auth-container">
+        <div className={`auth-container ${step === 'projects' ? 'auth-container-wide' : ''}`}>
           <div className="auth-content">
-            <button className="close-btn" onClick={() => setShowAuth(false)}>
+            <button className="close-btn" onClick={handleClose} aria-label="Закрыть окно">
               &times;
             </button>
-            <h2>{isLogin ? 'С возвращением' : 'Создать аккаунт'}</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Электронная почта"
-                  className="form-input"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
 
-              <div className="form-group password-input-container">
-                <div className="password-input-wrapper">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Пароль"
-                    className="form-input"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                  </button>
+            {step === 'projects' ? (
+              <>
+                <div className="project-choice-header">
+                  <span className="projects-panel-eyebrow">Выбор проекта</span>
+                  <h2>Где будем работать?</h2>
+                  <p>
+                    Выберите проект, в котором вы участвуете. Рабочая область откроется уже с
+                    этим контекстом.
+                  </p>
                 </div>
-                {!isLogin && (
-                  <PasswordStrength
-                    password={formData.password}
-                    requirements={passwordRequirements}
-                    strength={passwordStrength}
-                  />
-                )}
-              </div>
 
-              <button
-                type="submit"
-                className="auth-submit-btn"
-                disabled={!isLogin && passwordStrength < 3}
-              >
-                {isLogin ? 'Войти' : 'Зарегистрироваться'}
-              </button>
+                <div className="project-choice-list">
+                  {isProjectsLoading ? <p className="helper-note">Загружаем проекты...</p> : null}
 
-              <p className="auth-switch">
-                {isLogin
-                  ? 'Нет аккаунта? '
-                  : 'Уже есть аккаунт? '}
-                <span onClick={() => setIsLogin(!isLogin)} className="switch-link">
-                  {isLogin ? 'Регистрация' : 'Вход'}
-                </span>
-              </p>
-            </form>
+                  {!isProjectsLoading && projects.length === 0 ? (
+                    <div className="project-choice-empty">
+                      <p>У вас пока нет проектов для выбора.</p>
+                      <button type="button" className="profile-save-btn compact" onClick={handleCreateProject}>
+                        Перейти к проектам
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {!isProjectsLoading &&
+                    projects.map((project) => {
+                      const projectId = project.oid || project.id;
+                      const isActive = activeProjectId === projectId;
+
+                      return (
+                        <button
+                          key={projectId}
+                          type="button"
+                          className={`project-choice-card${isActive ? ' is-active' : ''}`}
+                          onClick={() => handleChooseProject(projectId)}
+                        >
+                          <span>{isActive ? 'Выбран сейчас' : 'Проект'}</span>
+                          <strong>{project.title}</strong>
+                          <small>{project.description || 'Описание не указано'}</small>
+                        </button>
+                      );
+                    })}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>{isLogin ? 'С возвращением' : 'Создать аккаунт'}</h2>
+                <form onSubmit={handleSubmit}>
+                  <div className="form-group">
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Электронная почта"
+                      className="form-input"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group password-input-container">
+                    <div className="password-input-wrapper">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        placeholder="Пароль"
+                        className="form-input"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                    {!isLogin && (
+                      <PasswordStrength
+                        password={formData.password}
+                        requirements={passwordRequirements}
+                        strength={passwordStrength}
+                      />
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="auth-submit-btn"
+                    disabled={!isLogin && passwordStrength < 3}
+                  >
+                    {isLogin ? 'Войти' : 'Зарегистрироваться'}
+                  </button>
+
+                  <p className="auth-switch">
+                    {isLogin ? 'Нет аккаунта? ' : 'Уже есть аккаунт? '}
+                    <span onClick={() => setIsLogin(!isLogin)} className="switch-link">
+                      {isLogin ? 'Регистрация' : 'Вход'}
+                    </span>
+                  </p>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>

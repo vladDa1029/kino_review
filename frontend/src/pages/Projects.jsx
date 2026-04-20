@@ -26,6 +26,7 @@ import {
   deleteRequisite,
   deleteSound,
   getRequisiteImage,
+  getProjectUserResources,
   listCameraFreeTimes,
   listCameras,
   listCameraTripodFreeTimes,
@@ -51,6 +52,8 @@ import {
   updateRequisite,
   updateSound,
 } from '../services/api';
+import { useAuth } from '../context/useAuth';
+import { useProjectContext } from '../context/useProjectContext';
 import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
 
 const resourceOrder = ['microfons', 'cameras', 'camera-tripods', 'lights', 'light-tripods', 'sounds', 'requisites'];
@@ -199,6 +202,10 @@ const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const getColumnValue = (item, column) => (typeof column.render === 'function' ? column.render(item) : item[column.key] || '-');
 
+const getProjectId = (project) => project?.oid || project?.id || '';
+const getCurrentUserId = (userData) =>
+  userData?.user_id || userData?.sub || userData?.id || userData?.oid || '';
+
 const getPreviewSource = (image) => {
   const candidate = image?.file || image?.storage_key || '';
 
@@ -298,6 +305,15 @@ const getWindowPayload = (windowForm) => {
 };
 
 const Projects = () => {
+  const { userData } = useAuth();
+  const {
+    projects,
+    activeProject,
+    activeProjectId,
+    isProjectsLoading,
+    refreshProjects,
+    setActiveProjectId,
+  } = useProjectContext();
   const [activeResource, setActiveResource] = useState(resourceOrder[0]);
   const [form, setForm] = useState(createInitialResourceForm);
   const [editingId, setEditingId] = useState(null);
@@ -328,9 +344,14 @@ const Projects = () => {
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
   const [activeDateFilterKey, setActiveDateFilterKey] = useState(null);
+  const [projectResources, setProjectResources] = useState([]);
+  const [projectResourcesRole, setProjectResourcesRole] = useState('');
+  const [isProjectResourcesLoading, setIsProjectResourcesLoading] = useState(false);
 
   const currentResource = useMemo(() => resourceMeta[activeResource], [activeResource]);
   const todayKey = useMemo(() => toDateKey(new Date()), []);
+  const currentUserId = useMemo(() => getCurrentUserId(userData), [userData]);
+  const activeProjectTitle = activeProject?.title || 'Проект не выбран';
 
   const selectedItem = useMemo(
     () => items.find((item) => item.oid === selectedItemId) || null,
@@ -373,6 +394,24 @@ const Projects = () => {
         .join(', '),
     [selectedFreeTimeDateKeys],
   );
+  const projectResourceSummary = useMemo(
+    () =>
+      projectResources.reduce((acc, resource) => {
+        const key = resource.resource_kind || resource.resource_type || 'resource';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {}),
+    [projectResources],
+  );
+  const projectResourceSummaryLabel = useMemo(() => {
+    const entries = Object.entries(projectResourceSummary);
+
+    if (entries.length === 0) {
+      return 'Ресурсы проекта пока не назначены';
+    }
+
+    return entries.map(([kind, count]) => `${kind}: ${count}`).join(', ');
+  }, [projectResourceSummary]);
 
   const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
@@ -392,6 +431,61 @@ const Projects = () => {
     setImageInputKey((prev) => prev + 1);
     setSelectedImage(null);
   }, []);
+
+  const handleActiveProjectChange = (event) => {
+    setActiveProjectId(event.target.value);
+  };
+
+  useEffect(() => {
+    refreshProjects();
+  }, [refreshProjects]);
+
+  useEffect(() => {
+    resetForm();
+    resetManagementState();
+    setActiveDateFilterKey(null);
+    setAddedFreeTimeDateKeysByItem({});
+    setProjectResources([]);
+    setProjectResourcesRole('');
+  }, [activeProjectId, resetForm, resetManagementState]);
+
+  useEffect(() => {
+    if (!activeProjectId || !currentUserId) {
+      setProjectResources([]);
+      setProjectResourcesRole('');
+      return;
+    }
+
+    let isMounted = true;
+    setIsProjectResourcesLoading(true);
+
+    getProjectUserResources(activeProjectId, currentUserId)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setProjectResources(Array.isArray(response?.resources) ? response.resources : []);
+        setProjectResourcesRole(response?.role || '');
+      })
+      .catch(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setProjectResources([]);
+        setProjectResourcesRole('');
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsProjectResourcesLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeProjectId, currentUserId]);
 
   const fetchItems = useCallback(async ({ page = pagination.page, pageSize = pagination.pageSize } = {}) => {
     setLoading(true);
@@ -857,7 +951,6 @@ const Projects = () => {
   const activeDayLabel = activeDateFilterKey
     ? selectedDateFormatter.format(new Date(`${activeDateFilterKey}T00:00:00`))
     : null;
-  const activeResourcePosition = resourceOrder.indexOf(activeResource) + 1;
 
   return (
     <section className="projects-wrapper">
@@ -865,26 +958,57 @@ const Projects = () => {
         <div className="dashboard-panel projects-overview-panel">
           <div className="projects-overview-copy">
             <span className="projects-panel-eyebrow">Рабочая область</span>
-            <h1>{currentResource.label}</h1>
+            <h1>{activeProjectTitle}</h1>
             <p>
-              {activeDateFilterKey
-                ? `Таблица отфильтрована по дате: ${activeDayLabel}.`
-                : 'Добавляйте инвентарь, выбирайте объект и управляйте доступностью в одном экране.'}
+              {activeProject
+                ? `Открыт раздел: ${currentResource.label}. ${projectResourceSummaryLabel}.`
+                : 'Выберите проект, чтобы рабочая область показывала нужный контекст.'}
             </p>
+            <div className="project-switcher-inline">
+              <label className="field-block">
+                <span>Активный проект</span>
+                <select
+                  value={activeProjectId}
+                  onChange={handleActiveProjectChange}
+                  disabled={isProjectsLoading || projects.length === 0}
+                >
+                  {projects.length === 0 ? (
+                    <option value="">Нет проектов</option>
+                  ) : (
+                    projects.map((project) => {
+                      const projectId = getProjectId(project);
+                      return (
+                        <option key={projectId} value={projectId}>
+                          {project.title}
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="ghost-action-btn"
+                onClick={() => refreshProjects()}
+                disabled={isProjectsLoading}
+              >
+                Обновить проекты
+              </button>
+            </div>
           </div>
 
           <div className="projects-overview-stats" aria-label="Сводка рабочей области">
             <div className="projects-stat-card">
-              <span>Категория</span>
-              <strong>{activeResourcePosition}/{resourceOrder.length}</strong>
+              <span>Проекты</span>
+              <strong>{projects.length}</strong>
             </div>
             <div className="projects-stat-card">
-              <span>Всего</span>
-              <strong>{pagination.totalCount}</strong>
+              <span>Роль</span>
+              <strong>{projectResourcesRole || '-'}</strong>
             </div>
             <div className="projects-stat-card">
-              <span>{activeDateFilterKey ? 'В фильтре' : 'На экране'}</span>
-              <strong>{filteredItems.length}</strong>
+              <span>Ресурсы</span>
+              <strong>{isProjectResourcesLoading ? '...' : projectResources.length}</strong>
             </div>
           </div>
 
@@ -934,6 +1058,43 @@ const Projects = () => {
         </aside>
 
         <div className="projects-center-column">
+          <section className="dashboard-panel project-context-panel">
+            <div className="section-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Данные проекта</span>
+                <h2>{activeProject ? activeProject.title : 'Проект не выбран'}</h2>
+              </div>
+              <p>
+                {isProjectResourcesLoading
+                  ? 'Загружаем ресурсы проекта...'
+                  : `Ресурсов в проекте: ${projectResources.length}`}
+              </p>
+            </div>
+
+            {activeProject ? (
+              <div className="project-context-grid">
+                {projectResources.slice(0, 6).map((resource) => (
+                  <article key={`${resource.resource_kind}-${resource.resource_id}`} className="project-context-card">
+                    <span>{resource.resource_kind || resource.resource_type || 'Ресурс'}</span>
+                    <strong>{resource.title}</strong>
+                    <p>{resource.description || 'Без описания'}</p>
+                    <small>
+                      Окон доступности: {Array.isArray(resource.windows) ? resource.windows.length : 0}
+                    </small>
+                  </article>
+                ))}
+
+                {!isProjectResourcesLoading && projectResources.length === 0 ? (
+                  <p className="helper-note">
+                    Для этого проекта пока нет назначенных ресурсов или backend не вернул их для вашей роли.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="helper-note">Создайте или выберите проект на странице проектов.</p>
+            )}
+          </section>
+
           <section className="dashboard-panel">
             <div className="section-heading">
               <h2>{editingId ? `Редактирование: ${currentResource.one}` : `Новый объект: ${currentResource.one}`}</h2>

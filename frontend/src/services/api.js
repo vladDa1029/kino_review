@@ -100,6 +100,23 @@ const createImageUploadFormData = (payload) => {
   return formData;
 };
 
+const createShiftDocumentFormData = (payload) => {
+  if (payload instanceof FormData) {
+    return payload;
+  }
+
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  formData.append('doc_type', payload.doc_type);
+  formData.append('title', payload.title);
+
+  if (payload.description !== undefined && payload.description !== null) {
+    formData.append('description', payload.description);
+  }
+
+  return formData;
+};
+
 const microfonsApi = createCollectionHelpers('/user/users/me/microfons', buildEquipmentListParams);
 const camerasApi = createCollectionHelpers('/user/users/me/cameras', buildEquipmentListParams);
 const cameraTripodsApi = createCollectionHelpers('/user/users/me/camera-tripods', buildEquipmentListParams);
@@ -260,3 +277,122 @@ export const removeRequisiteImage = async (requisiteId, imageId) =>
   apiClient(`/user/users/me/requisites/${requisiteId}/images/${imageId}`, {
     method: 'DELETE',
   });
+
+export const projectHealth = async () =>
+  apiClient('/project/health', {
+    method: 'GET',
+    skipAuth: true,
+  });
+
+export const createProject = async (payload) =>
+  createJsonRequest('/project/projects', 'POST', payload);
+
+export const listProjects = async ({ includeArchived = false } = {}) =>
+  apiClient(
+    withQuery('/project/projects', {
+      include_archived: includeArchived,
+    }),
+    {
+      method: 'GET',
+    },
+  );
+
+export const getProject = async (projectId) =>
+  apiClient(`/project/projects/${projectId}`, {
+    method: 'GET',
+  });
+
+export const updateProject = async (projectId, payload) =>
+  createJsonRequest(`/project/projects/${projectId}`, 'PATCH', payload);
+
+export const archiveProject = async (projectId) =>
+  apiClient(`/project/projects/${projectId}`, {
+    method: 'DELETE',
+  });
+
+export const inviteProjectMember = async (projectId, payload) =>
+  createJsonRequest(`/project/projects/${projectId}/members`, 'POST', payload);
+
+export const listProjectMembers = async (
+  projectId,
+  { userId, includeInactive = false } = {},
+) =>
+  apiClient(
+    withQuery(`/project/projects/${projectId}/members`, {
+      user_id: userId,
+      include_inactive: includeInactive,
+    }),
+    {
+      method: 'GET',
+    },
+  );
+
+export const getProjectMember = async (
+  projectId,
+  targetUserId,
+  { includeInactive = false } = {},
+) =>
+  apiClient(
+    withQuery(`/project/projects/${projectId}/members/${targetUserId}`, {
+      include_inactive: includeInactive,
+    }),
+    {
+      method: 'GET',
+    },
+  );
+
+export const removeProjectMember = async (projectId, targetUserId) =>
+  apiClient(`/project/projects/${projectId}/members/${targetUserId}`, {
+    method: 'DELETE',
+  });
+
+export const changeProjectMemberRole = async (projectId, targetUserId, payload) =>
+  createJsonRequest(`/project/projects/${projectId}/members/${targetUserId}/role`, 'PATCH', payload);
+
+export const getProjectUserResources = async (projectId, targetUserId) =>
+  apiClient(`/project/projects/${projectId}/members/${targetUserId}/resources`, {
+    method: 'GET',
+  });
+
+export const createShift = async (projectId, payload) =>
+  createJsonRequest(`/project/projects/${projectId}/shifts`, 'POST', payload);
+
+export const approveShift = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}/approve`, {
+    method: 'POST',
+  });
+
+export const inviteShiftParticipant = async (shiftId, payload) =>
+  createJsonRequest(`/project/shifts/${shiftId}/participants`, 'POST', payload);
+
+export const confirmShiftParticipant = async (participantId) =>
+  apiClient(`/project/participants/${participantId}/confirm`, {
+    method: 'POST',
+  });
+
+export const declineShiftParticipant = async (participantId) =>
+  apiClient(`/project/participants/${participantId}/decline`, {
+    method: 'POST',
+  });
+
+export const uploadShiftDocument = async (shiftId, payload) =>
+  apiClient(`/project/shifts/${shiftId}/documents`, {
+    method: 'POST',
+    body: createShiftDocumentFormData(payload),
+  });
+
+export const getDocumentDownloadUrl = async (documentId) =>
+  apiClient(`/project/documents/${documentId}/download-url`, {
+    method: 'GET',
+  });
+
+export const createShiftResourceRequest = async (shiftId, payload) =>
+  createJsonRequest(`/project/shifts/${shiftId}/resource-requests`, 'POST', payload);
+
+export const approveResourceRequest = async (requestId) =>
+  apiClient(`/project/resource-requests/${requestId}/approve`, {
+    method: 'POST',
+  });
+
+export const rejectResourceRequest = async (requestId, payload) =>
+  createJsonRequest(`/project/resource-requests/${requestId}/reject`, 'POST', payload);

@@ -64,7 +64,6 @@ export const AuthProvider = ({ children }) => {
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
           toast.success('Вы успешно вошли в систему');
-          setIsAuthModalOpen(false);
           return response;
         }
         throw new Error('Сервер не вернул токен доступа');
@@ -83,7 +82,6 @@ export const AuthProvider = ({ children }) => {
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
           toast.success('Регистрация и вход выполнены успешно');
-          setIsAuthModalOpen(false);
           return response;
         }
 
@@ -91,7 +89,6 @@ export const AuthProvider = ({ children }) => {
         if (loginResponse?.access_token) {
           applyToken(loginResponse.access_token, loginResponse.token_type);
           toast.success('Регистрация и вход выполнены успешно');
-          setIsAuthModalOpen(false);
           return loginResponse;
         }
 
@@ -112,7 +109,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       clearAccessToken();
       toast.info('Вы вышли из системы');
-      setIsAuthModalOpen(false);
     }
   }, []);
 

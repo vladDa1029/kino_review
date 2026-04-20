@@ -346,6 +346,98 @@ body:not(.dark-theme) {
   padding: 1.1rem;
 }
 
+.project-choice-backdrop {
+  align-items: center;
+  padding: 1rem;
+}
+
+.project-choice-dialog {
+  width: min(720px, 94vw);
+  max-height: min(720px, 88vh);
+  overflow: auto;
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-strong) 92%, transparent));
+  box-shadow: var(--shadow-lg);
+  padding: 1.4rem;
+}
+
+.project-choice-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.project-choice-header {
+  padding-right: 2.2rem;
+}
+
+.project-choice-header h2 {
+  margin: 0.25rem 0 0;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+}
+
+.project-choice-header p,
+.project-choice-empty p {
+  margin: 0.65rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.project-choice-list {
+  margin-top: 1.1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.project-choice-card {
+  width: 100%;
+  min-height: 112px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-strong) 74%, transparent);
+  color: var(--text);
+  padding: 0.95rem;
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.project-choice-card:hover,
+.project-choice-card.is-active {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.project-choice-card span {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.project-choice-card strong {
+  font-size: 1.08rem;
+  overflow-wrap: anywhere;
+}
+
+.project-choice-card small {
+  color: var(--text-muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.project-choice-empty {
+  display: grid;
+  gap: 0.85rem;
+}
+
 .feature-icon {
   font-size: 1.45rem;
 }
@@ -576,6 +668,12 @@ body:not(.dark-theme) {
   width: min(420px, 92vw);
   padding: 1.4rem;
   position: relative;
+}
+
+.auth-container-wide {
+  width: min(720px, 94vw);
+  max-height: min(720px, 88vh);
+  overflow: auto;
 }
 
 .profile-modal-backdrop {
@@ -1410,6 +1508,174 @@ body:not(.dark-theme) {
   gap: 0.9rem;
 }
 
+.project-list-page {
+  width: min(1280px, 94vw);
+  margin: 1.5rem auto 3rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.project-list-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.project-list-hero h1 {
+  margin: 0.2rem 0 0;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+}
+
+.project-list-hero p,
+.project-card-main p {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+}
+
+.project-list-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 0.6rem;
+}
+
+.project-list-stats div {
+  min-height: 74px;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 76%, transparent);
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+}
+
+.project-list-stats span,
+.project-type-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.project-list-stats strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.project-list-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.42fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.project-create-panel {
+  position: sticky;
+  top: 5.4rem;
+}
+
+.project-cards {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.project-card-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.project-card-item.is-active-project {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.project-card-main h2 {
+  margin: 0.35rem 0 0;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+.project-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.project-type-label.active {
+  color: var(--accent);
+}
+
+.project-card-description {
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+}
+
+.project-list-toolbar,
+.project-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.project-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.project-card-actions select,
+.project-create-panel select,
+.project-create-panel input,
+.project-create-panel textarea {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 76%, transparent);
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+
+.project-create-panel textarea {
+  resize: vertical;
+  min-height: 132px;
+}
+
+.project-form-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.toggle-inline input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.project-empty-state p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .field-block {
   display: grid;
   gap: 0.45rem;
@@ -1759,6 +2025,64 @@ body:not(.dark-theme) {
   margin: 0.7rem 0 0;
   color: var(--text-muted);
   line-height: 1.55;
+}
+
+.project-switcher-inline {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.project-switcher-inline select {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--projects-input-line, var(--line));
+  background: var(--projects-input-bg, color-mix(in srgb, var(--surface-strong) 86%, transparent));
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+
+.project-context-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.project-context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.7rem;
+}
+
+.project-context-card {
+  min-height: 138px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  padding: 0.85rem;
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.project-context-card span,
+.project-context-card small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.project-context-card strong,
+.project-context-card p {
+  overflow-wrap: anywhere;
+}
+
+.project-context-card p {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .projects-overview-stats {
@@ -2268,6 +2592,15 @@ body:not(.dark-theme) {
 }
 
 @media (max-width: 980px) {
+  .project-list-hero,
+  .project-list-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .project-create-panel {
+    position: static;
+  }
+
   .projects-page.projects-dashboard-layout {
     width: min(1100px, 94vw);
     grid-template-columns: 1fr;
@@ -2355,6 +2688,15 @@ body:not(.dark-theme) {
 
   .features-grid {
     grid-template-columns: 1fr;
+  }
+
+  .project-list-stats,
+  .project-card-item {
+    grid-template-columns: 1fr;
+  }
+
+  .project-card-actions {
+    justify-content: flex-start;
   }
 
   .grid-two-columns,

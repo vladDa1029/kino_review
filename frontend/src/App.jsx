@@ -8,6 +8,7 @@ import AppToastContainer from './components/ToastContainer';
 import UserList from './components/UserList';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
+import ProjectListPage from './pages/ProjectListPage';
 import Projects from './pages/Projects';
 import './App.css';
 
@@ -184,6 +185,14 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage onOpenAuth={() => setIsAuthModalOpen(true)} />} />
         <Route
+          path="/my-projects"
+          element={(
+            <ProtectedRoute>
+              <ProjectListPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
           path="/projects"
           element={(
             <ProtectedRoute>
@@ -247,8 +256,8 @@ function App() {
               <nav className="app-drawer-nav" aria-label="Навигация приложения">
                 <button
                   type="button"
-                  className={`app-drawer-link ${location.pathname === '/' ? 'is-active' : ''}`}
-                  onClick={() => handleMenuNavigation('/')}
+                  className={`app-drawer-link ${location.pathname === '/my-projects' ? 'is-active' : ''}`}
+                  onClick={() => handleMenuNavigation('/my-projects')}
                 >
                   <HomeIcon />
                   <span>Проекты</span>
@@ -287,6 +296,7 @@ function App() {
           </aside>
         </div>
       ) : null}
+
 
       <AuthModal showAuth={isAuthModalOpen} setShowAuth={setIsAuthModalOpen} />
     </div>
