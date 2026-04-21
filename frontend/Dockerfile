@@ -2,31 +2,24 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 RUN npm run build
 
-# Вторая стадия - запуск сервера для раздачи статических файлов
-FROM node:20-alpine
+FROM nginx:1.27-alpine
 
-WORKDIR /app
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Копируем все файлы package* (включая package-lock.json)
-COPY --from=build /app/package*.json ./
-
-# Устанавливаем только production зависимости
-RUN npm ci --only=production
-
-# Устанавливаем serve для раздачи статических файлов
-RUN npm install -g serve
-
-# Копируем сконструированные файлы
-COPY --from=build /app/dist ./dist
-
-# Expose порт
 EXPOSE 80
 
-# Запускаем serve для раздачи статических файлов
-CMD ["serve", "-s", "dist", "-l", "80"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
