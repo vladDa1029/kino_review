@@ -23,6 +23,8 @@ Both processes depend on:
 - SMTP server for email delivery;
 - shared configuration from [app/config.py](../app/config.py).
 
+The Taskiq dispatcher and worker use a service-specific exchange and queue from [app/config.py](../app/config.py), so email-delivery tasks do not share the same transport queue with other services.
+
 ## Composition Root
 
 Primary entrypoints:
