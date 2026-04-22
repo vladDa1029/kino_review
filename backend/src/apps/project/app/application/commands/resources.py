@@ -14,9 +14,11 @@ from app.application.ports.domain import (
     ProjectMemberRepository,
     ReservationOutboxRepository,
     ResourceRequestRepository,
+    ShiftReportRepository,
     ShiftRepository,
     UserServicePort,
 )
+from app.application.reports_support import mark_shift_reports_stale
 from app.application.ports.transaction import TransactionManager
 from app.application.support import (
     get_actor_member,
@@ -50,6 +52,7 @@ class CreateResourceRequestHandler:
         project_members: ProjectMemberRepository,
         shifts: ShiftRepository,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
@@ -59,6 +62,7 @@ class CreateResourceRequestHandler:
         self._project_members = project_members
         self._shifts = shifts
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: CreateResourceRequestCommand) -> ShiftResourceRequest:
@@ -82,6 +86,12 @@ class CreateResourceRequestHandler:
                 now=now,
             )
             await self._resource_requests.add(request)
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=shift.oid,
+                reason="Resource request composition changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()
@@ -115,6 +125,7 @@ class ApproveResourceRequestHandler:
         publisher: EventPublisher,
         reservation_outbox: ReservationOutboxRepository,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
@@ -122,6 +133,7 @@ class ApproveResourceRequestHandler:
         self._publisher = publisher
         self._reservation_outbox = reservation_outbox
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: ApproveResourceRequestCommand) -> ShiftResourceRequest:
@@ -150,6 +162,12 @@ class ApproveResourceRequestHandler:
                     updated_at=now,
                 )
             )
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=request.shift_id,
+                reason="Resource request status changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()
@@ -173,12 +191,14 @@ class RejectResourceRequestHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: RejectResourceRequestCommand) -> ShiftResourceRequest:
@@ -195,6 +215,12 @@ class RejectResourceRequestHandler:
                 now=now,
             )
             await self._resource_requests.update(request)
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=request.shift_id,
+                reason="Resource request status changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()

@@ -135,6 +135,14 @@ class FakeOutboxRepo:
         self.data[message.oid] = message
 
 
+class FakeShiftReportRepo:
+    async def list_by_shift(self, shift_id: UUID) -> list:
+        return []
+
+    async def update(self, report) -> None:
+        return None
+
+
 def test_process_reservation_outbox_dispatches_participant_check_request() -> None:
     async def scenario() -> None:
         now = now_utc()
@@ -290,6 +298,7 @@ def test_participant_check_failed_marks_participant_failed() -> None:
             transaction_manager=tx,
             clock=FakeClock(now),
             shift_participants=repo,
+            shift_reports=FakeShiftReportRepo(),
             shift_participant_service=ShiftParticipantService(),
         )
 
@@ -398,6 +407,7 @@ def test_resource_reserved_event_marks_request_reserved_and_publishes_domain_eve
             clock=FakeClock(now),
             publisher=publisher,
             resource_requests=repo,
+            shift_reports=FakeShiftReportRepo(),
             resource_request_service=ResourceRequestService(),
         )
 

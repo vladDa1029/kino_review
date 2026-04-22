@@ -7,7 +7,7 @@
 
 ## Mission
 
-- Keep `project` responsible for projects, shifts, participants, resource requests, workflow state, and reservation outbox orchestration.
+- Keep `project` responsible for projects, shifts, participants, reports, resource requests, workflow state, and reservation outbox orchestration.
 
 ## Hard Boundaries
 
@@ -21,6 +21,7 @@
 - Reservation status change: update domain enums, serializers, state queries, broker consumers, docs, and regression tests.
 - Outbox flow change: update outbox writer, poller, event consumers, docs, and interservice tests.
 - Approval-state request/reply change: update broker consumers, reply payloads, token-state matching assumptions, docs, and tests.
+- Shift report generation change: update `ShiftReport` persistence, taskiq worker, snapshot request/reply contracts, renderer, storage metadata, docs, and tests together.
 - User-service contract change: update ACL client, schemas, dependent handlers, docs, and integration coverage.
 
 ## Known Traps
@@ -29,10 +30,12 @@
 - Mixing raw enum ints and `.name` assumptions.
 - Reintroducing direct HTTP for user existence or approval-state rechecks.
 - Pulling user-owned resource logic into project-owned persistence or domain services.
+- Reusing the shared document table as the source of truth for generated shift reports.
 
 ## Validation
 
 - Run [tests/test_project_management_service.py](tests/test_project_management_service.py).
 - Run [tests/test_reservation_event_flow.py](tests/test_reservation_event_flow.py).
 - Run [tests/test_user_service_http_contract.py](tests/test_user_service_http_contract.py).
+- Run [tests/test_report_snapshot_contract.py](tests/test_report_snapshot_contract.py) for report snapshot request/reply changes.
 - Run [tests/test_runtime_regressions.py](tests/test_runtime_regressions.py) for serialization or workflow fixes.

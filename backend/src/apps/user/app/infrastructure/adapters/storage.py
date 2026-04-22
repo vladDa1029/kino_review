@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError
 
 from app.application.ports.storage import FileStorage, StoredObject
 from app.config import StorageSettings
@@ -21,6 +23,15 @@ from app.infrastructure.errors.storage import (
     StorageStreamError,
     StorageUploadError,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class StorageStartupResult:
+    backend: str
+    bucket: str
+    bucket_created: bool
+    endpoint_url: str | None = None
+    local_path: Path | None = None
 
 
 class LocalFileStorage(FileStorage):
@@ -185,3 +196,81 @@ def create_file_storage(settings: StorageSettings) -> FileStorage:
         "s3", **{k: v for k, v in client_kwargs.items() if v is not None}
     )
     return S3FileStorage(client, settings.bucket)
+
+
+async def prepare_file_storage(settings: StorageSettings) -> StorageStartupResult:
+    if settings.backend == "local":
+        bucket_path = (settings.local_root / settings.bucket).resolve()
+        bucket_exists = bucket_path.exists()
+        await asyncio.to_thread(bucket_path.mkdir, parents=True, exist_ok=True)
+        return StorageStartupResult(
+            backend=settings.backend,
+            bucket=settings.bucket,
+            bucket_created=not bucket_exists,
+            local_path=bucket_path,
+        )
+
+    client_kwargs: dict[str, object] = {
+        "region_name": settings.s3_region,
+        "aws_access_key_id": settings.s3_access_key,
+        "aws_secret_access_key": settings.s3_secret_key,
+        "endpoint_url": settings.s3_endpoint_url,
+        "use_ssl": settings.s3_use_ssl,
+    }
+    client = boto3.client(
+        "s3", **{k: v for k, v in client_kwargs.items() if v is not None}
+    )
+
+    try:
+        bucket_created = await _ensure_remote_bucket(client, settings)
+    finally:
+        close = getattr(client, "close", None)
+        if callable(close):
+            await asyncio.to_thread(close)
+
+    return StorageStartupResult(
+        backend=settings.backend,
+        bucket=settings.bucket,
+        bucket_created=bucket_created,
+        endpoint_url=settings.s3_endpoint_url,
+    )
+
+
+async def _ensure_remote_bucket(client: Any, settings: StorageSettings) -> bool:
+    try:
+        await asyncio.to_thread(client.head_bucket, Bucket=settings.bucket)
+        return False
+    except ClientError as exc:
+        if not _is_missing_bucket_error(exc):
+            raise RuntimeError(f"Storage connectivity check failed: {exc}") from exc
+
+    try:
+        await asyncio.to_thread(client.create_bucket, **_create_bucket_kwargs(settings))
+        return True
+    except ClientError as exc:
+        if _is_existing_bucket_error(exc):
+            return False
+        raise RuntimeError(f"Storage bucket creation failed: {exc}") from exc
+
+
+def _create_bucket_kwargs(settings: StorageSettings) -> dict[str, object]:
+    kwargs: dict[str, object] = {"Bucket": settings.bucket}
+    if settings.s3_region and settings.s3_region != "us-east-1":
+        kwargs["CreateBucketConfiguration"] = {
+            "LocationConstraint": settings.s3_region,
+        }
+    return kwargs
+
+
+def _is_missing_bucket_error(exc: ClientError) -> bool:
+    error = exc.response.get("Error", {})
+    code = str(error.get("Code", ""))
+    status_code = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    return code in {"404", "NoSuchBucket", "NotFound"} or status_code == 404
+
+
+def _is_existing_bucket_error(exc: ClientError) -> bool:
+    error = exc.response.get("Error", {})
+    code = str(error.get("Code", ""))
+    status_code = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    return code in {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"} or status_code == 409

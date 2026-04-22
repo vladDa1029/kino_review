@@ -81,6 +81,7 @@ from app.application.queries.equipment_free_times import (
     ListSoundFreeTimesHandler,
 )
 from app.application.queries.users import GetUserExistsHandler
+from app.application.queries.report_snapshot import ProvideShiftReportSnapshotHandler
 from app.application.queries.spare_times import (
     GetUserSpareTimeHandler,
     ListUserSpareTimesHandler,
@@ -352,6 +353,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=GetRequisiteImageHandler)
     provider.provide(source=GetDescriptionHandler)
     provider.provide(source=GetUserExistsHandler)
+    provider.provide(source=ProvideShiftReportSnapshotHandler)
     provider.provide(source=ListMicrofonFreeTimesHandler)
     provider.provide(source=ListCameraFreeTimesHandler)
     provider.provide(source=ListCameraTripodFreeTimesHandler)

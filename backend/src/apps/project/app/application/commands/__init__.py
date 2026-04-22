@@ -2,6 +2,14 @@ from app.application.commands.documents import (
     UploadShiftDocumentCommand,
     UploadShiftDocumentHandler,
 )
+from app.application.commands.reports import (
+    ArchiveShiftReportCommand,
+    ArchiveShiftReportHandler,
+    GenerateShiftReportCommand,
+    GenerateShiftReportHandler,
+    ProcessShiftReportGenerationCommand,
+    ProcessShiftReportGenerationHandler,
+)
 from app.application.commands.reservation_events import (
     HandleParticipantReservationCheckFailedCommand,
     HandleParticipantReservationCheckFailedHandler,
@@ -87,6 +95,12 @@ __all__ = [
     "DeclineShiftParticipantHandler",
     "UploadShiftDocumentCommand",
     "UploadShiftDocumentHandler",
+    "GenerateShiftReportCommand",
+    "GenerateShiftReportHandler",
+    "ArchiveShiftReportCommand",
+    "ArchiveShiftReportHandler",
+    "ProcessShiftReportGenerationCommand",
+    "ProcessShiftReportGenerationHandler",
     "ProcessReservationOutboxHandler",
     "HandleParticipantReservationCheckSucceededCommand",
     "HandleParticipantReservationCheckSucceededHandler",

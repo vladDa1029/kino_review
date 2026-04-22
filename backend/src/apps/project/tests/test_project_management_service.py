@@ -10,6 +10,14 @@ from app.application.commands.participants import (
     InviteShiftParticipantCommand,
     InviteShiftParticipantHandler,
 )
+from app.application.commands.reports import (
+    ArchiveShiftReportCommand,
+    ArchiveShiftReportHandler,
+    GenerateShiftReportCommand,
+    GenerateShiftReportHandler,
+    ProcessShiftReportGenerationCommand,
+    ProcessShiftReportGenerationHandler,
+)
 from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
 from app.application.commands.projects import (
     ApproveProjectMemberInvitationCommand,
@@ -25,11 +33,23 @@ from app.application.commands.projects import (
     UpdateProjectCommand,
     UpdateProjectHandler,
 )
+from app.application.commands.resources import (
+    ApproveResourceRequestCommand,
+    ApproveResourceRequestHandler,
+    CreateResourceRequestCommand,
+    CreateResourceRequestHandler,
+)
 from app.application.ports.domain import (
     StoredFile,
     UserResourceItem,
     UserResourceTimeWindow,
 )
+from app.application.ports.reporting import (
+    ShiftReportSnapshot,
+    ShiftReportResourceDetails,
+    ShiftReportUserDetails,
+)
+from app.application.ports.tasks import ScheduleShiftReportGenerationCommand
 from app.application.queries.documents import (
     GetDocumentDownloadUrlHandler,
     GetDocumentDownloadUrlQuery,
@@ -56,6 +76,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReport,
     ShiftResourceRequest,
 )
 from app.domain.enums import (
@@ -64,7 +85,10 @@ from app.domain.enums import (
     ProjectMemberStatus,
     ProjectRole,
     ProjectStatus,
+    ResourceRequestStatus,
     ShiftParticipantStatus,
+    ShiftReportActualityStatus,
+    ShiftReportGenerationStatus,
     ShiftStatus,
 )
 from app.domain.errors.business import AccessDeniedError, EntityNotFoundError, StateTransitionError
@@ -154,10 +178,17 @@ class FakeUserService:
 
 
 class FakeStorage:
-    async def upload(self, *, filename: str, content: bytes, content_type: str) -> StoredFile:
+    async def upload(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        storage_key: str | None = None,
+    ) -> StoredFile:
         return StoredFile(
             bucket="bucket",
-            storage_key=f"key-{filename}",
+            storage_key=storage_key or f"key-{filename}",
             size=len(content),
             mime_type=content_type,
         )
@@ -258,6 +289,9 @@ class InMemoryParticipantRepo:
     async def get_by_shift_and_user(self, shift_id: UUID, user_id: UUID) -> ShiftParticipant | None:
         return self.by_shift_user.get((shift_id, user_id))
 
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftParticipant]:
+        return [item for item in self.by_id.values() if item.shift_id == shift_id]
+
     async def update(self, participant: ShiftParticipant) -> None:
         self.by_id[participant.oid] = participant
         self.by_shift_user[(participant.shift_id, participant.user_id)] = participant
@@ -273,6 +307,13 @@ class InMemoryDocumentRepo:
     async def get_by_id(self, document_id: UUID) -> Document | None:
         return self.data.get(document_id)
 
+    async def list_by_shift(self, shift_id: UUID) -> list[Document]:
+        return [
+            document
+            for document in self.data.values()
+            if document.shift_id == shift_id
+        ]
+
     async def update(self, document: Document) -> None:
         self.data[document.oid] = document
 
@@ -286,6 +327,9 @@ class InMemoryResourceRequestRepo:
 
     async def get_by_id(self, request_id: UUID) -> ShiftResourceRequest | None:
         return self.data.get(request_id)
+
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftResourceRequest]:
+        return [item for item in self.data.values() if item.shift_id == shift_id]
 
     async def update(self, request: ShiftResourceRequest) -> None:
         self.data[request.oid] = request
@@ -312,6 +356,71 @@ class InMemoryReservationOutboxRepo:
         self.data[message.oid] = message
 
 
+class InMemoryShiftReportRepo:
+    def __init__(self) -> None:
+        self.data: dict[UUID, ShiftReport] = {}
+
+    async def add(self, report: ShiftReport) -> None:
+        self.data[report.oid] = report
+
+    async def get_by_id(self, report_id: UUID) -> ShiftReport | None:
+        return self.data.get(report_id)
+
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftReport]:
+        reports = [report for report in self.data.values() if report.shift_id == shift_id]
+        reports.sort(key=lambda item: item.version)
+        return reports
+
+    async def update(self, report: ShiftReport) -> None:
+        self.data[report.oid] = report
+
+
+class FakeShiftReportTaskDispatcher:
+    def __init__(self) -> None:
+        self.commands: list[ScheduleShiftReportGenerationCommand] = []
+
+    async def schedule_generation(self, command: ScheduleShiftReportGenerationCommand) -> None:
+        self.commands.append(command)
+
+
+class FakeShiftReportSnapshot:
+    def __init__(self, *, fail: Exception | None = None) -> None:
+        self.fail = fail
+        self.calls: list[dict[str, object]] = []
+        self.snapshot = ShiftReportSnapshot(users=(), resources=())
+
+    async def fetch_snapshot(
+        self,
+        *,
+        report_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        participants,
+        resources,
+    ) -> ShiftReportSnapshot:
+        self.calls.append(
+            {
+                "report_id": report_id,
+                "project_id": project_id,
+                "shift_id": shift_id,
+                "participants": participants,
+                "resources": resources,
+            }
+        )
+        if self.fail is not None:
+            raise self.fail
+        return self.snapshot
+
+
+class FakeShiftReportRenderer:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def render(self, **payload) -> bytes:
+        self.calls.append(payload)
+        return b"fake-xlsx"
+
+
 def build_context(
     *,
     fail_reserve_user: bool = False,
@@ -327,6 +436,7 @@ def build_context(
     documents = InMemoryDocumentRepo()
     requests = InMemoryResourceRequestRepo()
     reservation_outbox = InMemoryReservationOutboxRepo()
+    shift_reports = InMemoryShiftReportRepo()
     storage = FakeStorage()
     clock = SystemClock()
     reservation_processor = ProcessReservationOutboxHandler(
@@ -356,6 +466,7 @@ def build_context(
         reservation_outbox=reservation_outbox,
         shifts=shifts,
         shift_participants=participants,
+        shift_reports=shift_reports,
         shift_participant_service=ShiftParticipantService(),
     )
     get_document_url_handler = GetDocumentDownloadUrlHandler(
@@ -555,6 +666,7 @@ def test_invite_shift_participant_still_checks_participant_user_exists() -> None
             project_members=members,
             shifts=shifts,
             shift_participants=participants,
+            shift_reports=InMemoryShiftReportRepo(),
             shift_participant_service=ShiftParticipantService(),
         )
 
@@ -1504,5 +1616,858 @@ def test_get_project_query_requires_active_member() -> None:
             )
         )
         assert result.oid == project_id
+
+    asyncio.run(scenario())
+
+
+def build_report_generation_context():
+    tx = FakeTx()
+    publisher = FakePublisher()
+    projects = InMemoryProjectRepo()
+    members = InMemoryProjectMemberRepo()
+    shifts = InMemoryShiftRepo()
+    participants = InMemoryParticipantRepo()
+    requests = InMemoryResourceRequestRepo()
+    reports = InMemoryShiftReportRepo()
+    storage = FakeStorage()
+    snapshot = FakeShiftReportSnapshot()
+    renderer = FakeShiftReportRenderer()
+    dispatcher = FakeShiftReportTaskDispatcher()
+    clock = SystemClock()
+    id_generator = FakeIdGenerator()
+
+    generate_handler = GenerateShiftReportHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=id_generator,
+        project_members=members,
+        shifts=shifts,
+        shift_reports=reports,
+        task_dispatcher=dispatcher,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+    process_handler = ProcessShiftReportGenerationHandler(
+        transaction_manager=tx,
+        clock=clock,
+        projects=projects,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        shift_reports=reports,
+        shift_report_snapshot=snapshot,
+        report_renderer=renderer,
+        document_storage=storage,
+        snapshot_retry_count=2,
+        snapshot_retry_delay_seconds=0,
+    )
+    archive_handler = ArchiveShiftReportHandler(
+        transaction_manager=tx,
+        clock=clock,
+        project_members=members,
+        shifts=shifts,
+        shift_reports=reports,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+
+    return {
+        "tx": tx,
+        "publisher": publisher,
+        "projects": projects,
+        "members": members,
+        "shifts": shifts,
+        "participants": participants,
+        "requests": requests,
+        "reports": reports,
+        "storage": storage,
+        "snapshot": snapshot,
+        "renderer": renderer,
+        "dispatcher": dispatcher,
+        "generate_handler": generate_handler,
+        "process_handler": process_handler,
+        "archive_handler": archive_handler,
+    }
+
+
+def test_generate_shift_report_creates_pending_version_and_schedules_task() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+
+        await ctx["projects"].add(
+            Project(
+                oid=project_id,
+                title="Reports",
+                description="Desc",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Approved shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        report = await ctx["generate_handler"](
+            GenerateShiftReportCommand(
+                shift_id=shift_id,
+                actor_user_id=director_id,
+            )
+        )
+
+        assert report.version == 1
+        assert report.generation_status == ShiftReportGenerationStatus.PENDING
+        assert ctx["dispatcher"].commands[0].report_id == report.oid
+        assert await ctx["reports"].get_by_id(report.oid) is not None
+
+    asyncio.run(scenario())
+
+
+def test_generate_shift_report_rejects_second_in_progress_report() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+
+        await ctx["projects"].add(
+            Project(
+                oid=project_id,
+                title="Reports",
+                description="Desc",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Approved shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["reports"].add(
+            ShiftReport(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.RENDERING,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name=None,
+                bucket=None,
+                storage_key=None,
+                mime_type=None,
+                generated_at=None,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        with pytest.raises(StateTransitionError):
+            await ctx["generate_handler"](
+                GenerateShiftReportCommand(
+                    shift_id=shift_id,
+                    actor_user_id=director_id,
+                )
+            )
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_report_generation_builds_xlsx_and_marks_report_ready() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        participant_user_id = uuid4()
+        external_owner_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        report_id = uuid4()
+        resource_id = uuid4()
+
+        await ctx["projects"].add(
+            Project(
+                oid=project_id,
+                title="Feature film",
+                description="Desc",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Night shoot",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=4),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=participant_user_id,
+                role=ProjectRole.ACTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["participants"].add(
+            ShiftParticipant(
+                oid=uuid4(),
+                shift_id=shift_id,
+                user_id=participant_user_id,
+                role=ProjectRole.ACTOR,
+                time_from=now,
+                time_to=now + timedelta(hours=2),
+                status=ShiftParticipantStatus.RESERVED,
+                added_by=director_id,
+                created_at=now,
+                updated_at=now,
+                user_reservation_id=uuid4(),
+            )
+        )
+        await ctx["requests"].add(
+            ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift_id,
+                resource_type="camera",
+                resource_id=resource_id,
+                resource_owner_user_id=external_owner_id,
+                requested_by_user_id=director_id,
+                time_from=now,
+                time_to=now + timedelta(hours=2),
+                status=ResourceRequestStatus.RESERVED,
+                created_at=now,
+                updated_at=now,
+                resource_reservation_id=uuid4(),
+            )
+        )
+        await ctx["reports"].add(
+            ShiftReport(
+                oid=report_id,
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.PENDING,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name=None,
+                bucket=None,
+                storage_key=None,
+                mime_type=None,
+                generated_at=None,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        ctx["snapshot"].snapshot = ShiftReportSnapshot(
+            users=(
+                ShiftReportUserDetails(
+                    user_id=participant_user_id,
+                    username="Ivan Ivanov",
+                    phone="+79990001122",
+                    email="ivan@example.com",
+                ),
+                ShiftReportUserDetails(
+                    user_id=external_owner_id,
+                    username="Owner",
+                    phone=None,
+                    email="owner@example.com",
+                ),
+            ),
+            resources=(
+                ShiftReportResourceDetails(
+                    resource_id=resource_id,
+                    owner_user_id=external_owner_id,
+                    title="Sony A7",
+                    resource_type="mirrorless",
+                    description="Main camera",
+                    size=None,
+                ),
+            ),
+        )
+
+        await ctx["process_handler"](
+            ProcessShiftReportGenerationCommand(
+                report_id=report_id,
+            )
+        )
+
+        report = await ctx["reports"].get_by_id(report_id)
+        assert report is not None
+        assert report.generation_status == ShiftReportGenerationStatus.READY
+        assert report.file_name is not None and report.file_name.endswith(".xlsx")
+        assert report.storage_key is not None and report.storage_key.startswith("reports/")
+        assert report.mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert len(ctx["snapshot"].calls) == 1
+        assert len(ctx["renderer"].calls) == 1
+        render_call = ctx["renderer"].calls[0]
+        assert render_call["participants"][0]["username"] == "Ivan Ivanov"
+        assert render_call["external_owner_sections"][0]["owner_display_name"] == "Owner"
+        assert render_call["external_owner_sections"][0]["resources"][0]["title"] == "Sony A7"
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_report_generation_uses_placeholders_for_missing_snapshot_fields() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        participant_user_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        report_id = uuid4()
+        resource_id = uuid4()
+
+        await ctx["projects"].add(
+            Project(
+                oid=project_id,
+                title="Feature film",
+                description="Desc",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Night shoot",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=4),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=participant_user_id,
+                role=ProjectRole.CAMERA,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["participants"].add(
+            ShiftParticipant(
+                oid=uuid4(),
+                shift_id=shift_id,
+                user_id=participant_user_id,
+                role=ProjectRole.CAMERA,
+                time_from=now,
+                time_to=now + timedelta(hours=2),
+                status=ShiftParticipantStatus.CONFIRMED,
+                added_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["requests"].add(
+            ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift_id,
+                resource_type="camera",
+                resource_id=resource_id,
+                resource_owner_user_id=participant_user_id,
+                requested_by_user_id=director_id,
+                time_from=now,
+                time_to=now + timedelta(hours=2),
+                status=ResourceRequestStatus.RESERVED,
+                created_at=now,
+                updated_at=now,
+                resource_reservation_id=uuid4(),
+            )
+        )
+        await ctx["reports"].add(
+            ShiftReport(
+                oid=report_id,
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.PENDING,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name=None,
+                bucket=None,
+                storage_key=None,
+                mime_type=None,
+                generated_at=None,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        await ctx["process_handler"](
+            ProcessShiftReportGenerationCommand(
+                report_id=report_id,
+            )
+        )
+
+        render_call = ctx["renderer"].calls[0]
+        assert render_call["participants"][0]["username"] == "Неизвестный пользователь"
+        assert render_call["participants"][0]["phone"] == "Телефон не указан"
+        assert render_call["owner_sections"][0]["resources"][0]["description"] == "Описание не указано"
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_report_generation_marks_failed_after_snapshot_error() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        report_id = uuid4()
+
+        await ctx["projects"].add(
+            Project(
+                oid=project_id,
+                title="Feature film",
+                description="Desc",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Night shoot",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=4),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["reports"].add(
+            ShiftReport(
+                oid=report_id,
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.PENDING,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name=None,
+                bucket=None,
+                storage_key=None,
+                mime_type=None,
+                generated_at=None,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        ctx["snapshot"].fail = RuntimeError("broker failed")
+
+        await ctx["process_handler"](
+            ProcessShiftReportGenerationCommand(
+                report_id=report_id,
+            )
+        )
+
+        report = await ctx["reports"].get_by_id(report_id)
+        assert report is not None
+        assert report.generation_status == ShiftReportGenerationStatus.FAILED
+        assert report.error_message is not None
+        assert "broker failed" in report.error_message
+
+    asyncio.run(scenario())
+
+
+def test_archive_shift_report_sets_archived_status() -> None:
+    async def scenario() -> None:
+        ctx = build_report_generation_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        report_id = uuid4()
+
+        await ctx["shifts"].add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Approved shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.APPROVED,
+                created_by=director_id,
+                approved_by=director_id,
+                approved_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["members"].add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await ctx["reports"].add(
+            ShiftReport(
+                oid=report_id,
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.READY,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name="report.xlsx",
+                bucket="bucket",
+                storage_key="reports/report.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                generated_at=now,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        archived = await ctx["archive_handler"](
+            ArchiveShiftReportCommand(
+                report_id=report_id,
+                actor_user_id=director_id,
+            )
+        )
+
+        assert archived.generation_status == ShiftReportGenerationStatus.ARCHIVED
+        assert archived.archived_at is not None
+
+    asyncio.run(scenario())
+
+
+def test_confirm_participant_marks_ready_reports_stale() -> None:
+    async def scenario() -> None:
+        tx = FakeTx()
+        clock = SystemClock()
+        publisher = FakePublisher()
+        reservation_outbox = InMemoryReservationOutboxRepo()
+        shifts = InMemoryShiftRepo()
+        participants = InMemoryParticipantRepo()
+        reports = InMemoryShiftReportRepo()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        participant_id = uuid4()
+        user_id = uuid4()
+
+        await shifts.add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.DRAFT,
+                created_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await participants.add(
+            ShiftParticipant(
+                oid=participant_id,
+                shift_id=shift_id,
+                user_id=user_id,
+                role=ProjectRole.ACTOR,
+                time_from=now,
+                time_to=now + timedelta(hours=1),
+                status=ShiftParticipantStatus.INVITED,
+                added_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await reports.add(
+            ShiftReport(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.READY,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name="report.xlsx",
+                bucket="bucket",
+                storage_key="reports/report.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                generated_at=now,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        handler = ConfirmShiftParticipantHandler(
+            transaction_manager=tx,
+            clock=clock,
+            publisher=publisher,
+            reservation_outbox=reservation_outbox,
+            shifts=shifts,
+            shift_participants=participants,
+            shift_reports=reports,
+            shift_participant_service=ShiftParticipantService(),
+        )
+
+        await handler(
+            ConfirmShiftParticipantCommand(
+                participant_id=participant_id,
+                actor_user_id=user_id,
+            )
+        )
+
+        report = (await reports.list_by_shift(shift_id))[0]
+        assert report.actuality_status == ShiftReportActualityStatus.STALE
+        assert report.stale_reason == "Participant status changed."
+
+    asyncio.run(scenario())
+
+
+def test_create_resource_request_marks_ready_reports_stale() -> None:
+    async def scenario() -> None:
+        tx = FakeTx()
+        clock = SystemClock()
+        publisher = FakePublisher()
+        project_members = InMemoryProjectMemberRepo()
+        shifts = InMemoryShiftRepo()
+        requests = InMemoryResourceRequestRepo()
+        reports = InMemoryShiftReportRepo()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+
+        await shifts.add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.DRAFT,
+                created_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await project_members.add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await reports.add(
+            ShiftReport(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.READY,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=director_id,
+                file_name="report.xlsx",
+                bucket="bucket",
+                storage_key="reports/report.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                generated_at=now,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        handler = CreateResourceRequestHandler(
+            transaction_manager=tx,
+            clock=clock,
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            project_members=project_members,
+            shifts=shifts,
+            resource_requests=requests,
+            shift_reports=reports,
+            resource_request_service=ResourceRequestService(),
+        )
+
+        await handler(
+            CreateResourceRequestCommand(
+                shift_id=shift_id,
+                actor_user_id=director_id,
+                resource_type="camera",
+                resource_id=uuid4(),
+                resource_owner_user_id=uuid4(),
+                time_from=now,
+                time_to=now + timedelta(hours=1),
+            )
+        )
+
+        report = (await reports.list_by_shift(shift_id))[0]
+        assert report.actuality_status == ShiftReportActualityStatus.STALE
+        assert report.stale_reason == "Resource request composition changed."
 
     asyncio.run(scenario())

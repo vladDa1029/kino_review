@@ -32,6 +32,10 @@ from app.application.queries.equipment_free_times import (
     ListSoundFreeTimesQuery,
 )
 from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
+from app.application.queries.report_snapshot import (
+    ProvideShiftReportSnapshotHandler,
+    ProvideShiftReportSnapshotQuery,
+)
 from app.application.queries.spare_times import (
     GetUserSpareTimeHandler,
     GetUserSpareTimeQuery,
@@ -53,6 +57,8 @@ __all__ = [
     "GetDescriptionQuery",
     "GetUserExistsHandler",
     "GetUserExistsQuery",
+    "ProvideShiftReportSnapshotHandler",
+    "ProvideShiftReportSnapshotQuery",
     "ListMicrofonFreeTimesQuery",
     "ListMicrofonFreeTimesHandler",
     "ListCameraFreeTimesQuery",

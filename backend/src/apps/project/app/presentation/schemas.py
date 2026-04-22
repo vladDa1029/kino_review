@@ -13,9 +13,15 @@ from app.domain.entities import (
     ProjectMember,
     Shift,
     ShiftParticipant,
+    ShiftReport,
     ShiftResourceRequest,
 )
-from app.domain.enums import DocumentType, ProjectRole
+from app.domain.enums import (
+    DocumentType,
+    ProjectRole,
+    ShiftReportActualityStatus,
+    ShiftReportGenerationStatus,
+)
 
 
 class ProjectRoleInput(StrEnum):
@@ -363,6 +369,68 @@ class DocumentDownloadUrlResponse(BaseModel):
     download_url: str
 
 
+class ReportResponse(BaseModel):
+    oid: UUID
+    project_id: UUID
+    shift_id: UUID
+    version: int
+    generation_status: int
+    generation_status_name: str
+    actuality_status: int
+    actuality_status_name: str
+    requested_by_user_id: UUID
+    file_name: str | None
+    bucket: str | None
+    storage_key: str | None
+    mime_type: str | None
+    generated_at: datetime | None
+    archived_at: datetime | None
+    error_message: str | None
+    stale_reason: str | None
+    stale_marked_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_entity(cls, report: ShiftReport) -> "ReportResponse":
+        generation_status = (
+            report.generation_status
+            if isinstance(report.generation_status, ShiftReportGenerationStatus)
+            else ShiftReportGenerationStatus(int(report.generation_status))
+        )
+        actuality_status = (
+            report.actuality_status
+            if isinstance(report.actuality_status, ShiftReportActualityStatus)
+            else ShiftReportActualityStatus(int(report.actuality_status))
+        )
+        return cls(
+            oid=report.oid,
+            project_id=report.project_id,
+            shift_id=report.shift_id,
+            version=report.version,
+            generation_status=int(generation_status),
+            generation_status_name=generation_status.name,
+            actuality_status=int(actuality_status),
+            actuality_status_name=actuality_status.name,
+            requested_by_user_id=report.requested_by_user_id,
+            file_name=report.file_name,
+            bucket=report.bucket,
+            storage_key=report.storage_key,
+            mime_type=report.mime_type,
+            generated_at=report.generated_at,
+            archived_at=report.archived_at,
+            error_message=report.error_message,
+            stale_reason=report.stale_reason,
+            stale_marked_at=report.stale_marked_at,
+            created_at=report.created_at,
+            updated_at=report.updated_at,
+        )
+
+
+class ReportListResponse(BaseModel):
+    items: list[ReportResponse]
+
+
 class BrokerProjectMemberInvitationApproved(BaseModel):
     project_id: UUID
     user_id: UUID
@@ -461,3 +529,59 @@ class BrokerShiftResourceRequestApprovalStateRequested(BaseModel):
     correlation_id: UUID
     reply_topic: str
     resource_request_id: UUID
+
+
+class BrokerShiftReportParticipantContext(BaseModel):
+    participant_id: UUID
+    user_id: UUID
+    project_role: str
+    shift_role: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftReportResourceContext(BaseModel):
+    resource_request_id: UUID
+    resource_id: UUID
+    owner_user_id: UUID
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftReportSnapshotRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    report_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participants: list[BrokerShiftReportParticipantContext]
+    resources: list[BrokerShiftReportResourceContext]
+
+
+class BrokerShiftReportUserDetails(BaseModel):
+    user_id: UUID
+    username: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class BrokerShiftReportResourceDetails(BaseModel):
+    resource_id: UUID
+    owner_user_id: UUID
+    title: str | None = None
+    resource_type: str | None = None
+    description: str | None = None
+    size: str | None = None
+
+
+class BrokerShiftReportSnapshotReply(BaseModel):
+    correlation_id: UUID
+    response_type: Literal[
+        "shift.report_snapshot_provided",
+        "shift.report_snapshot_failed",
+    ]
+    report_id: UUID
+    users: list[BrokerShiftReportUserDetails] = Field(default_factory=list)
+    resources: list[BrokerShiftReportResourceDetails] = Field(default_factory=list)
+    reason: str | None = None

@@ -23,6 +23,14 @@ from app.application.queries.resources import (
     ListProjectMembersHandler,
     ListProjectMembersQuery,
 )
+from app.application.queries.reports import (
+    GetReportDownloadUrlHandler,
+    GetReportDownloadUrlQuery,
+    GetReportHandler,
+    GetReportQuery,
+    ListShiftReportsHandler,
+    ListShiftReportsQuery,
+)
 
 __all__ = [
     "HealthHandler",
@@ -33,6 +41,12 @@ __all__ = [
     "GetResourceApprovalStateHandler",
     "GetDocumentDownloadUrlQuery",
     "GetDocumentDownloadUrlHandler",
+    "ListShiftReportsQuery",
+    "ListShiftReportsHandler",
+    "GetReportQuery",
+    "GetReportHandler",
+    "GetReportDownloadUrlQuery",
+    "GetReportDownloadUrlHandler",
     "GetProjectQuery",
     "GetProjectHandler",
     "ListActorProjectsQuery",

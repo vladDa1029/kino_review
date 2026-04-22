@@ -14,9 +14,11 @@ from app.application.ports.domain import (
     ProjectMemberRepository,
     ReservationOutboxRepository,
     ShiftParticipantRepository,
+    ShiftReportRepository,
     ShiftRepository,
     UserServicePort,
 )
+from app.application.reports_support import mark_shift_reports_stale
 from app.application.ports.transaction import TransactionManager
 from app.application.support import (
     get_actor_member,
@@ -51,6 +53,7 @@ class InviteShiftParticipantHandler:
         project_members: ProjectMemberRepository,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
@@ -61,6 +64,7 @@ class InviteShiftParticipantHandler:
         self._project_members = project_members
         self._shifts = shifts
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: InviteShiftParticipantCommand) -> ShiftParticipant:
@@ -92,6 +96,12 @@ class InviteShiftParticipantHandler:
                 await self._shift_participants.add(participant)
             else:
                 await self._shift_participants.update(participant)
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=shift.oid,
+                reason="Participant composition changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()
@@ -126,6 +136,7 @@ class ConfirmShiftParticipantHandler:
         reservation_outbox: ReservationOutboxRepository,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
@@ -134,6 +145,7 @@ class ConfirmShiftParticipantHandler:
         self._reservation_outbox = reservation_outbox
         self._shifts = shifts
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: ConfirmShiftParticipantCommand) -> ShiftParticipant:
@@ -163,6 +175,12 @@ class ConfirmShiftParticipantHandler:
                     updated_at=now,
                 )
             )
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=shift.oid,
+                reason="Participant status changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()
@@ -185,12 +203,16 @@ class DeclineShiftParticipantHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
+        shifts: ShiftRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
+        self._shifts = shifts
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: DeclineShiftParticipantCommand) -> ShiftParticipant:
@@ -206,6 +228,13 @@ class DeclineShiftParticipantHandler:
                 now=now,
             )
             await self._shift_participants.update(participant)
+            shift = await require_shift(shifts=self._shifts, shift_id=participant.shift_id)
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=shift.oid,
+                reason="Participant status changed.",
+            )
             await self._tx.commit()
         except Exception:
             await self._tx.rollback()

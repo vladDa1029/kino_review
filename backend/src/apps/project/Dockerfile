@@ -15,4 +15,5 @@ COPY ./app ./app
 COPY alembic.ini ./
 COPY ./migrations ./migrations
 COPY main.py ./
+COPY worker.py ./
 COPY ./run_scripts.sh ./run_scripts.sh  

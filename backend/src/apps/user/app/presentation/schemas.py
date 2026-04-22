@@ -237,6 +237,50 @@ class BrokerShiftResourceRequestApprovalStateReply(BaseModel):
     reason: str | None = None
 
 
+class BrokerShiftReportParticipantContext(BaseModel):
+    participant_id: UUID
+    user_id: UUID
+    project_role: str
+    shift_role: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftReportResourceContext(BaseModel):
+    resource_request_id: UUID
+    resource_id: UUID
+    owner_user_id: UUID
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftReportSnapshotRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    report_id: UUID
+    project_id: UUID
+    shift_id: UUID
+    participants: list[BrokerShiftReportParticipantContext]
+    resources: list[BrokerShiftReportResourceContext]
+
+
+class BrokerShiftReportUserDetails(BaseModel):
+    user_id: UUID
+    username: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class BrokerShiftReportResourceDetails(BaseModel):
+    resource_id: UUID
+    owner_user_id: UUID
+    title: str | None = None
+    resource_type: str | None = None
+    description: str | None = None
+    size: str | None = None
+
+
 class EquipmentListQuery(BaseModel):
     page: int = Field(1, ge=1)
     page_size: int = Field(20, ge=1, le=MAX_PAGE_SIZE)

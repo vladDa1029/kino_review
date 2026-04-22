@@ -25,10 +25,16 @@ poetry install
 poetry run alembic upgrade head
 ```
 
-4. Start the service:
+4. Start the API service:
 
 ```bash
 poetry run uvicorn main:start_app_dev --factory --reload
+```
+
+5. Start the Taskiq worker for generated shift reports:
+
+```bash
+poetry run taskiq worker worker:create_worker_taskiq_app
 ```
 
 By default the OpenAPI UI is available at `http://localhost:8000/docs`.

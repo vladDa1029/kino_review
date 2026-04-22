@@ -5,42 +5,29 @@ from typing import cast
 from uuid import uuid4
 
 import structlog
-from dishka import AsyncContainer, make_async_container
+from dishka import AsyncContainer
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
+from taskiq import AsyncBroker
 
+from app.bootstrap import (
+    create_container,
+    create_message_broker,
+    create_task_manager,
+    declare_api_message_topology,
+)
 from app.config import (
-    DatabaseSettings,
-    Log,
-    Minio,
-    Rabbitmq,
     ReservationOutbox,
-    SQLAlchemySettings,
-    UserService,
     get_settings,
 )
 from app.application.commands import ProcessReservationOutboxHandler
+from app.config import Minio
 from app.domain.errors.base import ApplicationError
 from app.infrastructure.adapters.orm import start_mappers
-from app.infrastructure.broker.consumer import (
-    PROJECT_MEMBER_APPROVED_QUEUE,
-    SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE,
-    SHIFT_PARTICIPANT_RESERVED_QUEUE,
-    SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE,
-    SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE,
-    SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE,
-    USER_EVENTS_EXCHANGE,
-)
-from app.infrastructure.broker.publisher import PROJECT_EVENTS_EXCHANGE
-from app.infrastructure.broker.request_reply import BrokerReplyInbox, build_reply_queue
-from app.ioc import setup_providers
+from app.infrastructure.broker.request_reply import BrokerReplyInbox
+from app.infrastructure.storage.minio import ensure_minio_bucket
 from app.presentation import handlers
 from app.presentation.api import (
     PROJECT_API_DESCRIPTION,
@@ -57,25 +44,17 @@ log = structlog.get_logger(__file__)
 async def lifespan(app: FastAPI):
     broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
     reply_inbox = cast(BrokerReplyInbox, app.state.reply_inbox)
+    minio_settings = cast(Minio, app.state.minio_settings)
+    task_manager = cast(AsyncBroker, app.state.task_manager)
     poll_task: asyncio.Task | None = None
+
+    await _prepare_storage(component="api", settings=minio_settings)
+    await task_manager.startup()
 
     broker_started = False
     try:
         await broker.start()
-        await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
-        await broker.declare_exchange(USER_EVENTS_EXCHANGE)
-        await broker.declare_queue(PROJECT_MEMBER_APPROVED_QUEUE)
-        await broker.declare_queue(build_reply_queue(reply_inbox))
-        await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE)
-        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE)
-        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE)
-        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVED_QUEUE)
-        await broker.declare_queue(SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE)
-        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE)
-        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE)
-        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE)
-        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE)
-        await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE)
+        await declare_api_message_topology(broker, reply_inbox)
         broker_started = True
     except Exception as exc:
         log.warning("RabbitMQ is unavailable, starting without broker", error=str(exc))
@@ -107,7 +86,34 @@ async def lifespan(app: FastAPI):
                 pass
         if broker_started:
             await broker.stop()
+        await task_manager.shutdown()
         await cast(AsyncContainer, app.state.dishka_container).close()
+
+
+async def _prepare_storage(*, component: str, settings: Minio) -> None:
+    try:
+        bucket_created = await ensure_minio_bucket(settings)
+    except Exception:
+        log.exception(
+            "storage.startup.failed",
+            component=component,
+            bucket=settings.bucket,
+            endpoint_url=settings.endpoint_url,
+        )
+        raise
+
+    log.info(
+        "storage.connection.ready",
+        component=component,
+        bucket=settings.bucket,
+        endpoint_url=settings.endpoint_url,
+    )
+    log.info(
+        "storage.bucket.created" if bucket_created else "storage.bucket.ready",
+        component=component,
+        bucket=settings.bucket,
+        endpoint_url=settings.endpoint_url,
+    )
 
 
 def start_app_dev() -> FastAPI:
@@ -166,25 +172,20 @@ def start_app_dev() -> FastAPI:
             )
         return response
 
-    broker = RabbitBroker(url=settings.rabbitmq.url)
+    task_manager = create_task_manager(settings)
     reply_inbox = BrokerReplyInbox(service_name="project")
+    broker = create_message_broker(settings)
     app.state._broker = broker
     app.state.reply_inbox = reply_inbox
     app.state.reservation_outbox = settings.reservation_outbox
+    app.state.minio_settings = settings.minio
+    app.state.task_manager = task_manager
 
-    container: AsyncContainer = make_async_container(
-        *setup_providers(),
-        context={
-            Log: settings.log,
-            DatabaseSettings: settings.db,
-            SQLAlchemySettings: settings.alchemy,
-            Rabbitmq: settings.rabbitmq,
-            UserService: settings.user_service,
-            BrokerReplyInbox: reply_inbox,
-            ReservationOutbox: settings.reservation_outbox,
-            Minio: settings.minio,
-            RabbitBroker: broker,
-        },
+    container: AsyncContainer = create_container(
+        settings,
+        message_broker=broker,
+        task_manager=task_manager,
+        reply_inbox=reply_inbox,
     )
     broker.include_router(create_broker_router(container, reply_inbox))
     setup_dishka(container=container, app=app)
