@@ -5,14 +5,20 @@ import { toast } from 'react-toastify';
 import {
   archiveProject,
   changeProjectMemberRole,
+  approveShift,
   createProject,
+  createShift,
+  declineShiftParticipant,
+  confirmShiftParticipant,
   inviteProjectMember,
+  inviteShiftParticipant,
   listProjectMembers,
   removeProjectMember,
   updateProject,
 } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { useProjectContext } from '../context/useProjectContext';
+import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
 
 const initialForm = {
   title: '',
@@ -22,6 +28,21 @@ const initialForm = {
 const initialMemberForm = {
   userId: '',
   role: 'ACTOR',
+};
+
+const initialShiftForm = {
+  title: '',
+  description: '',
+  startTime: '',
+  endTime: '',
+};
+
+const initialParticipantForm = {
+  shiftId: '',
+  userId: '',
+  role: 'ACTOR',
+  timeFrom: '',
+  timeTo: '',
 };
 
 const roleOptions = [
@@ -43,6 +64,17 @@ const memberStatusLabels = {
   1: 'Неактивен',
 };
 
+const participantStatusLabels = {
+  0: 'Ожидает',
+  1: 'Подтвержден',
+  2: 'Отклонен',
+};
+
+const shiftStatusLabels = {
+  0: 'Черновик',
+  1: 'Подтверждена',
+};
+
 const formatDate = (value) => {
   if (!value) {
     return 'Нет даты';
@@ -59,6 +91,8 @@ const getStatusLabel = (status) => statusLabels[status] || `Статус ${statu
 const getRoleLabel = (role) => roleOptions.find((option) => option.value === role)?.label || role;
 
 const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Статус ${status}`;
+const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
+const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
 
 const getCurrentUserId = (userData) =>
   userData?.user_id ||
@@ -97,6 +131,14 @@ const ProjectListPage = () => {
   const [isInvitingMember, setIsInvitingMember] = useState(false);
   const [updatingMemberId, setUpdatingMemberId] = useState(null);
   const [removingMemberId, setRemovingMemberId] = useState(null);
+  const [shiftForm, setShiftForm] = useState(initialShiftForm);
+  const [projectShifts, setProjectShifts] = useState({});
+  const [participantForm, setParticipantForm] = useState(initialParticipantForm);
+  const [shiftParticipants, setShiftParticipants] = useState({});
+  const [isCreatingShift, setIsCreatingShift] = useState(false);
+  const [approvingShiftId, setApprovingShiftId] = useState(null);
+  const [isInvitingParticipant, setIsInvitingParticipant] = useState(false);
+  const [participantActionId, setParticipantActionId] = useState(null);
 
   const loadProjects = useCallback(async () => {
     await refreshProjects({ includeArchived });
@@ -138,6 +180,21 @@ const ProjectListPage = () => {
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
+
+  useEffect(() => {
+    setParticipantForm((prev) => {
+      const availableShiftIds = new Set((projectShifts[memberProjectId] || []).map((shift) => shift.oid));
+      const nextShiftId = availableShiftIds.has(prev.shiftId)
+        ? prev.shiftId
+        : (projectShifts[memberProjectId] || [])[0]?.oid || '';
+
+      if (prev.shiftId === nextShiftId) {
+        return prev;
+      }
+
+      return { ...prev, shiftId: nextShiftId };
+    });
+  }, [memberProjectId, projectShifts]);
 
   const counters = useMemo(
     () => ({
@@ -187,6 +244,31 @@ const ProjectListPage = () => {
       ...members,
     ];
   }, [memberProject, members]);
+  const selectedProjectShifts = useMemo(
+    () => projectShifts[memberProjectId] || [],
+    [memberProjectId, projectShifts],
+  );
+  const selectedShiftParticipants = useMemo(
+    () => shiftParticipants[participantForm.shiftId] || [],
+    [participantForm.shiftId, shiftParticipants],
+  );
+  const availableParticipantMembers = useMemo(
+    () => displayedMembers.filter((member) => !member.isOwner || member.user_id),
+    [displayedMembers],
+  );
+
+  useEffect(() => {
+    if (!participantForm.userId) {
+      return;
+    }
+
+    const selectedMember = displayedMembers.find((member) => member.user_id === participantForm.userId);
+    if (!selectedMember || selectedMember.role === participantForm.role) {
+      return;
+    }
+
+    setParticipantForm((prev) => ({ ...prev, role: selectedMember.role }));
+  }, [displayedMembers, participantForm.role, participantForm.userId]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -283,6 +365,109 @@ const ProjectListPage = () => {
     setMemberForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleShiftFormChange = (event) => {
+    const { name, value } = event.target;
+    setShiftForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleParticipantFormChange = (event) => {
+    const { name, value } = event.target;
+    setParticipantForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectShiftForParticipants = (shiftId) => {
+    setParticipantForm((prev) => ({
+      ...prev,
+      shiftId,
+      timeFrom: prev.timeFrom || '',
+      timeTo: prev.timeTo || '',
+    }));
+  };
+
+  const handleCreateShift = async (event) => {
+    event.preventDefault();
+
+    const title = shiftForm.title.trim();
+    const startTime = toIsoDateTime(shiftForm.startTime);
+    const endTime = toIsoDateTime(shiftForm.endTime);
+
+    if (!memberProjectId) {
+      toast.error('Сначала выберите проект');
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав создавать смены в этом проекте');
+      return;
+    }
+
+    if (!title || !startTime || !endTime) {
+      toast.error('Заполните название смены, дату начала и дату окончания');
+      return;
+    }
+
+    if (new Date(startTime) >= new Date(endTime)) {
+      toast.error('Время окончания смены должно быть позже времени начала');
+      return;
+    }
+
+    setIsCreatingShift(true);
+
+    try {
+      const createdShift = await createShift(memberProjectId, {
+        title,
+        description: shiftForm.description.trim(),
+        start_time: startTime,
+        end_time: endTime,
+      });
+
+      setProjectShifts((prev) => ({
+        ...prev,
+        [memberProjectId]: [createdShift, ...(prev[memberProjectId] || [])],
+      }));
+      setParticipantForm((prev) => ({
+        ...prev,
+        shiftId: createdShift.oid,
+        timeFrom: shiftForm.startTime,
+        timeTo: shiftForm.endTime,
+      }));
+      setShiftForm(initialShiftForm);
+      toast.success('Смена создана');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось создать смену');
+    } finally {
+      setIsCreatingShift(false);
+    }
+  };
+
+  const handleApproveShift = async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав подтверждать смены в этом проекте');
+      return;
+    }
+
+    setApprovingShiftId(shiftId);
+
+    try {
+      const updatedShift = await approveShift(shiftId);
+      setProjectShifts((prev) => ({
+        ...prev,
+        [memberProjectId]: (prev[memberProjectId] || []).map((shift) =>
+          shift.oid === shiftId ? updatedShift : shift,
+        ),
+      }));
+      toast.success('Смена подтверждена');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось подтвердить смену');
+    } finally {
+      setApprovingShiftId(null);
+    }
+  };
+
   const handleInviteMember = async (event) => {
     event.preventDefault();
 
@@ -316,6 +501,111 @@ const ProjectListPage = () => {
       toast.error(error?.message || 'Не удалось пригласить участника');
     } finally {
       setIsInvitingMember(false);
+    }
+  };
+
+  const handleInviteParticipant = async (event) => {
+    event.preventDefault();
+
+    const userId = participantForm.userId.trim();
+    const timeFrom = toIsoDateTime(participantForm.timeFrom);
+    const timeTo = toIsoDateTime(participantForm.timeTo);
+
+    if (!participantForm.shiftId || !userId || !timeFrom || !timeTo) {
+      toast.error('Выберите смену, участника и укажите время участия');
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав приглашать участников в смену');
+      return;
+    }
+
+    if (new Date(timeFrom) >= new Date(timeTo)) {
+      toast.error('Время окончания участия должно быть позже времени начала');
+      return;
+    }
+
+    setIsInvitingParticipant(true);
+
+    try {
+      const participant = await inviteShiftParticipant(participantForm.shiftId, {
+        user_id: userId,
+        role: participantForm.role,
+        time_from: timeFrom,
+        time_to: timeTo,
+      });
+
+      setShiftParticipants((prev) => ({
+        ...prev,
+        [participantForm.shiftId]: [participant, ...(prev[participantForm.shiftId] || [])],
+      }));
+      setParticipantForm((prev) => ({
+        ...initialParticipantForm,
+        shiftId: prev.shiftId,
+        timeFrom: prev.timeFrom,
+        timeTo: prev.timeTo,
+      }));
+      toast.success('Участник приглашен в смену');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось пригласить участника в смену');
+    } finally {
+      setIsInvitingParticipant(false);
+    }
+  };
+
+  const updateParticipantInState = (shiftId, participantId, nextParticipant) => {
+    setShiftParticipants((prev) => ({
+      ...prev,
+      [shiftId]: (prev[shiftId] || []).map((participant) =>
+        participant.oid === participantId ? nextParticipant : participant,
+      ),
+    }));
+  };
+
+  const handleConfirmParticipant = async (shiftId, participantId) => {
+    if (!participantId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав подтверждать участие в этой смене');
+      return;
+    }
+
+    setParticipantActionId(participantId);
+
+    try {
+      const updatedParticipant = await confirmShiftParticipant(participantId);
+      updateParticipantInState(shiftId, participantId, updatedParticipant);
+      toast.success('Участие подтверждено');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось подтвердить участие');
+    } finally {
+      setParticipantActionId(null);
+    }
+  };
+
+  const handleDeclineParticipant = async (shiftId, participantId) => {
+    if (!participantId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав отклонять участие в этой смене');
+      return;
+    }
+
+    setParticipantActionId(participantId);
+
+    try {
+      const updatedParticipant = await declineShiftParticipant(participantId);
+      updateParticipantInState(shiftId, participantId, updatedParticipant);
+      toast.success('Участие отклонено');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось отклонить участие');
+    } finally {
+      setParticipantActionId(null);
     }
   };
 
@@ -533,6 +823,241 @@ const ProjectListPage = () => {
             })}
         </section>
       </div>
+
+      {false ? (
+      <section className="dashboard-panel project-shifts-panel">
+        <div className="section-heading project-members-heading">
+          <div>
+            <span className="projects-panel-eyebrow">Смены</span>
+            <h2>{memberProject ? `Смены проекта "${memberProject.title}"` : 'Выберите проект'}</h2>
+          </div>
+          <p>Создайте смену, затем пригласите участников с ролью и временным окном работы.</p>
+        </div>
+
+        <form className="project-shift-form" onSubmit={handleCreateShift}>
+          <label className="field-block">
+            <span>Название смены</span>
+            <input
+              name="title"
+              value={shiftForm.title}
+              onChange={handleShiftFormChange}
+              placeholder="Смена первого съемочного дня"
+              disabled={!memberProjectId || isCreatingShift}
+              
+            />
+          </label>
+
+          <label className="field-block">
+            <span>Описание</span>
+            <input
+              name="description"
+              value={shiftForm.description}
+              onChange={handleShiftFormChange}
+              placeholder="Коротко о задачах смены"
+              disabled={!memberProjectId || isCreatingShift}
+            />
+          </label>
+
+          <label className="field-block">
+            <span>Начало</span>
+            <input
+              name="startTime"
+              type="datetime-local"
+              value={shiftForm.startTime}
+              onChange={handleShiftFormChange}
+              disabled={!memberProjectId || isCreatingShift}
+            />
+          </label>
+
+          <label className="field-block">
+            <span>Окончание</span>
+            <input
+              name="endTime"
+              type="datetime-local"
+              value={shiftForm.endTime}
+              onChange={handleShiftFormChange}
+              disabled={!memberProjectId || isCreatingShift}
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="profile-save-btn compact"
+            disabled={!memberProjectId || !canManageMembers || isCreatingShift}
+          >
+            {isCreatingShift ? 'Создаем...' : 'Создать смену'}
+          </button>
+        </form>
+
+        <div className="project-shifts-list">
+          {selectedProjectShifts.length === 0 ? (
+            <p className="helper-note">Смены появятся здесь после создания на этой странице.</p>
+          ) : (
+            selectedProjectShifts.map((shift) => {
+              const isSelectedShift = participantForm.shiftId === shift.oid;
+              const isApproving = approvingShiftId === shift.oid;
+              return (
+                <article
+                  key={shift.oid}
+                  className={`project-shift-card${isSelectedShift ? ' is-active-project' : ''}`}
+                >
+                  <div>
+                    <div className="project-card-meta">
+                      <span className="project-type-label">{getShiftStatusLabel(shift.status)}</span>
+                      <span>Создана: {formatDate(shift.created_at)}</span>
+                    </div>
+                    <h3>{shift.title}</h3>
+                    <p>{shift.description || 'Описание не указано'}</p>
+                    <p>{formatDateTime(shift.start_time)} - {formatDateTime(shift.end_time)}</p>
+                  </div>
+
+                  <div className="project-shift-actions">
+                    <button
+                      type="button"
+                      className="ghost-action-btn"
+                      onClick={() => handleSelectShiftForParticipants(shift.oid)}
+                    >
+                      {isSelectedShift ? 'Выбрана' : 'Выбрать'}
+                    </button>
+                    <button
+                      type="button"
+                      className="profile-save-btn compact"
+                      onClick={() => handleApproveShift(shift.oid)}
+                      disabled={!canManageMembers || isApproving}
+                    >
+                      {isApproving ? 'Подтверждаем...' : 'Подтвердить смену'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <form className="project-participant-form" onSubmit={handleInviteParticipant}>
+          <label className="field-block">
+            <span>Смена</span>
+            <select
+              name="shiftId"
+              value={participantForm.shiftId}
+              onChange={handleParticipantFormChange}
+              disabled={selectedProjectShifts.length === 0 || !canManageMembers}
+            >
+              {selectedProjectShifts.length === 0 ? (
+                <option value="">Нет смен</option>
+              ) : (
+                selectedProjectShifts.map((shift) => (
+                  <option key={shift.oid} value={shift.oid}>
+                    {shift.title}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+
+          <label className="field-block">
+            <span>Участник</span>
+            <select
+              name="userId"
+              value={participantForm.userId}
+              onChange={handleParticipantFormChange}
+              disabled={availableParticipantMembers.length === 0 || !canManageMembers}
+            >
+              <option value="">Выберите участника проекта</option>
+              {availableParticipantMembers.map((member) => (
+                <option key={member.user_id} value={member.user_id}>
+                  {member.user_id} - {getRoleLabel(member.role)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field-block">
+            <span>Роль в смене</span>
+            <select
+              name="role"
+              value={participantForm.role}
+              onChange={handleParticipantFormChange}
+            >
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field-block">
+            <span>С</span>
+            <input
+              name="timeFrom"
+              type="datetime-local"
+              value={participantForm.timeFrom}
+              onChange={handleParticipantFormChange}
+            />
+          </label>
+
+          <label className="field-block">
+            <span>До</span>
+            <input
+              name="timeTo"
+              type="datetime-local"
+              value={participantForm.timeTo}
+              onChange={handleParticipantFormChange}
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="profile-save-btn compact"
+            disabled={!participantForm.shiftId || !canManageMembers || isInvitingParticipant}
+          >
+            {isInvitingParticipant ? 'Приглашаем...' : 'Пригласить в смену'}
+          </button>
+        </form>
+
+        <div className="project-participants-list">
+          {!participantForm.shiftId ? (
+            <p className="helper-note">Выберите смену, чтобы увидеть приглашенных участников.</p>
+          ) : selectedShiftParticipants.length === 0 ? (
+            <p className="helper-note">Для этой смены пока нет приглашенных участников.</p>
+          ) : (
+            selectedShiftParticipants.map((participant) => {
+              const isProcessing = participantActionId === participant.oid;
+              return (
+                <article key={participant.oid} className="project-member-card">
+                  <div>
+                    <span className="project-type-label">{getParticipantStatusLabel(participant.status)}</span>
+                    <h3>{participant.user_id}</h3>
+                    <p>{getRoleLabel(participant.role)}</p>
+                    <p>{formatDateTime(participant.time_from)} - {formatDateTime(participant.time_to)}</p>
+                  </div>
+
+                  <div className="project-member-actions">
+                    <button
+                      type="button"
+                      className="ghost-action-btn"
+                      onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
+                      disabled={!canManageMembers || isProcessing}
+                    >
+                      {isProcessing ? '...' : 'Подтвердить'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-action-btn danger"
+                      onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
+                      disabled={!canManageMembers || isProcessing}
+                    >
+                      {isProcessing ? '...' : 'Отклонить'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+      </section>
+      ) : null}
 
       <section className="dashboard-panel project-members-panel">
         <div className="section-heading project-members-heading">

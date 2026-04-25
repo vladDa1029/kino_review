@@ -1683,7 +1683,46 @@ body:not(.dark-theme) {
   color: var(--text-muted);
 }
 
+.project-shifts-panel,
 .project-members-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.shift-planning-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.shift-planning-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.shift-planning-toolbar .field-block {
+  min-width: min(320px, 100%);
+  flex: 1 1 320px;
+}
+
+.shift-planning-toolbar select {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 76%, transparent);
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+
+.shift-planning-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.shift-planning-card {
   display: grid;
   gap: 1rem;
 }
@@ -1703,10 +1742,33 @@ body:not(.dark-theme) {
   align-items: end;
 }
 
+.project-shift-form,
+.project-participant-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.shift-planning-form,
+.shift-planning-participant-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
 .project-member-invite-form {
   grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.35fr) auto;
 }
 
+.shift-planning-form input,
+.shift-planning-form select,
+.shift-planning-participant-form input,
+.shift-planning-participant-form select,
+.project-shift-form input,
+.project-participant-form input,
+.project-participant-form select,
 .project-members-toolbar select,
 .project-member-invite-form input,
 .project-member-invite-form select,
@@ -1720,11 +1782,19 @@ body:not(.dark-theme) {
   font: inherit;
 }
 
+.shift-planning-submit {
+  min-width: 0;
+  width: 100%;
+}
+
+.project-shifts-list,
+.project-participants-list,
 .project-members-list {
   display: grid;
   gap: 0.75rem;
 }
 
+.project-shift-card,
 .project-member-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1736,17 +1806,20 @@ body:not(.dark-theme) {
   align-items: center;
 }
 
+.project-shift-card h3,
 .project-member-card h3 {
   margin: 0.3rem 0 0;
   font-size: 1rem;
   overflow-wrap: anywhere;
 }
 
+.project-shift-card p,
 .project-member-card p {
   margin: 0.45rem 0 0;
   color: var(--text-muted);
 }
 
+.project-shift-actions,
 .project-member-actions {
   display: flex;
   align-items: end;
@@ -2752,6 +2825,10 @@ body:not(.dark-theme) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .shift-planning-toolbar {
+    align-items: stretch;
+  }
+
   .hero-section,
   .about-container {
     grid-template-columns: 1fr;
@@ -2804,10 +2881,22 @@ body:not(.dark-theme) {
     grid-template-columns: 1fr;
   }
 
+  .shift-planning-toolbar,
+  .shift-planning-form,
+  .shift-planning-participant-form,
+  .project-members-heading,
+  .project-members-toolbar,
+  .project-member-invite-form,
+  .project-shift-card,
+  .project-member-card {
+    grid-template-columns: 1fr;
+  }
+
   .project-card-actions {
     justify-content: flex-start;
   }
 
+  .project-shift-actions,
   .project-member-actions {
     justify-content: flex-start;
   }

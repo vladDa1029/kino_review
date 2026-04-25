@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectListPage from './pages/ProjectListPage';
 import Projects from './pages/Projects';
+import ShiftPlanningPage from './pages/ShiftPlanningPage';
 import { getUserDescription } from './services/api';
 import { ApiError } from './services/httpClient';
 import {
@@ -45,6 +46,15 @@ const WorkspaceIcon = () => (
     <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
     <path d="M3 10H21" stroke="currentColor" strokeWidth="1.8" />
     <path d="M9 20V10" stroke="currentColor" strokeWidth="1.8" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M8 3V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M16 3V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M4 9H20" stroke="currentColor" strokeWidth="1.8" />
   </svg>
 );
 
@@ -290,6 +300,14 @@ function App() {
           )}
         />
         <Route
+          path="/shifts"
+          element={(
+            <ProtectedRoute>
+              <ShiftPlanningPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
           path="/profile"
           element={(
             <ProtectedRoute>
@@ -359,6 +377,15 @@ function App() {
                 >
                   <WorkspaceIcon />
                   <span>Рабочая область</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`app-drawer-link ${location.pathname === '/shifts' ? 'is-active' : ''}`}
+                  onClick={() => handleMenuNavigation('/shifts')}
+                >
+                  <CalendarIcon />
+                  <span>Смены</span>
                 </button>
 
                 <button
