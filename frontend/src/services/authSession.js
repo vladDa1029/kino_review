@@ -24,10 +24,23 @@ const createSessionError = (message, status, data) => {
 
 const parseResponsePayload = async (response) => {
   const contentType = response.headers.get('content-type') || '';
-  return contentType.includes('application/json') ? response.json() : response.text();
+  const rawText = await response.text();
+
+  if (!rawText) {
+    return null;
+  }
+
+  return contentType.includes('application/json') ? JSON.parse(rawText) : rawText;
 };
 
 let refreshPromise = null;
+let lastRefreshFailureAt = 0;
+
+const REFRESH_RETRY_COOLDOWN_MS = 30_000;
+
+const shouldSkipRefreshRetry = () =>
+  lastRefreshFailureAt > 0 &&
+  Date.now() - lastRefreshFailureAt < REFRESH_RETRY_COOLDOWN_MS;
 
 export const refreshAccessToken = async ({ preserveSessionOnNetworkError = false } = {}) => {
   if (refreshPromise) {
@@ -35,6 +48,10 @@ export const refreshAccessToken = async ({ preserveSessionOnNetworkError = false
   }
 
   const currentToken = getAccessToken();
+
+  if (preserveSessionOnNetworkError && shouldSkipRefreshRetry()) {
+    return currentToken;
+  }
 
   refreshPromise = (async () => {
     try {
@@ -57,6 +74,7 @@ export const refreshAccessToken = async ({ preserveSessionOnNetworkError = false
       }
 
       if (data?.access_token) {
+        lastRefreshFailureAt = 0;
         setAuthSession(data.access_token, data.token_type);
         return data.access_token;
       }
@@ -64,7 +82,14 @@ export const refreshAccessToken = async ({ preserveSessionOnNetworkError = false
       clearAccessToken();
       return null;
     } catch (error) {
+      lastRefreshFailureAt = Date.now();
+
       if (error?.status === 401 || error?.status === 403) {
+        clearAccessToken();
+        return null;
+      }
+
+      if (!preserveSessionOnNetworkError && error?.status >= 500) {
         clearAccessToken();
         return null;
       }

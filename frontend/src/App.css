@@ -985,6 +985,13 @@ body:not(.dark-theme) {
   font-size: 0.82rem;
 }
 
+.profile-hero-warning {
+  margin-top: 0.9rem;
+  color: var(--accent);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .profile-hero-action {
   min-width: 170px;
 }
@@ -1676,6 +1683,78 @@ body:not(.dark-theme) {
   color: var(--text-muted);
 }
 
+.project-members-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.project-members-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.project-members-toolbar,
+.project-member-invite-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.project-member-invite-form {
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.35fr) auto;
+}
+
+.project-members-toolbar select,
+.project-member-invite-form input,
+.project-member-invite-form select,
+.project-member-actions select {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 76%, transparent);
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+
+.project-members-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.project-member-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  padding: 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.project-member-card h3 {
+  margin: 0.3rem 0 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.project-member-card p {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+}
+
+.project-member-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
 .field-block {
   display: grid;
   gap: 0.45rem;
@@ -2043,6 +2122,32 @@ body:not(.dark-theme) {
   color: var(--text);
   padding: 0.7rem 0.85rem;
   font: inherit;
+}
+
+.project-switcher-readonly {
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.active-project-readout {
+  min-height: 58px;
+  border: 1px solid var(--projects-input-line, var(--line));
+  border-radius: var(--radius-md);
+  background: var(--projects-input-bg, color-mix(in srgb, var(--surface-strong) 86%, transparent));
+  padding: 0.65rem 0.85rem;
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+}
+
+.active-project-readout span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.active-project-readout strong {
+  overflow-wrap: anywhere;
 }
 
 .project-context-panel {
@@ -2593,7 +2698,11 @@ body:not(.dark-theme) {
 
 @media (max-width: 980px) {
   .project-list-hero,
-  .project-list-layout {
+  .project-list-layout,
+  .project-members-heading,
+  .project-members-toolbar,
+  .project-member-invite-form,
+  .project-member-card {
     grid-template-columns: 1fr;
   }
 
@@ -2696,6 +2805,10 @@ body:not(.dark-theme) {
   }
 
   .project-card-actions {
+    justify-content: flex-start;
+  }
+
+  .project-member-actions {
     justify-content: flex-start;
   }
 

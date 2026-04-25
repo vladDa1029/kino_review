@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuth } from './context/useAuth';
 import AuthModal from './components/AuthModal';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -10,6 +11,14 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectListPage from './pages/ProjectListPage';
 import Projects from './pages/Projects';
+import { getUserDescription } from './services/api';
+import { ApiError } from './services/httpClient';
+import {
+  getStoredProfileCompletion,
+  isProfileComplete,
+  PROFILE_COMPLETION_EVENT,
+  setStoredProfileCompletion,
+} from './utils/profileCompletion';
 import './App.css';
 
 const MenuIcon = () => (
@@ -83,6 +92,9 @@ function App() {
   const { token, handleLogout, isAuthModalOpen, setIsAuthModalOpen } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [isAppMenuOpen, setIsAppMenuOpen] = useState(false);
+  const [isProfileCompleteState, setIsProfileCompleteState] = useState(() => getStoredProfileCompletion());
+  const [isProfileStatusLoading, setIsProfileStatusLoading] = useState(false);
+  const hasShownProfileGuardRef = useRef(false);
 
   useEffect(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -96,8 +108,77 @@ function App() {
   useEffect(() => {
     if (!token) {
       setIsAppMenuOpen(false);
+      setIsProfileCompleteState(false);
+      setIsProfileStatusLoading(false);
+      hasShownProfileGuardRef.current = false;
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    let isMounted = true;
+    setIsProfileStatusLoading(true);
+
+    getUserDescription()
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const nextIsComplete = isProfileComplete(data);
+        setIsProfileCompleteState(nextIsComplete);
+        setStoredProfileCompletion(nextIsComplete);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 404) {
+          setIsProfileCompleteState(false);
+          setStoredProfileCompletion(false);
+          return;
+        }
+
+        setIsProfileCompleteState(false);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsProfileStatusLoading(false);
+        }
+      });
+
+    const handleProfileCompletionChange = (event) => {
+      const nextIsComplete = Boolean(event.detail?.isComplete);
+      setIsProfileCompleteState(nextIsComplete);
+      if (nextIsComplete) {
+        hasShownProfileGuardRef.current = false;
+      }
+    };
+
+    window.addEventListener(PROFILE_COMPLETION_EVENT, handleProfileCompletionChange);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener(PROFILE_COMPLETION_EVENT, handleProfileCompletionChange);
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || isProfileStatusLoading || isProfileCompleteState || location.pathname === '/profile') {
+      return;
+    }
+
+    if (!hasShownProfileGuardRef.current) {
+      toast.warning('Сначала заполните ФИО и телефон в профиле');
+      hasShownProfileGuardRef.current = true;
+    }
+
+    navigate('/profile', { replace: true });
+  }, [isProfileCompleteState, isProfileStatusLoading, location.pathname, navigate, token]);
 
   useEffect(() => {
     setIsAppMenuOpen(false);
@@ -138,6 +219,14 @@ function App() {
   };
 
   const handleMenuNavigation = (path) => {
+    if (token && !isProfileStatusLoading && !isProfileCompleteState && path !== '/profile') {
+      toast.warning('Сначала заполните ФИО и телефон в профиле');
+      hasShownProfileGuardRef.current = true;
+      navigate('/profile');
+      setIsAppMenuOpen(false);
+      return;
+    }
+
     navigate(path);
     setIsAppMenuOpen(false);
   };

@@ -126,7 +126,11 @@ const soundsApi = createCollectionHelpers('/user/users/me/sounds', buildEquipmen
 const requisitesApi = createCollectionHelpers('/user/users/me/requisites', buildRequisiteListParams);
 
 export const register = async (email, password) =>
-  createJsonRequest('/auth/register', 'POST', { email, password });
+  apiClient('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+    withCredentials: true,
+  });
 
 export const login = async (username, password) => {
   const formData = new URLSearchParams();
@@ -140,6 +144,7 @@ export const login = async (username, password) => {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: formData,
+    withCredentials: true,
   });
 };
 

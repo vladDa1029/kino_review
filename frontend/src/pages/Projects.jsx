@@ -57,6 +57,16 @@ import { useProjectContext } from '../context/useProjectContext';
 import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
 
 const resourceOrder = ['microfons', 'cameras', 'camera-tripods', 'lights', 'light-tripods', 'sounds', 'requisites'];
+const RESOURCE_PAGE_SIZE = 100;
+const resourceKindAliases = {
+  microfons: ['microfons', 'microfon', 'microphones', 'microphone'],
+  cameras: ['cameras', 'camera'],
+  'camera-tripods': ['camera-tripods', 'camera-tripod', 'camera_tripods', 'camera_tripod'],
+  lights: ['lights', 'light'],
+  'light-tripods': ['light-tripods', 'light-tripod', 'light_tripods', 'light_tripod'],
+  sounds: ['sounds', 'sound'],
+  requisites: ['requisites', 'requisite', 'props', 'prop'],
+};
 
 const createInitialResourceForm = () => ({ title: '', description: '', type: '', size: '' });
 const createInitialWindowForm = () => ({ startTime: '', endTime: '' });
@@ -202,7 +212,6 @@ const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const getColumnValue = (item, column) => (typeof column.render === 'function' ? column.render(item) : item[column.key] || '-');
 
-const getProjectId = (project) => project?.oid || project?.id || '';
 const getCurrentUserId = (userData) =>
   userData?.user_id || userData?.sub || userData?.id || userData?.oid || '';
 
@@ -260,6 +269,24 @@ const buildAvailabilityMap = (items) => {
   return map;
 };
 
+const normalizeResourceKind = (value) => {
+  if (!value) {
+    return '';
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(/[_\s]+/g, '-');
+  const matchedEntry = Object.entries(resourceKindAliases).find(([, aliases]) => aliases.includes(normalized));
+  return matchedEntry ? matchedEntry[0] : normalized;
+};
+
+const getProjectResourceIds = (resources, resourceKey) =>
+  new Set(
+    resources
+      .filter((resource) => normalizeResourceKind(resource.resource_kind || resource.resource_type) === resourceKey)
+      .map((resource) => resource.resource_id)
+      .filter(Boolean),
+  );
+
 const rangesOverlap = (leftStart, leftEnd, rightStart, rightEnd) =>
   !(leftEnd < rightStart || leftStart > rightEnd);
 
@@ -307,17 +334,14 @@ const getWindowPayload = (windowForm) => {
 const Projects = () => {
   const { userData } = useAuth();
   const {
-    projects,
     activeProject,
     activeProjectId,
-    isProjectsLoading,
     refreshProjects,
-    setActiveProjectId,
   } = useProjectContext();
   const [activeResource, setActiveResource] = useState(resourceOrder[0]);
   const [form, setForm] = useState(createInitialResourceForm);
   const [editingId, setEditingId] = useState(null);
-  const [items, setItems] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -345,13 +369,23 @@ const Projects = () => {
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
   const [activeDateFilterKey, setActiveDateFilterKey] = useState(null);
   const [projectResources, setProjectResources] = useState([]);
-  const [projectResourcesRole, setProjectResourcesRole] = useState('');
   const [isProjectResourcesLoading, setIsProjectResourcesLoading] = useState(false);
 
   const currentResource = useMemo(() => resourceMeta[activeResource], [activeResource]);
   const todayKey = useMemo(() => toDateKey(new Date()), []);
   const currentUserId = useMemo(() => getCurrentUserId(userData), [userData]);
   const activeProjectTitle = activeProject?.title || 'Проект не выбран';
+  const projectResourceIds = useMemo(
+    () => getProjectResourceIds(projectResources, activeResource),
+    [activeResource, projectResources],
+  );
+  const items = useMemo(() => {
+    if (!activeProjectId || projectResourceIds.size === 0) {
+      return [];
+    }
+
+    return allItems.filter((item) => projectResourceIds.has(item.oid));
+  }, [activeProjectId, allItems, projectResourceIds]);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.oid === selectedItemId) || null,
@@ -363,10 +397,18 @@ const Projects = () => {
     () => buildCalendarDays(visibleMonth, itemsByDate, selectedDateKey, todayKey),
     [itemsByDate, selectedDateKey, todayKey, visibleMonth],
   );
-  const filteredItems = useMemo(
+  const dateFilteredItems = useMemo(
     () => (activeDateFilterKey ? items.filter((item) => toDateKey(item.create_at) === activeDateFilterKey) : items),
     [activeDateFilterKey, items],
   );
+  const filteredItems = useMemo(() => {
+    if (activeDateFilterKey) {
+      return dateFilteredItems;
+    }
+
+    const startIndex = (pagination.page - 1) * pagination.pageSize;
+    return dateFilteredItems.slice(startIndex, startIndex + pagination.pageSize);
+  }, [activeDateFilterKey, dateFilteredItems, pagination.page, pagination.pageSize]);
   const selectedDayItems = useMemo(
     () => itemsByDate.get(activeDateFilterKey || selectedDateKey) || [],
     [activeDateFilterKey, itemsByDate, selectedDateKey],
@@ -412,6 +454,7 @@ const Projects = () => {
 
     return entries.map(([kind, count]) => `${kind}: ${count}`).join(', ');
   }, [projectResourceSummary]);
+  const isWorkspaceLoading = loading || isProjectResourcesLoading;
 
   const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
@@ -432,10 +475,6 @@ const Projects = () => {
     setSelectedImage(null);
   }, []);
 
-  const handleActiveProjectChange = (event) => {
-    setActiveProjectId(event.target.value);
-  };
-
   useEffect(() => {
     refreshProjects();
   }, [refreshProjects]);
@@ -446,13 +485,11 @@ const Projects = () => {
     setActiveDateFilterKey(null);
     setAddedFreeTimeDateKeysByItem({});
     setProjectResources([]);
-    setProjectResourcesRole('');
   }, [activeProjectId, resetForm, resetManagementState]);
 
   useEffect(() => {
     if (!activeProjectId || !currentUserId) {
       setProjectResources([]);
-      setProjectResourcesRole('');
       return;
     }
 
@@ -466,7 +503,6 @@ const Projects = () => {
         }
 
         setProjectResources(Array.isArray(response?.resources) ? response.resources : []);
-        setProjectResourcesRole(response?.role || '');
       })
       .catch(() => {
         if (!isMounted) {
@@ -474,7 +510,6 @@ const Projects = () => {
         }
 
         setProjectResources([]);
-        setProjectResourcesRole('');
       })
       .finally(() => {
         if (isMounted) {
@@ -487,31 +522,40 @@ const Projects = () => {
     };
   }, [activeProjectId, currentUserId]);
 
-  const fetchItems = useCallback(async ({ page = pagination.page, pageSize = pagination.pageSize } = {}) => {
+  const fetchItems = useCallback(async () => {
+    if (!activeProjectId) {
+      setAllItems([]);
+      setPagination((prev) => ({ ...prev, page: 1, totalPages: 1, totalCount: 0 }));
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await currentResource.list({
-        page,
-        pageSize,
-        sortBy: 'create_at',
-        sortDir: 'desc',
-      });
+      const collectedItems = [];
+      let page = 1;
+      let totalPages = 1;
 
-      setItems(response.items || []);
-      setPagination((prev) => ({
-        ...prev,
-        page,
-        pageSize,
-        totalPages: response.pages || 1,
-        totalCount: response.total_count || 0,
-      }));
+      do {
+        const response = await currentResource.list({
+          page,
+          pageSize: RESOURCE_PAGE_SIZE,
+          sortBy: 'create_at',
+          sortDir: 'desc',
+        });
+
+        collectedItems.push(...(response.items || []));
+        totalPages = response.pages || 1;
+        page += 1;
+      } while (page <= totalPages);
+
+      setAllItems(collectedItems);
     } catch (error) {
       toast.error(error.message || `Не удалось загрузить ${currentResource.label.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
-  }, [currentResource, pagination.page, pagination.pageSize]);
+  }, [activeProjectId, currentResource]);
 
   const loadSelectedItemFreeTimes = useCallback(
     async (itemId) => {
@@ -624,6 +668,25 @@ const Projects = () => {
     }
   }, [activeDateFilterKey, items]);
 
+  useEffect(() => {
+    setPagination((prev) => {
+      const totalCount = items.length;
+      const totalPages = Math.max(1, Math.ceil(totalCount / prev.pageSize));
+      const page = Math.min(prev.page, totalPages);
+
+      if (prev.totalCount === totalCount && prev.totalPages === totalPages && prev.page === page) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        page,
+        totalPages,
+        totalCount,
+      };
+    });
+  }, [items]);
+
   const switchResource = (nextResource) => {
     if (nextResource === activeResource) {
       return;
@@ -713,10 +776,7 @@ const Projects = () => {
         resetManagementState();
       }
 
-      const isLastItemOnPage = items.length === 1 && pagination.page > 1;
-      const nextPage = isLastItemOnPage ? pagination.page - 1 : pagination.page;
-      setPagination((prev) => ({ ...prev, page: nextPage }));
-      await fetchItems({ page: nextPage });
+      await fetchItems();
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         toast.error('Объект уже удален, список обновлен');
@@ -726,8 +786,7 @@ const Projects = () => {
       } else {
         toast.error(error.message || 'Не удалось удалить объект');
       }
-      const nextPage = items.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page;
-      await fetchItems({ page: nextPage });
+      await fetchItems();
     } finally {
       setDeletingId(null);
     }
@@ -964,52 +1023,6 @@ const Projects = () => {
                 ? `Открыт раздел: ${currentResource.label}. ${projectResourceSummaryLabel}.`
                 : 'Выберите проект, чтобы рабочая область показывала нужный контекст.'}
             </p>
-            <div className="project-switcher-inline">
-              <label className="field-block">
-                <span>Активный проект</span>
-                <select
-                  value={activeProjectId}
-                  onChange={handleActiveProjectChange}
-                  disabled={isProjectsLoading || projects.length === 0}
-                >
-                  {projects.length === 0 ? (
-                    <option value="">Нет проектов</option>
-                  ) : (
-                    projects.map((project) => {
-                      const projectId = getProjectId(project);
-                      return (
-                        <option key={projectId} value={projectId}>
-                          {project.title}
-                        </option>
-                      );
-                    })
-                  )}
-                </select>
-              </label>
-              <button
-                type="button"
-                className="ghost-action-btn"
-                onClick={() => refreshProjects()}
-                disabled={isProjectsLoading}
-              >
-                Обновить проекты
-              </button>
-            </div>
-          </div>
-
-          <div className="projects-overview-stats" aria-label="Сводка рабочей области">
-            <div className="projects-stat-card">
-              <span>Проекты</span>
-              <strong>{projects.length}</strong>
-            </div>
-            <div className="projects-stat-card">
-              <span>Роль</span>
-              <strong>{projectResourcesRole || '-'}</strong>
-            </div>
-            <div className="projects-stat-card">
-              <span>Ресурсы</span>
-              <strong>{isProjectResourcesLoading ? '...' : projectResources.length}</strong>
-            </div>
           </div>
 
           <button
@@ -1487,7 +1500,7 @@ const Projects = () => {
               <h2>{currentResource.label}</h2>
             </div>
             <p>
-              {loading
+              {isWorkspaceLoading
                 ? 'Загружаем список...'
                 : activeDateFilterKey
                   ? `Показаны записи за ${activeDayLabel}`
@@ -1551,11 +1564,13 @@ const Projects = () => {
               </tbody>
             </table>
 
-            {!loading && filteredItems.length === 0 ? (
+            {!isWorkspaceLoading && filteredItems.length === 0 ? (
               <p className="helper-note projects-empty-state">
                 {activeDateFilterKey
                   ? 'На выбранную дату записей нет. Снимите фильтр или выберите другой день.'
-                  : 'Список пока пуст. Добавьте первый объект через центральную панель.'}
+                  : activeProjectId
+                    ? 'В этом проекте пока нет элементов этой категории.'
+                    : 'Сначала выберите проект, чтобы увидеть его таблицу.'}
               </p>
             ) : null}
           </div>
@@ -1565,7 +1580,7 @@ const Projects = () => {
               <button
                 type="button"
                 onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1 || loading}
+                disabled={pagination.page <= 1 || isWorkspaceLoading}
               >
                 Назад
               </button>
@@ -1573,7 +1588,7 @@ const Projects = () => {
               <button
                 type="button"
                 onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages || loading}
+                disabled={pagination.page >= pagination.totalPages || isWorkspaceLoading}
               >
                 Вперед
               </button>

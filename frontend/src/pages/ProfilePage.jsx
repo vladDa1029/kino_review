@@ -12,6 +12,7 @@ import {
   updateUserDescription,
 } from '../services/api';
 import { formatDateTime, toDateTimeLocalValue, toIsoDateTime } from '../utils/dateTime';
+import { isProfileComplete, setStoredProfileCompletion } from '../utils/profileCompletion';
 
 const initialProfile = {
   username: '',
@@ -163,11 +164,13 @@ const ProfilePage = () => {
       setDescriptionId(data.oid);
       setProfile(nextProfile);
       setSavedProfile(nextProfile);
+      setStoredProfileCompletion(isProfileComplete(nextProfile));
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         setDescriptionId(null);
         setProfile(initialProfile);
         setSavedProfile(initialProfile);
+        setStoredProfileCompletion(false);
       } else {
         toast.error(error.message || 'Не удалось загрузить описание профиля');
       }
@@ -278,9 +281,16 @@ const ProfilePage = () => {
   const isProfileDirty =
     profile.username.trim() !== savedProfile.username.trim() ||
     profile.phone.trim() !== savedProfile.phone.trim();
+  const isProfileReady = isProfileComplete(profile);
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
+
+    if (!isProfileReady) {
+      toast.warning('Заполните ФИО и телефон, чтобы продолжить работу');
+      return;
+    }
+
     setIsSubmittingProfile(true);
 
     try {
@@ -296,6 +306,7 @@ const ProfilePage = () => {
       }
 
       await loadDescription();
+      setStoredProfileCompletion(true);
       toast.success('Описание профиля сохранено');
     } catch (error) {
       toast.error(error.message || 'Не удалось сохранить описание профиля');
@@ -491,6 +502,11 @@ const ProfilePage = () => {
                 <span>{monthlyWindows.length} окон в месяце</span>
                 <span>Заполнено: {completionPercent}%</span>
               </div>
+              {!isProfileReady ? (
+                <p className="profile-hero-warning">
+                  Заполните ФИО и телефон. Пока эти поля пустые, переход в другие разделы будет недоступен.
+                </p>
+              ) : null}
             </div>
 
             <div className="profile-hero-actions">
