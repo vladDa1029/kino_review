@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`user` owns user-facing operational data: local user projection, profile description, availability windows, user-owned resources, resource images, and the final reservation facts stored after successful approval.
+`user` owns user-facing operational data: local user projection, profile description, availability windows, user-owned resources, resource images, final reservation facts, and broker-delivered enrichment data used by generated shift reports.
 
 `user` does not own project workflow state. It must not decide whether a participant or resource request is already approved inside `project`. It only validates availability, issues confirmation links, performs the final reserve, and emits the resulting facts.
 
@@ -13,6 +13,7 @@ The service runs as a single FastAPI process created in [main.py](../main.py).
 At startup it:
 
 - loads settings from [app/config.py](../app/config.py);
+- verifies storage connectivity and ensures the configured bucket or local directory exists;
 - creates a RabbitMQ broker and declares inbound exchanges and queues;
 - builds the Dishka container through [app/ioc.py](../app/ioc.py);
 - starts ORM mappings from [app/infrastructure/adapters/orm.py](../app/infrastructure/adapters/orm.py);
@@ -80,6 +81,7 @@ Key adapters:
 | `user.existence_requested` | `project.events` | `user.existence_requested.user` | `project` | V1 broker request/reply for invited user existence validation |
 | `shift.participant_reservation_check_requested` | `project.events` | `shift.participant_reservation_check_requested.user` | `project` | Check participant availability without final reserve |
 | `shift.resource_request_reservation_check_requested` | `project.events` | `shift.resource_request_reservation_check_requested.user` | `project` | Check resource availability without final reserve |
+| `shift.report_snapshot_requested` | `project.events` | `shift.report_snapshot_requested.user` | `project` | Provide user-owned enrichment for generated shift reports |
 | `shift.participant_approval_requested` | `project.events` | `shift.participant_approval_requested.user` | `project` | Build participant confirmation email request |
 | `shift.resource_request_approval_requested` | `project.events` | `shift.resource_request_approval_requested.user` | `project` | Build resource-owner confirmation email request |
 | `shift.participant_reservation_requested` | `project.events` | `shift.participant_reservation_requested.user` | compatibility path | Perform direct participant reserve |
@@ -92,6 +94,7 @@ Key adapters:
 | Routing key | Exchange | Consumer | Trigger |
 | --- | --- | --- | --- |
 | `user.existence_provided` / `user.existence_failed` | `user.events` via `project.reply.<instance_id>` | `project` | V1 reply to invited-user existence lookup |
+| `shift.report_snapshot_provided` / `shift.report_snapshot_failed` | `user.events` via `project.reply.<instance_id>` | `project` | Reply with report enrichment snapshot |
 | `shift.participant_reservation_check_succeeded` | `user.events` | `project` | Participant interval is currently reservable |
 | `shift.participant_reservation_check_failed` | `user.events` | `project` | Participant interval cannot be reserved |
 | `shift.resource_request_reservation_check_succeeded` | `user.events` | `project` | Resource interval is currently reservable |
@@ -151,6 +154,15 @@ Key adapters:
 4. `notificate` sends the email.
 5. The user clicks `/user/confirmations/{token}` through the gateway.
 
+### Report enrichment for generated shift reports
+
+1. `project` emits `shift.report_snapshot_requested` with project-owned participant and resource context.
+2. `user` enriches that context with user-owned fields:
+   - `username`, `phone`, `email`
+   - resource `title`, `type`, `description`, `size`
+3. `user` replies on the caller-specific `project.reply.<instance_id>` topic.
+4. `project` remains the report owner and performs rendering, storage, and metadata persistence itself.
+
 ### Final reserve after click
 
 1. `user` decodes the token and validates signature and TTL.
@@ -163,6 +175,7 @@ Key adapters:
 - If you change confirmation-token claims, update [app/infrastructure/security/confirmation_token.py](../app/infrastructure/security/confirmation_token.py), the confirmation endpoint, tests, and the architecture table above in one change.
 - If you change any reservation event payload, update producer, consumer, Pydantic schema, and interservice tests together. Do not treat broker payloads as informal.
 - If you change the approval email flow, keep the broker-based recheck in `project`. Do not replace it with local assumptions inside `user`.
+- If you change report snapshot enrichment, update the broker consumer, payload schemas, project-side reply handling, docs, and tests together.
 - If you change image storage behavior, update storage adapter, config docs, and tests for both metadata and binary backend behavior.
 - If you add a new public route, verify whether it must stay public through the gateway or still require `X-User-Id`.
 
@@ -171,6 +184,7 @@ Key adapters:
 - Do not move project workflow state into `user`. `user` owns reservation facts, not project orchestration statuses.
 - Do not skip the broker-based project recheck before final reserve. A valid token is not enough by itself.
 - Do not treat `notification.email_requested` as a domain decision. It is a delivery request only.
+- Do not render or store generated shift reports in `user`. `user` only enriches report data.
 - Do not introduce a new pending-confirmation table casually. The current design is intentionally stateless for approval links.
 - Do not trust arbitrary `X-User-Id` values outside the gateway path contract.
 

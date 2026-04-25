@@ -82,11 +82,12 @@ These files define:
 
 ### Trusted headers forwarded downstream
 
-| Header | Source | Consumers |
+| Downstream surface | Headers | Notes |
 | --- | --- | --- |
-| `X-User-Id` | JWT `sub` claim | `user`, `project`, admin user routes |
-| `X-User-Token-Type` | JWT `type` claim | `auth`, `user`, `project` |
-| `X-User-Is-Superuser` | JWT payload | `auth`, admin user routes |
+| `/auth/*` | `X-User-Id`, `X-User-Token-Type`, `X-User-Is-Superuser` | Forwarded only on protected auth routes |
+| `/user/*` | `X-User-Id`, `X-User-Token-Type`, `X-User-Is-Superuser` | `/users/me` is rewritten to the caller id before proxying |
+| `/project/*` | `X-User-Id`, `X-User-Token-Type`, `X-User-Is-Superuser` | `project` currently reads `X-User-Id`, the other headers are pass-through |
+| `/admin/user/*` | `X-User-Id`, `X-User-Token-Type` | `X-User-Id` is rewritten to the target user id from the admin path; `X-User-Is-Superuser` stays in gateway and is used only for access control |
 
 ### Downstream proxy routes
 

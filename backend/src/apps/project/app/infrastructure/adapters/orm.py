@@ -20,6 +20,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReport,
     ShiftResourceRequest,
 )
 from app.domain.enums import (
@@ -29,6 +30,8 @@ from app.domain.enums import (
     ProjectRole,
     ProjectStatus,
     ResourceRequestStatus,
+    ShiftReportActualityStatus,
+    ShiftReportGenerationStatus,
     ShiftParticipantStatus,
     ShiftStatus,
 )
@@ -159,6 +162,42 @@ shift_resource_requests = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
 )
 
+shift_reports = Table(
+    "shift_reports",
+    metadata,
+    Column("oid", Uuid(as_uuid=True), primary_key=True),
+    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
+    Column("version", Integer, nullable=False),
+    Column(
+        "generation_status",
+        Integer,
+        nullable=False,
+        index=True,
+        default=int(ShiftReportGenerationStatus.PENDING),
+    ),
+    Column(
+        "actuality_status",
+        Integer,
+        nullable=False,
+        index=True,
+        default=int(ShiftReportActualityStatus.ACTUAL),
+    ),
+    Column("requested_by_user_id", Uuid(as_uuid=True), nullable=False),
+    Column("file_name", String(512), nullable=True),
+    Column("bucket", String(255), nullable=True),
+    Column("storage_key", String(1024), nullable=True, unique=True),
+    Column("mime_type", String(255), nullable=True),
+    Column("generated_at", DateTime(timezone=True), nullable=True),
+    Column("archived_at", DateTime(timezone=True), nullable=True),
+    Column("error_message", String(2000), nullable=True),
+    Column("stale_reason", String(255), nullable=True),
+    Column("stale_marked_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+    Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+    UniqueConstraint("shift_id", "version"),
+)
+
 reservation_outbox = Table(
     "reservation_outbox",
     metadata,
@@ -252,6 +291,10 @@ def start_mappers() -> None:
                 "ShiftResourceRequest",
                 back_populates="shift",
             ),
+            "reports": relationship(
+                "ShiftReport",
+                back_populates="shift",
+            ),
         },
         column_prefix="_",
     )
@@ -331,6 +374,35 @@ def start_mappers() -> None:
             "shift": relationship(
                 "Shift",
                 back_populates="resource_requests",
+            ),
+        },
+        column_prefix="_",
+    )
+    mapper_registry.map_imperatively(
+        ShiftReport,
+        shift_reports,
+        properties={
+            "oid": shift_reports.c.oid,
+            "project_id": shift_reports.c.project_id,
+            "shift_id": shift_reports.c.shift_id,
+            "version": shift_reports.c.version,
+            "generation_status": shift_reports.c.generation_status,
+            "actuality_status": shift_reports.c.actuality_status,
+            "requested_by_user_id": shift_reports.c.requested_by_user_id,
+            "file_name": shift_reports.c.file_name,
+            "bucket": shift_reports.c.bucket,
+            "storage_key": shift_reports.c.storage_key,
+            "mime_type": shift_reports.c.mime_type,
+            "generated_at": shift_reports.c.generated_at,
+            "archived_at": shift_reports.c.archived_at,
+            "error_message": shift_reports.c.error_message,
+            "stale_reason": shift_reports.c.stale_reason,
+            "stale_marked_at": shift_reports.c.stale_marked_at,
+            "created_at": shift_reports.c.created_at,
+            "updated_at": shift_reports.c.updated_at,
+            "shift": relationship(
+                "Shift",
+                back_populates="reports",
             ),
         },
         column_prefix="_",

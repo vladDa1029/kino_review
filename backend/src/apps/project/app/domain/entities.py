@@ -9,6 +9,8 @@ from app.domain.enums import (
     ProjectRole,
     ProjectStatus,
     ResourceRequestStatus,
+    ShiftReportActualityStatus,
+    ShiftReportGenerationStatus,
     ShiftParticipantStatus,
     ShiftStatus,
 )
@@ -121,6 +123,28 @@ class ShiftResourceRequest:
     @property
     def interval(self) -> TimeInterval:
         return TimeInterval(start=self.time_from, end=self.time_to)
+
+
+@dataclass
+class ShiftReport:
+    oid: UUID
+    project_id: UUID
+    shift_id: UUID
+    version: int
+    generation_status: ShiftReportGenerationStatus
+    actuality_status: ShiftReportActualityStatus
+    requested_by_user_id: UUID
+    file_name: str | None
+    bucket: str | None
+    storage_key: str | None
+    mime_type: str | None
+    generated_at: datetime | None
+    archived_at: datetime | None
+    error_message: str | None
+    stale_reason: str | None
+    stale_marked_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass

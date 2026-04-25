@@ -3,9 +3,11 @@ from collections.abc import Iterable
 from dishka import Provider, Scope
 from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
+from taskiq import AsyncBroker
 
 from app.application.commands import (
     ApproveProjectMemberInvitationHandler,
+    ArchiveShiftReportHandler,
     ProcessReservationOutboxHandler,
     HandleParticipantReservationCheckFailedHandler,
     HandleParticipantReservationCheckSucceededHandler,
@@ -20,6 +22,8 @@ from app.application.commands import (
     ChangeProjectMemberRoleHandler,
     ConfirmShiftParticipantHandler,
     CreateProjectHandler,
+    GenerateShiftReportHandler,
+    ProcessShiftReportGenerationHandler,
     CreateResourceRequestHandler,
     CreateShiftHandler,
     DeclineShiftParticipantHandler,
@@ -42,11 +46,22 @@ from app.application.ports.domain import (
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReportRepository,
     ShiftRepository,
     UserServicePort,
 )
+from app.application.ports.reporting import (
+    ShiftReportRendererPort,
+    ShiftReportSnapshotPort,
+)
+from app.application.ports.tasks import ShiftReportTaskDispatcher
 from app.application.ports.transaction import TransactionManager
 from app.application.queries.documents import GetDocumentDownloadUrlHandler
+from app.application.queries.reports import (
+    GetReportDownloadUrlHandler,
+    GetReportHandler,
+    ListShiftReportsHandler,
+)
 from app.application.queries.health import HealthHandler
 from app.application.queries.projects import (
     GetProjectHandler,
@@ -67,8 +82,10 @@ from app.config import (
     Log,
     Minio,
     Rabbitmq,
+    ReportGeneration,
     ReservationOutbox,
     SQLAlchemySettings,
+    TaskIQ,
     UserService,
 )
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
@@ -90,14 +107,18 @@ from app.infrastructure.adapters.domain_repositories import (
     SqlAlchemyReservationOutboxRepository,
     SqlAlchemyResourceRequestRepository,
     SqlAlchemyShiftParticipantRepository,
+    SqlAlchemyShiftReportRepository,
     SqlAlchemyShiftRepository,
 )
 from app.infrastructure.broker.publisher import RabbitPublisher
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker
 from app.infrastructure.generation import GenerationUUID
+from app.infrastructure.reporting.xlsx import OpenpyxlShiftReportRenderer
 from app.infrastructure.storage.minio import MinioDocumentStorage
+from app.infrastructure.taskiq.dispatcher import TaskiqShiftReportTaskDispatcher
 from app.infrastructure.transactions import TransactionManagerAlchemy
+from app.presentation.report_snapshot import ShiftReportSnapshotBrokerClient
 from app.presentation.http.user_service import UserServiceHttpClient
 
 
@@ -129,7 +150,10 @@ def settings_provider() -> Provider:
     provider.from_context(provides=UserService)
     provider.from_context(provides=BrokerReplyInbox)
     provider.from_context(provides=ReservationOutbox)
+    provider.from_context(provides=TaskIQ)
+    provider.from_context(provides=ReportGeneration)
     provider.from_context(provides=Minio)
+    provider.from_context(provides=AsyncBroker)
     return provider
 
 
@@ -156,6 +180,21 @@ def adapters_provider() -> Provider:
         provides=DocumentStoragePort,
         scope=Scope.APP,
     )
+    provider.provide(
+        source=ShiftReportSnapshotBrokerClient,
+        provides=ShiftReportSnapshotPort,
+        scope=Scope.APP,
+    )
+    provider.provide(
+        source=OpenpyxlShiftReportRenderer,
+        provides=ShiftReportRendererPort,
+        scope=Scope.APP,
+    )
+    provider.provide(
+        source=TaskiqShiftReportTaskDispatcher,
+        provides=ShiftReportTaskDispatcher,
+        scope=Scope.APP,
+    )
     provider.provide(source=SqlAlchemyProjectRepository, provides=ProjectRepository)
     provider.provide(source=SqlAlchemyProjectMemberRepository, provides=ProjectMemberRepository)
     provider.provide(source=SqlAlchemyShiftRepository, provides=ShiftRepository)
@@ -164,6 +203,7 @@ def adapters_provider() -> Provider:
     )
     provider.provide(source=SqlAlchemyDocumentRepository, provides=DocumentRepository)
     provider.provide(source=SqlAlchemyResourceRequestRepository, provides=ResourceRequestRepository)
+    provider.provide(source=SqlAlchemyShiftReportRepository, provides=ShiftReportRepository)
     provider.provide(
         source=SqlAlchemyReservationOutboxRepository,
         provides=ReservationOutboxRepository,
@@ -194,6 +234,9 @@ def use_case_provider() -> Provider:
     provider.provide(source=GetProjectHandler)
     provider.provide(source=ListActorProjectsHandler)
     provider.provide(source=GetDocumentDownloadUrlHandler)
+    provider.provide(source=ListShiftReportsHandler)
+    provider.provide(source=GetReportHandler)
+    provider.provide(source=GetReportDownloadUrlHandler)
     provider.provide(source=GetProjectMemberHandler)
     provider.provide(source=GetProjectUserResourcesHandler)
     provider.provide(source=ListProjectMembersHandler)
@@ -214,6 +257,8 @@ def use_case_provider() -> Provider:
     provider.provide(source=HandleParticipantReservationSucceededHandler)
     provider.provide(source=HandleParticipantReservationFailedHandler)
     provider.provide(source=UploadShiftDocumentHandler)
+    provider.provide(source=GenerateShiftReportHandler)
+    provider.provide(source=ArchiveShiftReportHandler)
     provider.provide(source=CreateResourceRequestHandler)
     provider.provide(source=ApproveResourceRequestHandler)
     provider.provide(source=RejectResourceRequestHandler)
@@ -221,8 +266,40 @@ def use_case_provider() -> Provider:
     provider.provide(source=HandleResourceReservationCheckFailedHandler)
     provider.provide(source=HandleResourceReservationSucceededHandler)
     provider.provide(source=HandleResourceReservationFailedHandler)
+    provider.provide(make_process_shift_report_generation_handler, provides=ProcessShiftReportGenerationHandler)
     provider.provide(source=ProcessReservationOutboxHandler)
     return provider
+
+
+def make_process_shift_report_generation_handler(
+    transaction_manager: TransactionManager,
+    clock: ClockPort,
+    projects: ProjectRepository,
+    project_members: ProjectMemberRepository,
+    shifts: ShiftRepository,
+    shift_participants: ShiftParticipantRepository,
+    resource_requests: ResourceRequestRepository,
+    shift_reports: ShiftReportRepository,
+    shift_report_snapshot: ShiftReportSnapshotPort,
+    report_renderer: ShiftReportRendererPort,
+    document_storage: DocumentStoragePort,
+    report_generation: ReportGeneration,
+) -> ProcessShiftReportGenerationHandler:
+    return ProcessShiftReportGenerationHandler(
+        transaction_manager=transaction_manager,
+        clock=clock,
+        projects=projects,
+        project_members=project_members,
+        shifts=shifts,
+        shift_participants=shift_participants,
+        resource_requests=resource_requests,
+        shift_reports=shift_reports,
+        shift_report_snapshot=shift_report_snapshot,
+        report_renderer=report_renderer,
+        document_storage=document_storage,
+        snapshot_retry_count=report_generation.snapshot_retry_count,
+        snapshot_retry_delay_seconds=report_generation.snapshot_retry_delay_seconds,
+    )
 
 
 def setup_providers() -> Iterable[Provider]:

@@ -11,6 +11,7 @@ from app.application.ports.domain import (
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReportRepository,
     ShiftRepository,
 )
 from app.domain.entities import (
@@ -20,11 +21,14 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReport,
     ShiftResourceRequest,
 )
 from app.domain.enums import ProjectMemberStatus, ProjectStatus
+from app.infrastructure.adapters.orm import documents as documents_table
 from app.infrastructure.adapters.orm import projects as projects_table
 from app.infrastructure.adapters.orm import reservation_outbox, shift_participants, users_project_role
+from app.infrastructure.adapters.orm import shift_reports as shift_reports_table
 
 T = TypeVar("T")
 
@@ -96,6 +100,10 @@ class SqlAlchemyShiftParticipantRepository(
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, ShiftParticipant)
 
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftParticipant]:
+        stmt = select(ShiftParticipant).where(shift_participants.c.shift_id == shift_id)
+        return list((await self._session.execute(stmt)).scalars().all())
+
     async def get_by_shift_and_user(self, shift_id: UUID, user_id: UUID) -> ShiftParticipant | None:
         stmt = select(ShiftParticipant).where(
             shift_participants.c.shift_id == shift_id,
@@ -108,12 +116,39 @@ class SqlAlchemyDocumentRepository(SqlAlchemyRepository[Document], DocumentRepos
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Document)
 
+    async def list_by_shift(self, shift_id: UUID) -> list[Document]:
+        stmt = (
+            select(Document)
+            .where(documents_table.c.shift_id == shift_id)
+            .order_by(documents_table.c.created_at.asc())
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
 
 class SqlAlchemyResourceRequestRepository(
     SqlAlchemyRepository[ShiftResourceRequest], ResourceRequestRepository
 ):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, ShiftResourceRequest)
+
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftResourceRequest]:
+        stmt = select(ShiftResourceRequest).where(
+            ShiftResourceRequest.shift_id == shift_id
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
+
+class SqlAlchemyShiftReportRepository(SqlAlchemyRepository[ShiftReport], ShiftReportRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, ShiftReport)
+
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftReport]:
+        stmt = (
+            select(ShiftReport)
+            .where(shift_reports_table.c.shift_id == shift_id)
+            .order_by(shift_reports_table.c.version.desc())
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
 
 
 class SqlAlchemyReservationOutboxRepository(ReservationOutboxRepository):

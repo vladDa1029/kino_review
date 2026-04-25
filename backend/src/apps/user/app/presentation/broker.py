@@ -20,11 +20,18 @@ from app.application.commands.user_registered import (
     UserRegisteredHandler,
 )
 from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
+from app.application.queries.report_snapshot import (
+    ProvideShiftReportSnapshotHandler,
+    ProvideShiftReportSnapshotQuery,
+    ShiftReportParticipantContext,
+    ShiftReportResourceContext,
+)
 from app.application.ports.broker import EventPublisher
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
@@ -39,6 +46,7 @@ from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_re
 from app.presentation.schemas import (
     BrokerUserExistenceRequested,
     BrokerShiftParticipantApprovalRequested,
+    BrokerShiftReportSnapshotRequested,
     BrokerShiftParticipantReservationCheckRequested,
     BrokerShiftParticipantReservationRequested,
     BrokerShiftResourceRequestApprovalRequested,
@@ -90,6 +98,63 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
                         "response_type": "user.existence_provided",
                         "user_id": str(event.user_id),
                         "exists": exists,
+                    },
+                )
+
+    @router.subscriber(SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE, exchange=PROJECT_EVENTS_EXCHANGE)
+    async def handle_shift_report_snapshot_requested(
+        event: BrokerShiftReportSnapshotRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(ProvideShiftReportSnapshotHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                snapshot = await handler(
+                    ProvideShiftReportSnapshotQuery(
+                        report_id=event.report_id,
+                        participants=tuple(
+                            ShiftReportParticipantContext(
+                                participant_id=item.participant_id,
+                                user_id=item.user_id,
+                                project_role=item.project_role,
+                                shift_role=item.shift_role,
+                                time_from=item.time_from,
+                                time_to=item.time_to,
+                            )
+                            for item in event.participants
+                        ),
+                        resources=tuple(
+                            ShiftReportResourceContext(
+                                resource_request_id=item.resource_request_id,
+                                resource_id=item.resource_id,
+                                owner_user_id=item.owner_user_id,
+                                resource_type=item.resource_type,
+                                time_from=item.time_from,
+                                time_to=item.time_to,
+                            )
+                            for item in event.resources
+                        ),
+                    )
+                )
+            except Exception as exc:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "shift.report_snapshot_failed",
+                        "report_id": str(event.report_id),
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "shift.report_snapshot_provided",
+                        "report_id": str(event.report_id),
+                        "users": snapshot["users"],
+                        "resources": snapshot["resources"],
                     },
                 )
 

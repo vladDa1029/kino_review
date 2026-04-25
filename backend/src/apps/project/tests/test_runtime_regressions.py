@@ -1,7 +1,9 @@
 import asyncio
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
+from app.application.commands.reports import _report_actuality_status
 from app.application.commands.reservation_outbox import (
     OUTBOX_STATUS_PENDING,
     PARTICIPANT_RESERVE_OPERATION,
@@ -23,11 +25,18 @@ from app.domain.entities import (
     ShiftResourceRequest,
 )
 from app.domain.enums import ProjectMemberStatus, ProjectRole, ProjectStatus, ShiftStatus
+from app.domain.enums import ShiftReportActualityStatus
 from app.presentation.schemas import to_project_role_input
 
 
 def test_to_project_role_input_accepts_raw_int_from_orm() -> None:
     assert to_project_role_input(int(ProjectRole.SOUND)).value == "SOUND"
+
+
+def test_report_actuality_status_accepts_raw_int_from_orm() -> None:
+    report = SimpleNamespace(actuality_status=int(ShiftReportActualityStatus.ACTUAL))
+
+    assert _report_actuality_status(report) is ShiftReportActualityStatus.ACTUAL
 
 
 class FakeTx:

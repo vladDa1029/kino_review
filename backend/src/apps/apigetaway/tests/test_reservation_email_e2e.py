@@ -190,6 +190,17 @@ def _future_interval() -> tuple[datetime, datetime]:
     return start, end
 
 
+def _wait_for_report_ready(client: httpx.Client, session: UserSession, report_id: UUID) -> dict:
+    def load_report() -> dict:
+        response = client.get(f"/project/reports/{report_id}", headers=session.headers)
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["generation_status_name"] == "READY"
+        return payload
+
+    return _poll_until(load_report)
+
+
 def test_member_invite_validates_user_existence_via_broker_request_reply() -> None:
     _require_live_stack()
     with _client() as client:
@@ -429,3 +440,69 @@ def test_resource_request_confirmation_flow_end_to_end() -> None:
                 expected_text="Already processed",
             )
         )
+
+
+def test_generated_shift_report_flow_end_to_end() -> None:
+    _require_live_stack()
+    with _client() as client:
+        suffix = uuid4().hex
+        director = _register_and_login(
+            client,
+            email=f"director-report-{suffix}@example.com",
+            password="test-password",
+        )
+        time_from, time_to = _future_interval()
+
+        project_response = client.post(
+            "/project/projects",
+            headers=director.headers,
+            json={"title": f"Report flow {suffix}", "description": "generated report e2e"},
+        )
+        assert project_response.status_code == 200, project_response.text
+        project_id = UUID(project_response.json()["oid"])
+
+        shift_response = client.post(
+            f"/project/projects/{project_id}/shifts",
+            headers=director.headers,
+            json={
+                "title": f"report-shift-{suffix}",
+                "description": "generated report shift",
+                "start_time": time_from.isoformat(),
+                "end_time": time_to.isoformat(),
+            },
+        )
+        assert shift_response.status_code == 200, shift_response.text
+        shift_id = UUID(shift_response.json()["oid"])
+
+        approve_shift_response = client.post(
+            f"/project/shifts/{shift_id}/approve",
+            headers=director.headers,
+        )
+        assert approve_shift_response.status_code == 200, approve_shift_response.text
+
+        generate_response = client.post(
+            f"/project/shifts/{shift_id}/reports/generate",
+            headers=director.headers,
+        )
+        assert generate_response.status_code == 200, generate_response.text
+        report_id = UUID(generate_response.json()["oid"])
+        assert generate_response.json()["generation_status_name"] == "PENDING"
+
+        ready_report = _wait_for_report_ready(client, director, report_id)
+        assert ready_report["version"] == 1
+        assert ready_report["file_name"].endswith(".xlsx")
+        assert ready_report["actuality_status_name"] == "ACTUAL"
+
+        list_response = client.get(
+            f"/project/shifts/{shift_id}/reports",
+            headers=director.headers,
+        )
+        assert list_response.status_code == 200, list_response.text
+        assert [item["oid"] for item in list_response.json()["items"]] == [str(report_id)]
+
+        download_url_response = client.get(
+            f"/project/reports/{report_id}/download-url",
+            headers=director.headers,
+        )
+        assert download_url_response.status_code == 200, download_url_response.text
+        assert ".xlsx" in download_url_response.json()["download_url"]

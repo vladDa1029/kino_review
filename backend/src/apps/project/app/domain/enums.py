@@ -42,6 +42,7 @@ class ShiftParticipantStatus(IntEnum):
 class DocumentType(IntEnum):
     PLAN = 10
     SCENARIO = 20
+    REPORT = 30
 
 
 class DocumentStatus(IntEnum):
@@ -58,3 +59,17 @@ class ResourceRequestStatus(IntEnum):
     REJECTED_OWNER = 30
     CANCELLED = 40
     RESERVE_FAILED = 50
+
+
+class ShiftReportGenerationStatus(IntEnum):
+    PENDING = 10
+    COLLECTING_SNAPSHOT = 20
+    RENDERING = 30
+    READY = 40
+    FAILED = 50
+    ARCHIVED = 60
+
+
+class ShiftReportActualityStatus(IntEnum):
+    ACTUAL = 10
+    STALE = 20

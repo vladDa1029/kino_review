@@ -113,6 +113,24 @@ class ReservationOutbox(ConfigABC):
     )
 
 
+class TaskIQ(ConfigABC):
+    default_retry_count: int = Field(alias="TASKIQ_DEFAULT_RETRY_COUNT", default=3)
+    default_delay_seconds: float = Field(alias="TASKIQ_DEFAULT_RETRY_DELAY_SECONDS", default=5.0)
+    use_jitter: bool = Field(alias="TASKIQ_USE_JITTER", default=True)
+    use_delay_exponent: bool = Field(alias="TASKIQ_USE_DELAY_EXPONENT", default=True)
+    max_delay_exponent: float = Field(alias="TASKIQ_MAX_DELAY_EXPONENT", default=60.0)
+    exchange_name: str = Field(alias="TASKIQ_EXCHANGE_NAME", default="project.taskiq")
+    queue_name: str = Field(alias="TASKIQ_QUEUE_NAME", default="project.taskiq")
+
+
+class ReportGeneration(ConfigABC):
+    snapshot_retry_count: int = Field(alias="REPORT_SNAPSHOT_RETRY_COUNT", default=3)
+    snapshot_retry_delay_seconds: float = Field(
+        alias="REPORT_SNAPSHOT_RETRY_DELAY_SECONDS",
+        default=2.0,
+    )
+
+
 class Minio(ConfigABC):
     endpoint_url: str = Field(alias="MINIO_ENDPOINT_URL")
     region_name: str = Field(alias="MINIO_REGION", default="us-east-1")
@@ -130,6 +148,8 @@ class Settings(ConfigABC):
     rabbitmq: Rabbitmq = Rabbitmq()
     user_service: UserService = UserService()
     reservation_outbox: ReservationOutbox = ReservationOutbox()
+    taskiq: TaskIQ = TaskIQ()
+    report_generation: ReportGeneration = ReportGeneration()
     minio: Minio = Minio()
 
 

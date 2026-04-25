@@ -7,9 +7,11 @@ from app.application.ports.domain import (
     ProjectRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReportRepository,
     ShiftRepository,
 )
 from app.application.ports.transaction import TransactionManager
+from app.application.reports_support import mark_shift_reports_stale
 from app.application.support import publish_best_effort
 from app.domain.enums import ProjectRole, ResourceRequestStatus, ShiftParticipantStatus
 from app.domain.services import ResourceRequestService, ShiftParticipantService
@@ -81,11 +83,13 @@ class HandleParticipantReservationCheckFailedHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: HandleParticipantReservationCheckFailedCommand) -> None:
@@ -98,6 +102,12 @@ class HandleParticipantReservationCheckFailedHandler:
             now=self._clock.now(),
         )
         await self._shift_participants.update(participant)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=participant.shift_id,
+            reason="Participant status changed.",
+        )
         await self._tx.commit()
 
 
@@ -117,12 +127,14 @@ class HandleParticipantReservationSucceededHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: HandleParticipantReservationSucceededCommand) -> None:
@@ -141,6 +153,12 @@ class HandleParticipantReservationSucceededHandler:
             now=self._clock.now(),
         )
         await self._shift_participants.update(participant)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=participant.shift_id,
+            reason="Participant status changed.",
+        )
         await self._tx.commit()
         await publish_best_effort(
             publisher=self._publisher,
@@ -167,11 +185,13 @@ class HandleParticipantReservationFailedHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
         shift_participant_service: ShiftParticipantService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
         self._shift_participant_service = shift_participant_service
 
     async def __call__(self, command: HandleParticipantReservationFailedCommand) -> None:
@@ -184,6 +204,12 @@ class HandleParticipantReservationFailedHandler:
             now=self._clock.now(),
         )
         await self._shift_participants.update(participant)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=participant.shift_id,
+            reason="Participant status changed.",
+        )
         await self._tx.commit()
 
 
@@ -252,11 +278,13 @@ class HandleResourceReservationCheckFailedHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: HandleResourceReservationCheckFailedCommand) -> None:
@@ -269,6 +297,12 @@ class HandleResourceReservationCheckFailedHandler:
             now=self._clock.now(),
         )
         await self._resource_requests.update(request)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=request.shift_id,
+            reason="Resource request status changed.",
+        )
         await self._tx.commit()
 
 
@@ -288,12 +322,14 @@ class HandleResourceReservationSucceededHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: HandleResourceReservationSucceededCommand) -> None:
@@ -315,6 +351,12 @@ class HandleResourceReservationSucceededHandler:
             now=self._clock.now(),
         )
         await self._resource_requests.update(request)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=request.shift_id,
+            reason="Resource request status changed.",
+        )
         await self._tx.commit()
         await publish_best_effort(
             publisher=self._publisher,
@@ -341,11 +383,13 @@ class HandleResourceReservationFailedHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
     ) -> None:
         self._tx = transaction_manager
         self._clock = clock
         self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
 
     async def __call__(self, command: HandleResourceReservationFailedCommand) -> None:
@@ -358,6 +402,12 @@ class HandleResourceReservationFailedHandler:
             now=self._clock.now(),
         )
         await self._resource_requests.update(request)
+        await mark_shift_reports_stale(
+            shift_reports=self._shift_reports,
+            clock=self._clock,
+            shift_id=request.shift_id,
+            reason="Resource request status changed.",
+        )
         await self._tx.commit()
 
 

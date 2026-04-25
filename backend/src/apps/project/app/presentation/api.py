@@ -6,6 +6,8 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, File, Form, Header, Response, UploadFile, status
 
 from app.application.commands import (
+    ArchiveShiftReportCommand,
+    ArchiveShiftReportHandler,
     ApproveResourceRequestCommand,
     ApproveResourceRequestHandler,
     ApproveShiftCommand,
@@ -18,6 +20,8 @@ from app.application.commands import (
     CreateProjectHandler,
     CreateResourceRequestCommand,
     CreateResourceRequestHandler,
+    GenerateShiftReportCommand,
+    GenerateShiftReportHandler,
     CreateShiftCommand,
     CreateShiftHandler,
     DeclineShiftParticipantCommand,
@@ -46,8 +50,14 @@ from app.application.queries import (
     GetProjectQuery,
     GetProjectUserResourcesHandler,
     GetProjectUserResourcesQuery,
+    GetReportDownloadUrlHandler,
+    GetReportDownloadUrlQuery,
+    GetReportHandler,
+    GetReportQuery,
     HealthHandler,
     HealthQuery,
+    ListShiftReportsHandler,
+    ListShiftReportsQuery,
     ListActorProjectsHandler,
     ListActorProjectsQuery,
     ListProjectMembersHandler,
@@ -73,6 +83,8 @@ from app.presentation.schemas import (
     ProjectUpdateRequest,
     ProjectUserResourcesResponse,
     RejectResourceRequestBody,
+    ReportListResponse,
+    ReportResponse,
     ResourceTimeWindowResponse,
     ShiftParticipantResponse,
     ShiftResourceRequestResponse,
@@ -82,7 +94,7 @@ from app.presentation.schemas import (
 
 PROJECT_API_DESCRIPTION = """
 Project service owns project planning, membership, shifts, participants, resource requests,
-document metadata, and reservation workflow orchestration.
+document metadata, reports, and reservation workflow orchestration.
 
 Notes:
 - Final availability and reserve facts are owned by `user`.
@@ -107,6 +119,10 @@ PROJECT_OPENAPI_TAGS = [
         "description": "Participant invitation and confirmation workflow endpoints.",
     },
     {"name": "documents", "description": "Shift document upload and download-url endpoints."},
+    {
+        "name": "reports",
+        "description": "Generated XLSX shift reports with versioning, stale tracking, and download endpoints.",
+    },
     {
         "name": "resource-requests",
         "description": "Resource request creation and owner decision endpoints.",
@@ -574,6 +590,111 @@ async def upload_document(
         )
     )
     return DocumentUploadResponse.from_entity(document)
+
+
+@router.post(
+    "/shifts/{shift_id}/reports/generate",
+    response_model=ReportResponse,
+    tags=["reports"],
+    summary="Generate shift report",
+    description="Creates a generated XLSX report in background for an APPROVED shift and returns report metadata immediately.",
+)
+async def generate_report(
+    shift_id: UUID,
+    handler: FromDishka[GenerateShiftReportHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ReportResponse:
+    report = await handler(
+        GenerateShiftReportCommand(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ReportResponse.from_entity(report)
+
+
+@router.get(
+    "/shifts/{shift_id}/reports",
+    response_model=ReportListResponse,
+    tags=["reports"],
+    summary="List shift reports",
+    description="Lists all report versions attached to the shift.",
+)
+async def list_shift_reports(
+    shift_id: UUID,
+    handler: FromDishka[ListShiftReportsHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ReportListResponse:
+    reports = await handler(
+        ListShiftReportsQuery(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ReportListResponse(items=[ReportResponse.from_entity(report) for report in reports])
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=ReportResponse,
+    tags=["reports"],
+    summary="Get report metadata",
+    description="Returns report metadata for a single generated shift report.",
+)
+async def get_report(
+    report_id: UUID,
+    handler: FromDishka[GetReportHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ReportResponse:
+    report = await handler(
+        GetReportQuery(
+            report_id=report_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ReportResponse.from_entity(report)
+
+
+@router.get(
+    "/reports/{report_id}/download-url",
+    response_model=DocumentDownloadUrlResponse,
+    tags=["reports"],
+    summary="Get report download url",
+    description="Returns a temporary download URL for a READY generated report.",
+)
+async def get_report_download_url(
+    report_id: UUID,
+    handler: FromDishka[GetReportDownloadUrlHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> DocumentDownloadUrlResponse:
+    url = await handler(
+        GetReportDownloadUrlQuery(
+            report_id=report_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return DocumentDownloadUrlResponse(download_url=url)
+
+
+@router.delete(
+    "/reports/{report_id}",
+    response_model=ReportResponse,
+    tags=["reports"],
+    summary="Archive report",
+    description="Soft-archives a generated report version. In-progress reports cannot be archived.",
+)
+async def archive_report(
+    report_id: UUID,
+    handler: FromDishka[ArchiveShiftReportHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ReportResponse:
+    report = await handler(
+        ArchiveShiftReportCommand(
+            report_id=report_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ReportResponse.from_entity(report)
 
 
 @router.get(

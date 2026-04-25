@@ -67,6 +67,8 @@ class TaskIQ(ConfigABC):
     use_jitter: bool = Field(alias="TASKIQ_USE_JITTER", default=True)
     use_delay_exponent: bool = Field(alias="TASKIQ_USE_DELAY_EXPONENT", default=True)
     max_delay_exponent: float = Field(alias="TASKIQ_MAX_DELAY_EXPONENT", default=60.0)
+    exchange_name: str = Field(alias="TASKIQ_EXCHANGE_NAME", default="notificate.taskiq")
+    queue_name: str = Field(alias="TASKIQ_QUEUE_NAME", default="notificate.taskiq")
 
 
 class Settings(ConfigABC):

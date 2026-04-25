@@ -55,20 +55,23 @@ from app.presentation.schemas import (
     BrokerShiftResourceRequestReservationCheckSucceeded,
     BrokerShiftResourceRequestReserveFailed,
     BrokerShiftResourceRequestReserved,
-    BrokerUserExistenceReply,
 )
 
 
-def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbox) -> RabbitRouter:
+def create_reply_router(reply_inbox: BrokerReplyInbox) -> RabbitRouter:
     router = RabbitRouter()
 
     @router.subscriber(build_reply_queue(reply_inbox), exchange=USER_EVENTS_EXCHANGE)
     async def handle_user_reply(event: dict) -> None:
-        try:
-            reply = BrokerUserExistenceReply.model_validate(event)
-        except Exception:
-            return
-        reply_inbox.resolve(str(reply.correlation_id), event)
+        correlation_id = event.get("correlation_id")
+        if isinstance(correlation_id, str):
+            reply_inbox.resolve(correlation_id, event)
+
+    return router
+
+
+def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbox) -> RabbitRouter:
+    router = create_reply_router(reply_inbox)
 
     @router.subscriber(PROJECT_MEMBER_APPROVED_QUEUE, exchange=USER_EVENTS_EXCHANGE)
     async def handle_project_member_approved(

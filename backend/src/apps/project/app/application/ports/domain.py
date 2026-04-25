@@ -10,6 +10,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReport,
     ShiftResourceRequest,
 )
 
@@ -72,6 +73,9 @@ class ShiftParticipantRepository(Protocol):
     async def get_by_id(self, participant_id: UUID) -> ShiftParticipant | None:
         raise NotImplementedError
 
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftParticipant]:
+        raise NotImplementedError
+
     async def get_by_shift_and_user(self, shift_id: UUID, user_id: UUID) -> ShiftParticipant | None:
         raise NotImplementedError
 
@@ -86,6 +90,9 @@ class DocumentRepository(Protocol):
     async def get_by_id(self, document_id: UUID) -> Document | None:
         raise NotImplementedError
 
+    async def list_by_shift(self, shift_id: UUID) -> list[Document]:
+        raise NotImplementedError
+
     async def update(self, document: Document) -> None:
         raise NotImplementedError
 
@@ -97,7 +104,24 @@ class ResourceRequestRepository(Protocol):
     async def get_by_id(self, request_id: UUID) -> ShiftResourceRequest | None:
         raise NotImplementedError
 
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftResourceRequest]:
+        raise NotImplementedError
+
     async def update(self, request: ShiftResourceRequest) -> None:
+        raise NotImplementedError
+
+
+class ShiftReportRepository(Protocol):
+    async def add(self, report: ShiftReport) -> None:
+        raise NotImplementedError
+
+    async def get_by_id(self, report_id: UUID) -> ShiftReport | None:
+        raise NotImplementedError
+
+    async def list_by_shift(self, shift_id: UUID) -> list[ShiftReport]:
+        raise NotImplementedError
+
+    async def update(self, report: ShiftReport) -> None:
         raise NotImplementedError
 
 
@@ -190,6 +214,7 @@ class DocumentStoragePort(Protocol):
         filename: str,
         content: bytes,
         content_type: str,
+        storage_key: str | None = None,
     ) -> StoredFile:
         raise NotImplementedError
 

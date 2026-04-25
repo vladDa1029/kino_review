@@ -34,7 +34,7 @@ def create_message_broker(settings: Settings) -> RabbitBroker:
 
 
 def create_task_manager(settings: Settings) -> AsyncBroker:
-    broker = create_taskiq_broker(settings.rabbitmq.url)
+    broker = create_taskiq_broker(settings.rabbitmq.url, taskiq=settings.taskiq)
     setup_task_manager_middlewares(broker, settings.taskiq)
     setup_task_manager_tasks(broker, settings.taskiq)
     return broker

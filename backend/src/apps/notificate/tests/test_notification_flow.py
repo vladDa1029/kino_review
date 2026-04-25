@@ -8,7 +8,9 @@ from app.application.commands.send_email import (
     SendNotificationEmailCommand,
     SendNotificationEmailHandler,
 )
+from app.config import TaskIQ
 from app.infrastructure.taskiq.dispatcher import TaskiqNotificationTaskDispatcher
+from app.infrastructure.taskiq.broker import create_taskiq_broker
 
 
 class FakeDispatcher:
@@ -154,3 +156,14 @@ def test_taskiq_dispatcher_uses_registered_task() -> None:
         ]
 
     asyncio.run(scenario())
+
+
+def test_taskiq_broker_uses_notificate_specific_transport_entities() -> None:
+    settings = TaskIQ()
+
+    broker = create_taskiq_broker("amqp://guest:guest@localhost:5672/", taskiq=settings)
+
+    assert broker._exchange_name == "notificate.taskiq"
+    assert broker._queue_name == "notificate.taskiq"
+    assert broker._dead_letter_queue_name == "notificate.taskiq.dead_letter"
+    assert broker._delay_queue_name == "notificate.taskiq.delay"

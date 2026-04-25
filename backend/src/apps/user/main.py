@@ -24,6 +24,7 @@ from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
+    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
@@ -35,6 +36,7 @@ from app.infrastructure.adapters.broker import (
     USER_REGISTERED_QUEUE,
 )
 from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
+from app.infrastructure.adapters.storage import prepare_file_storage
 from app.infrastructure.adapters.orm import start_mappers
 from app.presentation import handlers
 from app.presentation.api import router as web_router
@@ -48,6 +50,8 @@ log = structlog.get_logger(__file__)
 async def lifespan(app: FastAPI):
     broker: RabbitBroker = cast(RabbitBroker, app.state._broker)
     reply_inbox = cast(BrokerReplyInbox, app.state.reply_inbox)
+    storage_settings = cast(StorageSettings, app.state.storage_settings)
+    await _prepare_storage(storage_settings)
     await broker.start()
     await broker.declare_exchange(PROJECT_EVENTS_EXCHANGE)
     await broker.declare_exchange(USER_REGISTERED_EXCHANGE)
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI):
     await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE)
+    await broker.declare_queue(SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE)
@@ -66,6 +71,34 @@ async def lifespan(app: FastAPI):
     finally:
         await broker.stop()
         await cast(AsyncContainer, app.state.dishka_container).close()
+
+
+async def _prepare_storage(settings: StorageSettings) -> None:
+    try:
+        startup_result = await prepare_file_storage(settings)
+    except Exception:
+        log.exception(
+            "storage.startup.failed",
+            backend=settings.backend,
+            bucket=settings.bucket,
+            endpoint_url=settings.s3_endpoint_url,
+        )
+        raise
+
+    connection_payload: dict[str, object] = {
+        "backend": startup_result.backend,
+        "bucket": startup_result.bucket,
+    }
+    if startup_result.endpoint_url is not None:
+        connection_payload["endpoint_url"] = startup_result.endpoint_url
+    if startup_result.local_path is not None:
+        connection_payload["local_path"] = str(startup_result.local_path)
+
+    log.info("storage.connection.ready", **connection_payload)
+    log.info(
+        "storage.bucket.created" if startup_result.bucket_created else "storage.bucket.ready",
+        **connection_payload,
+    )
 
 
 def start_app_dev() -> FastAPI:
@@ -80,6 +113,7 @@ def start_app_dev() -> FastAPI:
     reply_inbox = BrokerReplyInbox(service_name="user")
     app.state._broker = broker
     app.state.reply_inbox = reply_inbox
+    app.state.storage_settings = settings.storage
     container: AsyncContainer = make_async_container(
         *setup_providers(),
         context={

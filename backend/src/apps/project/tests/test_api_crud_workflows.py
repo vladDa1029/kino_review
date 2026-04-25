@@ -13,6 +13,11 @@ from app.application.commands.participants import (
     DeclineShiftParticipantHandler,
     InviteShiftParticipantHandler,
 )
+from app.application.commands.reports import (
+    ArchiveShiftReportHandler,
+    GenerateShiftReportHandler,
+)
+from app.application.commands.documents import UploadShiftDocumentHandler
 from app.application.commands.projects import (
     ChangeProjectMemberRoleHandler,
     CreateProjectHandler,
@@ -33,6 +38,7 @@ from app.application.ports.domain import (
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReportRepository,
     ShiftRepository,
 )
 from app.application.ports.transaction import TransactionManager
@@ -40,6 +46,7 @@ from app.application.queries.projects import (
     GetProjectHandler,
     ListActorProjectsHandler,
 )
+from app.application.queries.reports import GetReportDownloadUrlHandler, GetReportHandler, ListShiftReportsHandler
 from app.application.queries.resources import (
     GetProjectMemberHandler,
     ListProjectMembersHandler,
@@ -54,6 +61,7 @@ from app.domain.enums import (
 from app.domain.errors.base import ApplicationError
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
+    DocumentService,
     ProjectMembershipService,
     ResourceRequestService,
     ShiftParticipantService,
@@ -68,13 +76,17 @@ from app.presentation.api import (
 from tests.test_project_management_service import (
     FakeIdGenerator,
     FakePublisher,
+    FakeShiftReportTaskDispatcher,
+    FakeStorage,
     FakeTx,
+    InMemoryDocumentRepo,
     FakeUserService,
     InMemoryProjectMemberRepo,
     InMemoryProjectRepo,
     InMemoryReservationOutboxRepo,
     InMemoryResourceRequestRepo,
     InMemoryShiftRepo,
+    InMemoryShiftReportRepo,
     InMemoryParticipantRepo,
 )
 
@@ -94,8 +106,11 @@ class ProjectApiCrudContext:
     members: InMemoryProjectMemberRepo
     shifts: InMemoryShiftRepo
     participants: InMemoryParticipantRepo
+    documents: InMemoryDocumentRepo
+    reports: InMemoryShiftReportRepo
     requests: InMemoryResourceRequestRepo
     reservation_outbox: InMemoryReservationOutboxRepo
+    report_tasks: FakeShiftReportTaskDispatcher
 
 
 def _provide_instance(provider: Provider, instance, provides) -> None:
@@ -117,10 +132,14 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
     members = InMemoryProjectMemberRepo()
     shifts = InMemoryShiftRepo()
     participants = InMemoryParticipantRepo()
+    documents = InMemoryDocumentRepo()
+    reports = InMemoryShiftReportRepo()
     requests = InMemoryResourceRequestRepo()
     reservation_outbox = InMemoryReservationOutboxRepo()
+    storage = FakeStorage()
     clock = SystemClock()
     id_generator = FakeIdGenerator()
+    report_tasks = FakeShiftReportTaskDispatcher()
 
     create_project_handler = CreateProjectHandler(
         transaction_manager=tx,
@@ -212,6 +231,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         project_members=members,
         shifts=shifts,
         shift_participants=participants,
+        shift_reports=reports,
         shift_participant_service=ShiftParticipantService(),
     )
     confirm_participant_handler = ConfirmShiftParticipantHandler(
@@ -221,6 +241,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         reservation_outbox=reservation_outbox,
         shifts=shifts,
         shift_participants=participants,
+        shift_reports=reports,
         shift_participant_service=ShiftParticipantService(),
     )
     decline_participant_handler = DeclineShiftParticipantHandler(
@@ -228,7 +249,57 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         clock=clock,
         publisher=publisher,
         shift_participants=participants,
+        shift_reports=reports,
+        shifts=shifts,
         shift_participant_service=ShiftParticipantService(),
+    )
+    upload_document_handler = UploadShiftDocumentHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=id_generator,
+        publisher=publisher,
+        document_storage=storage,
+        project_members=members,
+        shifts=shifts,
+        documents=documents,
+        document_service=DocumentService(),
+    )
+    generate_report_handler = GenerateShiftReportHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=id_generator,
+        project_members=members,
+        shifts=shifts,
+        shift_reports=reports,
+        task_dispatcher=report_tasks,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+    archive_report_handler = ArchiveShiftReportHandler(
+        transaction_manager=tx,
+        clock=clock,
+        project_members=members,
+        shifts=shifts,
+        shift_reports=reports,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+    list_shift_reports_handler = ListShiftReportsHandler(
+        shift_reports=reports,
+        shifts=shifts,
+        project_members=members,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+    get_report_handler = GetReportHandler(
+        shift_reports=reports,
+        shifts=shifts,
+        project_members=members,
+        director_member_policy=DirectorMemberPolicy(),
+    )
+    get_report_download_url_handler = GetReportDownloadUrlHandler(
+        shift_reports=reports,
+        shifts=shifts,
+        project_members=members,
+        director_member_policy=DirectorMemberPolicy(),
+        document_storage=storage,
     )
     create_resource_request_handler = CreateResourceRequestHandler(
         transaction_manager=tx,
@@ -238,6 +309,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         project_members=members,
         shifts=shifts,
         resource_requests=requests,
+        shift_reports=reports,
         resource_request_service=ResourceRequestService(),
     )
     approve_resource_request_handler = ApproveResourceRequestHandler(
@@ -246,6 +318,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         publisher=publisher,
         reservation_outbox=reservation_outbox,
         resource_requests=requests,
+        shift_reports=reports,
         resource_request_service=ResourceRequestService(),
     )
     reject_resource_request_handler = RejectResourceRequestHandler(
@@ -253,6 +326,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         clock=clock,
         publisher=publisher,
         resource_requests=requests,
+        shift_reports=reports,
         resource_request_service=ResourceRequestService(),
     )
 
@@ -273,6 +347,12 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         (invite_participant_handler, InviteShiftParticipantHandler),
         (confirm_participant_handler, ConfirmShiftParticipantHandler),
         (decline_participant_handler, DeclineShiftParticipantHandler),
+        (upload_document_handler, UploadShiftDocumentHandler),
+        (generate_report_handler, GenerateShiftReportHandler),
+        (archive_report_handler, ArchiveShiftReportHandler),
+        (list_shift_reports_handler, ListShiftReportsHandler),
+        (get_report_handler, GetReportHandler),
+        (get_report_download_url_handler, GetReportDownloadUrlHandler),
         (create_resource_request_handler, CreateResourceRequestHandler),
         (approve_resource_request_handler, ApproveResourceRequestHandler),
         (reject_resource_request_handler, RejectResourceRequestHandler),
@@ -281,6 +361,8 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         (members, ProjectMemberRepository),
         (shifts, ShiftRepository),
         (participants, ShiftParticipantRepository),
+        (documents, InMemoryDocumentRepo),
+        (reports, ShiftReportRepository),
         (requests, ResourceRequestRepository),
         (reservation_outbox, ReservationOutboxRepository),
     ):
@@ -306,8 +388,11 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         members=members,
         shifts=shifts,
         participants=participants,
+        documents=documents,
+        reports=reports,
         requests=requests,
         reservation_outbox=reservation_outbox,
+        report_tasks=report_tasks,
     )
 
 
@@ -396,6 +481,7 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
         "shifts",
         "participants",
         "documents",
+        "reports",
         "resource-requests",
     }.issubset(tag_names)
 
@@ -406,6 +492,8 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
         "member-resources"
     ]
     assert payload["paths"]["/participants/{participant_id}/confirm"]["post"]["tags"] == ["participants"]
+    assert payload["paths"]["/shifts/{shift_id}/reports/generate"]["post"]["tags"] == ["reports"]
+    assert payload["paths"]["/reports/{report_id}"]["get"]["tags"] == ["reports"]
     assert payload["paths"]["/resource-requests/{request_id}/approve"]["post"]["tags"] == [
         "resource-requests"
     ]
@@ -413,6 +501,95 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
         payload["paths"]["/projects/{project_id}/members/{target_user_id}/resources"]["get"]["description"]
         .startswith("Returns resources owned by the target user")
     )
+
+
+def test_shift_reports_http_flow() -> None:
+    ctx = build_project_api_crud_context()
+    director_id = uuid4()
+    start_time = now_utc() + timedelta(hours=2)
+    end_time = start_time + timedelta(hours=2)
+
+    try:
+        with TestClient(ctx.app) as client:
+            project_response = client.post(
+                "/projects",
+                headers={"X-User-Id": str(director_id)},
+                json={"title": "Reports flow", "description": "report api"},
+            )
+            assert project_response.status_code == 200
+            project_id = project_response.json()["oid"]
+
+            shift_response = client.post(
+                f"/projects/{project_id}/shifts",
+                headers={"X-User-Id": str(director_id)},
+                json={
+                    "title": "Report shift",
+                    "description": "with report",
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                },
+            )
+            assert shift_response.status_code == 200
+            shift_id = shift_response.json()["oid"]
+
+            approve_shift_response = client.post(
+                f"/shifts/{shift_id}/approve",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert approve_shift_response.status_code == 200
+
+            create_report_response = client.post(
+                f"/shifts/{shift_id}/reports/generate",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert create_report_response.status_code == 200, create_report_response.text
+            report = create_report_response.json()
+            report_id = report["oid"]
+            assert report["version"] == 1
+            assert report["generation_status_name"] == "PENDING"
+            assert ctx.report_tasks.commands[0].report_id == UUID(report_id)
+
+            list_reports_response = client.get(
+                f"/shifts/{shift_id}/reports",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert list_reports_response.status_code == 200
+            assert [item["oid"] for item in list_reports_response.json()["items"]] == [report_id]
+
+            stored_report = ctx.reports.data[UUID(report_id)]
+            stored_report.generation_status = 40
+            stored_report.file_name = "shift-report.xlsx"
+            stored_report.bucket = "bucket"
+            stored_report.storage_key = "reports/test/shift-report.xlsx"
+            stored_report.mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            stored_report.generated_at = start_time
+            stored_report.updated_at = start_time
+            ctx.reports.data[UUID(report_id)] = stored_report
+
+            get_report_response = client.get(
+                f"/reports/{report_id}",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert get_report_response.status_code == 200
+            assert get_report_response.json()["file_name"] == "shift-report.xlsx"
+
+            download_url_response = client.get(
+                f"/reports/{report_id}/download-url",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert download_url_response.status_code == 200
+            assert download_url_response.json()["download_url"].endswith(
+                "reports/test/shift-report.xlsx"
+            )
+
+            archive_response = client.delete(
+                f"/reports/{report_id}",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert archive_response.status_code == 200
+            assert archive_response.json()["generation_status_name"] == "ARCHIVED"
+    finally:
+        asyncio.run(ctx.container.close())
 
 
 def test_project_http_management_flow_for_members_shifts_participants_and_requests() -> None:
