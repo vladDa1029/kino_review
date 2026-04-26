@@ -1752,7 +1752,8 @@ body:not(.dark-theme) {
 
 .shift-planning-form,
 .shift-planning-participant-form,
-.shift-planning-document-form {
+.shift-planning-document-form,
+.shift-planning-resource-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.75rem;
@@ -1769,6 +1770,8 @@ body:not(.dark-theme) {
 .shift-planning-participant-form select,
 .shift-planning-document-form input,
 .shift-planning-document-form select,
+.shift-planning-resource-form input,
+.shift-planning-resource-form select,
 .project-shift-form input,
 .project-participant-form input,
 .project-participant-form select,
@@ -1793,6 +1796,7 @@ body:not(.dark-theme) {
 .project-shifts-list,
 .project-documents-list,
 .project-participants-list,
+.project-resource-requests-list,
 .project-members-list {
   display: grid;
   gap: 0.75rem;
@@ -1830,6 +1834,15 @@ body:not(.dark-theme) {
   justify-content: flex-end;
   gap: 0.65rem;
   flex-wrap: wrap;
+}
+
+.shift-resource-actions {
+  min-width: min(360px, 100%);
+}
+
+.shift-resource-reason {
+  min-width: min(280px, 100%);
+  flex: 1 1 280px;
 }
 
 .field-block {

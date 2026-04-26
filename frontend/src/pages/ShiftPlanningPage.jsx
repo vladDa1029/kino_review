@@ -3,12 +3,16 @@ import { toast } from 'react-toastify';
 
 import {
   approveShift,
+  approveResourceRequest,
   createShift,
+  createShiftResourceRequest,
   declineShiftParticipant,
   confirmShiftParticipant,
   getDocumentDownloadUrl,
+  getProjectUserResources,
   inviteShiftParticipant,
   listProjectMembers,
+  rejectResourceRequest,
   uploadShiftDocument,
 } from '../services/api';
 import { useAuth } from '../context/useAuth';
@@ -19,6 +23,7 @@ const STORAGE_KEYS = {
   shifts: 'kinoflow.projectShifts',
   participants: 'kinoflow.shiftParticipants',
   documents: 'kinoflow.shiftDocuments',
+  resourceRequests: 'kinoflow.shiftResourceRequests',
 };
 
 const roleOptions = [
@@ -74,6 +79,15 @@ const initialDocumentForm = {
   description: '',
 };
 
+const initialResourceRequestForm = {
+  shiftId: '',
+  ownerUserId: '',
+  resourceId: '',
+  resourceType: '',
+  timeFrom: '',
+  timeTo: '',
+};
+
 const getProjectId = (project) => project?.oid || project?.id || '';
 
 const getCurrentUserId = (userData) =>
@@ -114,9 +128,11 @@ const ShiftPlanningPage = () => {
   const [shiftForm, setShiftForm] = useState(initialShiftForm);
   const [participantForm, setParticipantForm] = useState(initialParticipantForm);
   const [documentForm, setDocumentForm] = useState(initialDocumentForm);
+  const [resourceRequestForm, setResourceRequestForm] = useState(initialResourceRequestForm);
   const [projectShifts, setProjectShifts] = useState(() => readStorage(STORAGE_KEYS.shifts));
   const [shiftParticipants, setShiftParticipants] = useState(() => readStorage(STORAGE_KEYS.participants));
   const [shiftDocuments, setShiftDocuments] = useState(() => readStorage(STORAGE_KEYS.documents));
+  const [shiftResourceRequests, setShiftResourceRequests] = useState(() => readStorage(STORAGE_KEYS.resourceRequests));
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [approvingShiftId, setApprovingShiftId] = useState(null);
   const [isInvitingParticipant, setIsInvitingParticipant] = useState(false);
@@ -124,6 +140,11 @@ const ShiftPlanningPage = () => {
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [loadingDocumentId, setLoadingDocumentId] = useState(null);
   const [documentInputKey, setDocumentInputKey] = useState(0);
+  const [ownerResources, setOwnerResources] = useState([]);
+  const [isOwnerResourcesLoading, setIsOwnerResourcesLoading] = useState(false);
+  const [isSubmittingResourceRequest, setIsSubmittingResourceRequest] = useState(false);
+  const [resourceRequestActionId, setResourceRequestActionId] = useState(null);
+  const [rejectReasonsById, setRejectReasonsById] = useState({});
 
   const currentUserId = getCurrentUserId(userData);
 
@@ -142,6 +163,10 @@ const ShiftPlanningPage = () => {
   useEffect(() => {
     writeStorage(STORAGE_KEYS.documents, shiftDocuments);
   }, [shiftDocuments]);
+
+  useEffect(() => {
+    writeStorage(STORAGE_KEYS.resourceRequests, shiftResourceRequests);
+  }, [shiftResourceRequests]);
 
   useEffect(() => {
     if (memberProjectId && projects.some((project) => getProjectId(project) === memberProjectId)) {
@@ -235,6 +260,10 @@ const ShiftPlanningPage = () => {
     () => shiftDocuments[documentForm.shiftId] || [],
     [documentForm.shiftId, shiftDocuments],
   );
+  const selectedShiftResourceRequests = useMemo(
+    () => shiftResourceRequests[resourceRequestForm.shiftId] || [],
+    [resourceRequestForm.shiftId, shiftResourceRequests],
+  );
 
   useEffect(() => {
     setParticipantForm((prev) => {
@@ -265,6 +294,20 @@ const ShiftPlanningPage = () => {
   }, [selectedProjectShifts]);
 
   useEffect(() => {
+    setResourceRequestForm((prev) => {
+      const nextShiftId = selectedProjectShifts.some((shift) => shift.oid === prev.shiftId)
+        ? prev.shiftId
+        : selectedProjectShifts[0]?.oid || '';
+
+      if (nextShiftId === prev.shiftId) {
+        return prev;
+      }
+
+      return { ...prev, shiftId: nextShiftId };
+    });
+  }, [selectedProjectShifts]);
+
+  useEffect(() => {
     if (!participantForm.userId) {
       return;
     }
@@ -276,6 +319,42 @@ const ShiftPlanningPage = () => {
 
     setParticipantForm((prev) => ({ ...prev, role: selectedMember.role }));
   }, [displayedMembers, participantForm.role, participantForm.userId]);
+
+  useEffect(() => {
+    if (!memberProjectId || !resourceRequestForm.ownerUserId) {
+      setOwnerResources([]);
+      return;
+    }
+
+    let isMounted = true;
+    setIsOwnerResourcesLoading(true);
+
+    getProjectUserResources(memberProjectId, resourceRequestForm.ownerUserId)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOwnerResources(Array.isArray(response?.resources) ? response.resources : []);
+      })
+      .catch(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setOwnerResources([]);
+        toast.error('Не удалось загрузить ресурсы выбранного участника');
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsOwnerResourcesLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [memberProjectId, resourceRequestForm.ownerUserId]);
 
   const handleShiftFormChange = (event) => {
     const { name, value } = event.target;
@@ -293,6 +372,31 @@ const ShiftPlanningPage = () => {
       ...prev,
       [name]: name === 'file' ? files?.[0] || null : value,
     }));
+  };
+
+  const handleResourceRequestFormChange = (event) => {
+    const { name, value } = event.target;
+    setResourceRequestForm((prev) => {
+      if (name === 'ownerUserId') {
+        return {
+          ...prev,
+          ownerUserId: value,
+          resourceId: '',
+          resourceType: '',
+        };
+      }
+
+      if (name === 'resourceId') {
+        const nextResource = ownerResources.find((resource) => resource.resource_id === value);
+        return {
+          ...prev,
+          resourceId: value,
+          resourceType: nextResource?.resource_kind || nextResource?.resource_type || '',
+        };
+      }
+
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleCreateShift = async (event) => {
@@ -502,6 +606,110 @@ const ShiftPlanningPage = () => {
       toast.error(error?.message || 'Не удалось получить ссылку на документ');
     } finally {
       setLoadingDocumentId(null);
+    }
+  };
+
+  const handleCreateResourceRequest = async (event) => {
+    event.preventDefault();
+
+    const timeFrom = toIsoDateTime(resourceRequestForm.timeFrom);
+    const timeTo = toIsoDateTime(resourceRequestForm.timeTo);
+
+    if (
+      !resourceRequestForm.shiftId ||
+      !resourceRequestForm.ownerUserId ||
+      !resourceRequestForm.resourceId ||
+      !resourceRequestForm.resourceType ||
+      !timeFrom ||
+      !timeTo
+    ) {
+      toast.error('Выберите смену, владельца ресурса, ресурс и укажите время');
+      return;
+    }
+
+    if (new Date(timeFrom) >= new Date(timeTo)) {
+      toast.error('Время окончания запроса должно быть позже времени начала');
+      return;
+    }
+
+    setIsSubmittingResourceRequest(true);
+
+    try {
+      const request = await createShiftResourceRequest(resourceRequestForm.shiftId, {
+        resource_type: resourceRequestForm.resourceType,
+        resource_id: resourceRequestForm.resourceId,
+        resource_owner_user_id: resourceRequestForm.ownerUserId,
+        time_from: timeFrom,
+        time_to: timeTo,
+      });
+
+      setShiftResourceRequests((prev) => ({
+        ...prev,
+        [resourceRequestForm.shiftId]: [request, ...(prev[resourceRequestForm.shiftId] || [])],
+      }));
+      setResourceRequestForm((prev) => ({
+        ...initialResourceRequestForm,
+        shiftId: prev.shiftId,
+        ownerUserId: prev.ownerUserId,
+      }));
+      toast.success('Запрос на ресурс создан');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось создать запрос на ресурс');
+    } finally {
+      setIsSubmittingResourceRequest(false);
+    }
+  };
+
+  const updateResourceRequestInState = (shiftId, requestId, nextRequest) => {
+    setShiftResourceRequests((prev) => ({
+      ...prev,
+      [shiftId]: (prev[shiftId] || []).map((request) =>
+        request.oid === requestId ? nextRequest : request,
+      ),
+    }));
+  };
+
+  const handleApproveShiftResourceRequest = async (shiftId, requestId) => {
+    if (!requestId) {
+      return;
+    }
+
+    setResourceRequestActionId(requestId);
+
+    try {
+      const updatedRequest = await approveResourceRequest(requestId);
+      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      toast.success('Запрос на ресурс подтвержден');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось подтвердить запрос на ресурс');
+    } finally {
+      setResourceRequestActionId(null);
+    }
+  };
+
+  const handleRejectShiftResourceRequest = async (shiftId, requestId) => {
+    const reason = (rejectReasonsById[requestId] || '').trim();
+
+    if (!requestId) {
+      return;
+    }
+
+    if (!reason) {
+      toast.error('Укажите причину отклонения');
+      return;
+    }
+
+    setResourceRequestActionId(requestId);
+
+    try {
+      const updatedRequest = await rejectResourceRequest(requestId, { reason });
+      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      setRejectReasonsById((prev) => ({ ...prev, [requestId]: '' }));
+      toast.success('Запрос на ресурс отклонен');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось отклонить запрос на ресурс');
+    } finally {
+      setResourceRequestActionId(null);
     }
   };
 
@@ -970,6 +1178,159 @@ const ShiftPlanningPage = () => {
                     </div>
                   </article>
                 ))
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-panel shift-planning-card">
+            <div className="section-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Ресурсы</span>
+                <h2>Запросы на ресурсы</h2>
+              </div>
+              <p>Создайте запрос на ресурс для смены, затем владелец ресурса сможет его подтвердить или отклонить.</p>
+            </div>
+
+            <form className="shift-planning-resource-form" onSubmit={handleCreateResourceRequest}>
+              <label className="field-block">
+                <span>Смена</span>
+                <select
+                  name="shiftId"
+                  value={resourceRequestForm.shiftId}
+                  onChange={handleResourceRequestFormChange}
+                  disabled={selectedProjectShifts.length === 0}
+                >
+                  {selectedProjectShifts.length === 0 ? (
+                    <option value="">Нет смен</option>
+                  ) : (
+                    selectedProjectShifts.map((shift) => (
+                      <option key={shift.oid} value={shift.oid}>
+                        {shift.title}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Владелец ресурса</span>
+                <select
+                  name="ownerUserId"
+                  value={resourceRequestForm.ownerUserId}
+                  onChange={handleResourceRequestFormChange}
+                  disabled={availableParticipantMembers.length === 0}
+                >
+                  <option value="">Выберите владельца</option>
+                  {availableParticipantMembers.map((member) => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {member.user_id} - {member.isOwner ? 'Создатель' : getRoleLabel(member.role)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Ресурс</span>
+                <select
+                  name="resourceId"
+                  value={resourceRequestForm.resourceId}
+                  onChange={handleResourceRequestFormChange}
+                  disabled={!resourceRequestForm.ownerUserId || isOwnerResourcesLoading}
+                >
+                  <option value="">
+                    {isOwnerResourcesLoading ? 'Загружаем ресурсы...' : 'Выберите ресурс'}
+                  </option>
+                  {ownerResources.map((resource) => (
+                    <option key={resource.resource_id} value={resource.resource_id}>
+                      {(resource.title || resource.resource_id)} - {(resource.resource_kind || resource.resource_type || 'Ресурс')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>С</span>
+                <input
+                  name="timeFrom"
+                  type="datetime-local"
+                  value={resourceRequestForm.timeFrom}
+                  onChange={handleResourceRequestFormChange}
+                />
+              </label>
+
+              <label className="field-block">
+                <span>До</span>
+                <input
+                  name="timeTo"
+                  type="datetime-local"
+                  value={resourceRequestForm.timeTo}
+                  onChange={handleResourceRequestFormChange}
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="profile-save-btn compact shift-planning-submit"
+                disabled={!resourceRequestForm.shiftId || isSubmittingResourceRequest}
+              >
+                {isSubmittingResourceRequest ? 'Создаем...' : 'Создать запрос'}
+              </button>
+            </form>
+
+            <div className="project-resource-requests-list">
+              {!resourceRequestForm.shiftId ? (
+                <p className="helper-note">Выберите смену, чтобы увидеть запросы на ресурсы.</p>
+              ) : selectedShiftResourceRequests.length === 0 ? (
+                <p className="helper-note">Для этой смены пока нет запросов на ресурсы.</p>
+              ) : (
+                selectedShiftResourceRequests.map((request) => {
+                  const isProcessing = resourceRequestActionId === request.oid;
+                  const canDecide = currentUserId && request.resource_owner_user_id === currentUserId;
+
+                  return (
+                    <article key={request.oid} className="project-member-card">
+                      <div>
+                        <span className="project-type-label">{request.resource_type || 'Ресурс'}</span>
+                        <h3>{request.resource_id}</h3>
+                        <p>Владелец: {request.resource_owner_user_id}</p>
+                        <p>{formatDateTime(request.time_from)} - {formatDateTime(request.time_to)}</p>
+                        {request.rejection_reason ? <p>Причина отказа: {request.rejection_reason}</p> : null}
+                        {request.reserve_failure_reason ? <p>Ошибка резерва: {request.reserve_failure_reason}</p> : null}
+                      </div>
+
+                      <div className="project-member-actions shift-resource-actions">
+                        <label className="field-block shift-resource-reason">
+                          <span>Причина отказа</span>
+                          <input
+                            value={rejectReasonsById[request.oid] || ''}
+                            onChange={(event) =>
+                              setRejectReasonsById((prev) => ({ ...prev, [request.oid]: event.target.value }))
+                            }
+                            placeholder="Укажите причину"
+                            disabled={!canDecide || isProcessing}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          className="ghost-action-btn"
+                          onClick={() => handleApproveShiftResourceRequest(request.shift_id, request.oid)}
+                          disabled={!canDecide || isProcessing}
+                        >
+                          {isProcessing ? '...' : 'Подтвердить'}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-action-btn danger"
+                          onClick={() => handleRejectShiftResourceRequest(request.shift_id, request.oid)}
+                          disabled={!canDecide || isProcessing}
+                        >
+                          {isProcessing ? '...' : 'Отклонить'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
               )}
             </div>
           </section>
