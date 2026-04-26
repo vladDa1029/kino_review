@@ -10,6 +10,7 @@ import {
   createShift,
   declineShiftParticipant,
   confirmShiftParticipant,
+  getUsers,
   inviteProjectMember,
   inviteShiftParticipant,
   listProjectMembers,
@@ -129,6 +130,9 @@ const ProjectListPage = () => {
   const [includeInactiveMembers, setIncludeInactiveMembers] = useState(false);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
   const [isInvitingMember, setIsInvitingMember] = useState(false);
+  const [memberInviteError, setMemberInviteError] = useState('');
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [updatingMemberId, setUpdatingMemberId] = useState(null);
   const [removingMemberId, setRemovingMemberId] = useState(null);
   const [shiftForm, setShiftForm] = useState(initialShiftForm);
@@ -180,6 +184,19 @@ const ProjectListPage = () => {
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
+
+  const loadAvailableUsers = useCallback(async () => {
+    setIsUsersLoading(true);
+
+    try {
+      const response = await getUsers(1, 100);
+      setAvailableUsers(Array.isArray(response?.users) ? response.users : []);
+    } catch {
+      setAvailableUsers([]);
+    } finally {
+      setIsUsersLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     setParticipantForm((prev) => {
@@ -256,6 +273,53 @@ const ProjectListPage = () => {
     () => displayedMembers.filter((member) => !member.isOwner || member.user_id),
     [displayedMembers],
   );
+  const inviteableUsers = useMemo(() => {
+    const memberIds = new Set(displayedMembers.map((member) => member.user_id).filter(Boolean));
+
+    return availableUsers.filter((user) => {
+      const userId = user.oid || user.id || '';
+
+      if (!userId || userId === currentUserId) {
+        return false;
+      }
+
+      return !memberIds.has(userId);
+    });
+  }, [availableUsers, currentUserId, displayedMembers]);
+  const userDirectory = useMemo(
+    () =>
+      new Map(
+        availableUsers.map((user) => [
+          user.oid || user.id,
+          {
+            name: user.username || user.description?.username || '',
+            email: user.email || '',
+          },
+        ]),
+      ),
+    [availableUsers],
+  );
+  const visibleMembers = useMemo(
+    () =>
+      displayedMembers.map((member) => {
+        const profile = userDirectory.get(member.user_id) || {};
+
+        return {
+          ...member,
+          displayName: profile.name || member.user_id,
+          displayEmail: profile.email || '',
+        };
+      }),
+    [displayedMembers, userDirectory],
+  );
+
+  useEffect(() => {
+    if (!memberProjectId) {
+      return;
+    }
+
+    loadAvailableUsers();
+  }, [loadAvailableUsers, memberProjectId]);
 
   useEffect(() => {
     if (!participantForm.userId) {
@@ -362,6 +426,7 @@ const ProjectListPage = () => {
 
   const handleMemberFormChange = (event) => {
     const { name, value } = event.target;
+    setMemberInviteError('');
     setMemberForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -472,18 +537,33 @@ const ProjectListPage = () => {
     event.preventDefault();
 
     const userId = memberForm.userId.trim();
+    setMemberInviteError('');
+
     if (!memberProjectId || !userId) {
-      toast.error('Выберите проект и укажите user_id участника');
+      const message = 'Выберите проект и пользователя для приглашения';
+      setMemberInviteError(message);
+      toast.error(message);
       return;
     }
 
     if (!isUuid(userId)) {
-      toast.error('user_id должен быть UUID в формате xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+      const message = 'user_id должен быть UUID в формате xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
+      setMemberInviteError(message);
+      toast.error(message);
       return;
     }
 
     if (!canManageMembers) {
-      toast.error('У вас нет прав приглашать участников в этот проект');
+      const message = 'У вас нет прав приглашать участников в этот проект';
+      setMemberInviteError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (displayedMembers.some((member) => member.user_id === userId)) {
+      const message = 'Этот пользователь уже добавлен в проект';
+      setMemberInviteError(message);
+      toast.error(message);
       return;
     }
 
@@ -496,14 +576,16 @@ const ProjectListPage = () => {
       });
       toast.success('Участник приглашен в проект');
       setMemberForm(initialMemberForm);
+      setMemberInviteError('');
       await loadMembers();
     } catch (error) {
-      toast.error(error?.message || 'Не удалось пригласить участника');
+      const message = error?.message || 'Не удалось пригласить участника';
+      setMemberInviteError(message);
+      toast.error(message);
     } finally {
       setIsInvitingMember(false);
     }
   };
-
   const handleInviteParticipant = async (event) => {
     event.preventDefault();
 
@@ -1116,15 +1198,17 @@ const ProjectListPage = () => {
           </button>
         </div>
 
-        <form className="project-member-invite-form" onSubmit={handleInviteMember}>
+        {memberInviteError ? <p className="helper-note">{memberInviteError}</p> : null}
+
+                <form className="project-member-invite-form" onSubmit={handleInviteMember}>
           <label className="field-block">
-            <span>User ID</span>
+            <span>ID user</span>
             <input
               name="userId"
               value={memberForm.userId}
               onChange={handleMemberFormChange}
               disabled={!canManageMembers}
-              placeholder="UUID пользователя"
+              placeholder="UUID ????????????"
             />
           </label>
 
@@ -1156,12 +1240,12 @@ const ProjectListPage = () => {
         <div className="project-members-list">
           {isMembersLoading ? <p className="helper-note">Загружаем участников...</p> : null}
 
-          {!isMembersLoading && displayedMembers.length === 0 ? (
+          {!isMembersLoading && visibleMembers.length === 0 ? (
             <p className="helper-note">В этом проекте пока нет участников для отображения.</p>
           ) : null}
 
           {!isMembersLoading &&
-            displayedMembers.map((member) => {
+            visibleMembers.map((member) => {
               const isCurrentUser = member.user_id === currentUserId;
               const isUpdating = updatingMemberId === member.user_id;
               const isRemoving = removingMemberId === member.user_id;
@@ -1170,12 +1254,13 @@ const ProjectListPage = () => {
                 <article key={member.oid || member.user_id} className="project-member-card">
                   <div>
                     <span className="project-type-label">{member.isOwner ? 'Создатель' : getMemberStatusLabel(member.status)}</span>
-                    <h3>{member.user_id}</h3>
+                    <h3>{member.displayName}</h3>
                     <p>
                       {isCurrentUser ? 'Это вы' : `Пригласил: ${member.invited_by || '-'}`} · Создан:
                       {' '}
                       {formatDate(member.created_at)}
                     </p>
+                    <p>{member.displayEmail || member.user_id}</p>
                   </div>
 
                   <div className="project-member-actions">

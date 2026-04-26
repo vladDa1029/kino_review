@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { ApiError } from '../services/httpClient';
+import { useAuth } from '../context/useAuth';
 import {
   createSpareTime,
   createUserDescription,
@@ -117,6 +118,7 @@ const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', {
 });
 
 const ProfilePage = () => {
+  const { userData } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
   const [savedProfile, setSavedProfile] = useState(initialProfile);
   const [descriptionId, setDescriptionId] = useState(null);
@@ -218,6 +220,13 @@ const ProfilePage = () => {
 
   const availabilityMap = useMemo(() => buildAvailabilityMap(spareTimes), [spareTimes]);
   const todayKey = toDateKey(new Date());
+  const userId =
+    userData?.user_id ||
+    userData?.userId ||
+    userData?.sub ||
+    userData?.id ||
+    userData?.oid ||
+    '';
 
   useEffect(() => {
     const keysInMonth = [...availabilityMap.keys()]
@@ -499,6 +508,7 @@ const ProfilePage = () => {
                 />
               </div>
               <div className="profile-hero-meta">
+                {userId ? <span>ID user: {userId}</span> : null}
                 <span>{monthlyWindows.length} окон в месяце</span>
                 <span>Заполнено: {completionPercent}%</span>
               </div>
