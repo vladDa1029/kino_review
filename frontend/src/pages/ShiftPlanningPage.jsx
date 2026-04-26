@@ -6,8 +6,10 @@ import {
   createShift,
   declineShiftParticipant,
   confirmShiftParticipant,
+  getDocumentDownloadUrl,
   inviteShiftParticipant,
   listProjectMembers,
+  uploadShiftDocument,
 } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { useProjectContext } from '../context/useProjectContext';
@@ -16,6 +18,7 @@ import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
 const STORAGE_KEYS = {
   shifts: 'kinoflow.projectShifts',
   participants: 'kinoflow.shiftParticipants',
+  documents: 'kinoflow.shiftDocuments',
 };
 
 const roleOptions = [
@@ -43,6 +46,11 @@ const shiftStatusLabels = {
   1: 'Подтверждена',
 };
 
+const documentTypeOptions = [
+  { value: 'PLAN', label: 'План' },
+  { value: 'SCENARIO', label: 'Сценарий' },
+];
+
 const initialShiftForm = {
   title: '',
   description: '',
@@ -56,6 +64,14 @@ const initialParticipantForm = {
   role: 'ACTOR',
   timeFrom: '',
   timeTo: '',
+};
+
+const initialDocumentForm = {
+  shiftId: '',
+  file: null,
+  docType: 'PLAN',
+  title: '',
+  description: '',
 };
 
 const getProjectId = (project) => project?.oid || project?.id || '';
@@ -97,12 +113,17 @@ const ShiftPlanningPage = () => {
   const [isMembersLoading, setIsMembersLoading] = useState(false);
   const [shiftForm, setShiftForm] = useState(initialShiftForm);
   const [participantForm, setParticipantForm] = useState(initialParticipantForm);
+  const [documentForm, setDocumentForm] = useState(initialDocumentForm);
   const [projectShifts, setProjectShifts] = useState(() => readStorage(STORAGE_KEYS.shifts));
   const [shiftParticipants, setShiftParticipants] = useState(() => readStorage(STORAGE_KEYS.participants));
+  const [shiftDocuments, setShiftDocuments] = useState(() => readStorage(STORAGE_KEYS.documents));
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [approvingShiftId, setApprovingShiftId] = useState(null);
   const [isInvitingParticipant, setIsInvitingParticipant] = useState(false);
   const [participantActionId, setParticipantActionId] = useState(null);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [loadingDocumentId, setLoadingDocumentId] = useState(null);
+  const [documentInputKey, setDocumentInputKey] = useState(0);
 
   const currentUserId = getCurrentUserId(userData);
 
@@ -117,6 +138,10 @@ const ShiftPlanningPage = () => {
   useEffect(() => {
     writeStorage(STORAGE_KEYS.participants, shiftParticipants);
   }, [shiftParticipants]);
+
+  useEffect(() => {
+    writeStorage(STORAGE_KEYS.documents, shiftDocuments);
+  }, [shiftDocuments]);
 
   useEffect(() => {
     if (memberProjectId && projects.some((project) => getProjectId(project) === memberProjectId)) {
@@ -206,9 +231,27 @@ const ShiftPlanningPage = () => {
     () => shiftParticipants[participantForm.shiftId] || [],
     [participantForm.shiftId, shiftParticipants],
   );
+  const selectedShiftDocuments = useMemo(
+    () => shiftDocuments[documentForm.shiftId] || [],
+    [documentForm.shiftId, shiftDocuments],
+  );
 
   useEffect(() => {
     setParticipantForm((prev) => {
+      const nextShiftId = selectedProjectShifts.some((shift) => shift.oid === prev.shiftId)
+        ? prev.shiftId
+        : selectedProjectShifts[0]?.oid || '';
+
+      if (nextShiftId === prev.shiftId) {
+        return prev;
+      }
+
+      return { ...prev, shiftId: nextShiftId };
+    });
+  }, [selectedProjectShifts]);
+
+  useEffect(() => {
+    setDocumentForm((prev) => {
       const nextShiftId = selectedProjectShifts.some((shift) => shift.oid === prev.shiftId)
         ? prev.shiftId
         : selectedProjectShifts[0]?.oid || '';
@@ -242,6 +285,14 @@ const ShiftPlanningPage = () => {
   const handleParticipantFormChange = (event) => {
     const { name, value } = event.target;
     setParticipantForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDocumentFormChange = (event) => {
+    const { name, value, files } = event.target;
+    setDocumentForm((prev) => ({
+      ...prev,
+      [name]: name === 'file' ? files?.[0] || null : value,
+    }));
   };
 
   const handleCreateShift = async (event) => {
@@ -389,6 +440,69 @@ const ShiftPlanningPage = () => {
         participant.oid === participantId ? nextParticipant : participant,
       ),
     }));
+  };
+
+  const handleUploadDocument = async (event) => {
+    event.preventDefault();
+
+    if (!documentForm.shiftId || !documentForm.file || !documentForm.title.trim()) {
+      toast.error('Выберите смену, файл и заполните название документа');
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав загружать документы для этой смены');
+      return;
+    }
+
+    setIsUploadingDocument(true);
+
+    try {
+      const uploadedDocument = await uploadShiftDocument(documentForm.shiftId, {
+        file: documentForm.file,
+        doc_type: documentForm.docType,
+        title: documentForm.title.trim(),
+        description: documentForm.description.trim(),
+      });
+
+      setShiftDocuments((prev) => ({
+        ...prev,
+        [documentForm.shiftId]: [uploadedDocument, ...(prev[documentForm.shiftId] || [])],
+      }));
+      setDocumentForm((prev) => ({
+        ...initialDocumentForm,
+        shiftId: prev.shiftId,
+        docType: prev.docType,
+      }));
+      setDocumentInputKey((prev) => prev + 1);
+      toast.success('Документ загружен');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось загрузить документ');
+    } finally {
+      setIsUploadingDocument(false);
+    }
+  };
+
+  const handleOpenDocument = async (documentId) => {
+    if (!documentId) {
+      return;
+    }
+
+    setLoadingDocumentId(documentId);
+
+    try {
+      const response = await getDocumentDownloadUrl(documentId);
+      if (!response?.download_url) {
+        toast.error('Ссылка на скачивание не получена');
+        return;
+      }
+
+      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось получить ссылку на документ');
+    } finally {
+      setLoadingDocumentId(null);
+    }
   };
 
   const handleConfirmParticipant = async (shiftId, participantId) => {
@@ -737,6 +851,125 @@ const ShiftPlanningPage = () => {
                     </article>
                   );
                 })
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-panel shift-planning-card">
+            <div className="section-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Документы</span>
+                <h2>Документы смены</h2>
+              </div>
+              <p>Загрузите план или сценарий для выбранной смены и получите временную ссылку на скачивание.</p>
+            </div>
+
+            <form className="shift-planning-document-form" onSubmit={handleUploadDocument}>
+              <label className="field-block">
+                <span>Смена</span>
+                <select
+                  name="shiftId"
+                  value={documentForm.shiftId}
+                  onChange={handleDocumentFormChange}
+                  disabled={selectedProjectShifts.length === 0 || !canManageMembers}
+                >
+                  {selectedProjectShifts.length === 0 ? (
+                    <option value="">Нет смен</option>
+                  ) : (
+                    selectedProjectShifts.map((shift) => (
+                      <option key={shift.oid} value={shift.oid}>
+                        {shift.title}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Тип документа</span>
+                <select
+                  name="docType"
+                  value={documentForm.docType}
+                  onChange={handleDocumentFormChange}
+                  disabled={!canManageMembers}
+                >
+                  {documentTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-block">
+                <span>Название</span>
+                <input
+                  name="title"
+                  value={documentForm.title}
+                  onChange={handleDocumentFormChange}
+                  placeholder="План первого съемочного дня"
+                  disabled={!canManageMembers || isUploadingDocument}
+                />
+              </label>
+
+              <label className="field-block">
+                <span>Описание</span>
+                <input
+                  name="description"
+                  value={documentForm.description}
+                  onChange={handleDocumentFormChange}
+                  placeholder="Необязательно"
+                  disabled={!canManageMembers || isUploadingDocument}
+                />
+              </label>
+
+              <label className="field-block">
+                <span>Файл</span>
+                <input
+                  key={documentInputKey}
+                  name="file"
+                  type="file"
+                  onChange={handleDocumentFormChange}
+                  disabled={!canManageMembers || isUploadingDocument}
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="profile-save-btn compact shift-planning-submit"
+                disabled={!documentForm.shiftId || !canManageMembers || isUploadingDocument}
+              >
+                {isUploadingDocument ? 'Загружаем...' : 'Загрузить документ'}
+              </button>
+            </form>
+
+            <div className="project-documents-list">
+              {!documentForm.shiftId ? (
+                <p className="helper-note">Выберите смену, чтобы увидеть документы.</p>
+              ) : selectedShiftDocuments.length === 0 ? (
+                <p className="helper-note">Для этой смены пока нет документов.</p>
+              ) : (
+                selectedShiftDocuments.map((document) => (
+                  <article key={document.oid} className="project-member-card">
+                    <div>
+                      <span className="project-type-label">{document.doc_type}</span>
+                      <h3>{document.title}</h3>
+                      <p>{document.description || 'Описание не указано'}</p>
+                      <p>{document.filename || document.storage_key || 'Файл без имени'} · {formatDateTime(document.created_at)}</p>
+                    </div>
+
+                    <div className="project-member-actions">
+                      <button
+                        type="button"
+                        className="ghost-action-btn"
+                        onClick={() => handleOpenDocument(document.oid)}
+                        disabled={loadingDocumentId === document.oid}
+                      >
+                        {loadingDocumentId === document.oid ? 'Получаем...' : 'Открыть ссылку'}
+                      </button>
+                    </div>
+                  </article>
+                ))
               )}
             </div>
           </section>
