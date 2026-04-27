@@ -30,7 +30,7 @@ const defaultMultiDayForm = {
   endTime: '18:00',
 };
 
-const weekDayLabels = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
+const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const pad = (value) => String(value).padStart(2, '0');
 
@@ -117,6 +117,58 @@ const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
 });
 
+const CameraIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 8h4l1.5-2h5L16 8h4v10H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M7 3v3" />
+    <path d="M17 3v3" />
+    <path d="M4 9h16" />
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12.5l2.5 2.5L16 9.5" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="9" y="9" width="10" height="10" rx="2" />
+    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const InfoIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 10v5" />
+    <path d="M12 7h.01" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.2a1 1 0 0 0-.9.6Z" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
 const ProfilePage = () => {
   const { userData } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
@@ -149,11 +201,11 @@ const ProfilePage = () => {
     setSpareTimeForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const resetSpareTimeForm = () => {
+  const resetSpareTimeForm = useCallback(() => {
     setSpareTimeForm(initialSpareTimeForm);
     setEditingSpareTimeId(null);
     setSelectedAvailabilityDateKeys([]);
-  };
+  }, []);
 
   const loadDescription = useCallback(async () => {
     try {
@@ -227,15 +279,18 @@ const ProfilePage = () => {
     userData?.id ||
     userData?.oid ||
     '';
+  const userEmail =
+    userData?.email ||
+    userData?.preferred_username ||
+    userData?.login ||
+    userData?.username ||
+    '';
 
   useEffect(() => {
     const keysInMonth = [...availabilityMap.keys()]
       .filter((key) => {
         const date = fromDateKey(key);
-        return (
-          date.getFullYear() === visibleMonth.getFullYear() &&
-          date.getMonth() === visibleMonth.getMonth()
-        );
+        return date.getFullYear() === visibleMonth.getFullYear() && date.getMonth() === visibleMonth.getMonth();
       })
       .sort();
 
@@ -260,10 +315,7 @@ const ProfilePage = () => {
     () =>
       spareTimes.filter((item) => {
         const start = new Date(item.start_time);
-        return (
-          start.getFullYear() === visibleMonth.getFullYear() &&
-          start.getMonth() === visibleMonth.getMonth()
-        );
+        return start.getFullYear() === visibleMonth.getFullYear() && start.getMonth() === visibleMonth.getMonth();
       }),
     [spareTimes, visibleMonth],
   );
@@ -272,15 +324,14 @@ const ProfilePage = () => {
     () => sortSpareTimes(availabilityMap.get(selectedDateKey) || []),
     [availabilityMap, selectedDateKey],
   );
+
   const selectedAvailabilityDateSet = useMemo(
     () => new Set(selectedAvailabilityDateKeys),
     [selectedAvailabilityDateKeys],
   );
+
   const selectedAvailabilityDatesLabel = useMemo(
-    () =>
-      selectedAvailabilityDateKeys
-        .map((dateKey) => selectedDateFormatter.format(fromDateKey(dateKey)))
-        .join(', '),
+    () => selectedAvailabilityDateKeys.map((dateKey) => selectedDateFormatter.format(fromDateKey(dateKey))).join(', '),
     [selectedAvailabilityDateKeys],
   );
 
@@ -291,6 +342,19 @@ const ProfilePage = () => {
     profile.username.trim() !== savedProfile.username.trim() ||
     profile.phone.trim() !== savedProfile.phone.trim();
   const isProfileReady = isProfileComplete(profile);
+
+  const handleCopyUserId = async () => {
+    if (!userId || !navigator?.clipboard?.writeText) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(userId);
+      toast.success('ID пользователя скопирован');
+    } catch {
+      toast.error('Не удалось скопировать ID');
+    }
+  };
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
@@ -316,9 +380,9 @@ const ProfilePage = () => {
 
       await loadDescription();
       setStoredProfileCompletion(true);
-      toast.success('Описание профиля сохранено');
+      toast.success('Профиль сохранен');
     } catch (error) {
-      toast.error(error.message || 'Не удалось сохранить описание профиля');
+      toast.error(error.message || 'Не удалось сохранить профиль');
     } finally {
       setIsSubmittingProfile(false);
     }
@@ -353,19 +417,16 @@ const ProfilePage = () => {
 
     try {
       if (editingSpareTimeId) {
-        const payload = { start_time: startTime, end_time: endTime };
-        await updateSpareTime(editingSpareTimeId, payload);
+        await updateSpareTime(editingSpareTimeId, { start_time: startTime, end_time: endTime });
         toast.success('Окно доступности обновлено');
       } else {
         await Promise.all(
-          selectedAvailabilityDateKeys.map((dateKey) => {
-            const start = buildLocalDateTime(dateKey, spareTimeForm.startTime);
-            const end = buildLocalDateTime(dateKey, spareTimeForm.endTime);
-            return createSpareTime({
-              start_time: start.toISOString(),
-              end_time: end.toISOString(),
-            });
-          }),
+          selectedAvailabilityDateKeys.map((dateKey) =>
+            createSpareTime({
+              start_time: buildLocalDateTime(dateKey, spareTimeForm.startTime).toISOString(),
+              end_time: buildLocalDateTime(dateKey, spareTimeForm.endTime).toISOString(),
+            }),
+          ),
         );
         toast.success(`Окна доступности добавлены: ${selectedAvailabilityDateKeys.length}`);
       }
@@ -426,21 +487,14 @@ const ProfilePage = () => {
   };
 
   const handleMonthChange = (direction) => {
-    setVisibleMonth(
-      (prev) => new Date(prev.getFullYear(), prev.getMonth() + direction, 1),
-    );
+    setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + direction, 1));
   };
 
   const handleCreateAvailability = () => {
     resetSpareTimeForm();
-    setIsAvailabilityFormVisible((prev) => {
-      const nextVisible = !prev;
-      if (nextVisible) {
-        setSpareTimeForm(defaultMultiDayForm);
-        setSelectedAvailabilityDateKeys([selectedDateKey]);
-      }
-      return nextVisible;
-    });
+    setSpareTimeForm(defaultMultiDayForm);
+    setSelectedAvailabilityDateKeys([selectedDateKey]);
+    setIsAvailabilityFormVisible(true);
   };
 
   const handleCalendarDaySelect = (dateKey) => {
@@ -463,130 +517,149 @@ const ProfilePage = () => {
     setProfile(savedProfile);
   };
 
+  const handleCancelAvailability = () => {
+    resetSpareTimeForm();
+    setIsAvailabilityFormVisible(false);
+  };
+
   return (
     <section className="profile-route-page">
-      <div className="profile-modal-shell profile-reference-shell profile-route-shell">
-        <div className="profile-modal-scroll profile-reference-scroll profile-route-scroll">
-          <form className="profile-hero-card profile-hero-form" onSubmit={handleProfileSubmit}>
-            <div className="profile-hero-avatar">
-              <label
-                className={`profile-avatar-preview profile-reference-avatar ${avatarPreview ? '' : 'is-empty'}`}
-                htmlFor="avatar-upload"
-              >
-                {avatarPreview ? <img src={avatarPreview} alt="Предпросмотр аватара" /> : null}
-              </label>
-              <input
-                id="avatar-upload"
-                className="profile-avatar-input"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-              />
-            </div>
-
-            <div className="profile-hero-content">
-              <p className="profile-modal-kicker">Profile</p>
-              <div className="profile-hero-inputs">
-                <input
-                  id="profile-modal-title"
-                  name="username"
-                  type="text"
-                  value={profile.username}
-                  onChange={handleProfileChange}
-                  placeholder="Введите ФИО"
-                  className="profile-hero-input profile-hero-name-input"
-                  required
-                />
-                <input
-                  name="phone"
-                  type="tel"
-                  value={profile.phone}
-                  onChange={handleProfileChange}
-                  placeholder="+79991234567"
-                  className="profile-hero-input profile-hero-phone-input"
-                  required
-                />
+      <div className="profile-modal-shell profile-route-shell profile-dashboard-shell">
+        <div className="profile-modal-scroll profile-route-scroll profile-dashboard">
+          <form className="profile-card-surface profile-top-card" onSubmit={handleProfileSubmit}>
+            <div className="profile-top-header">
+              <div>
+                <h1 className="profile-top-title">Профиль пользователя</h1>
               </div>
-              <div className="profile-hero-meta">
-                {userId ? <span>ID user: {userId}</span> : null}
-                <span>{monthlyWindows.length} окон в месяце</span>
-                <span>Заполнено: {completionPercent}%</span>
-              </div>
-              {!isProfileReady ? (
-                <p className="profile-hero-warning">
-                  Заполните ФИО и телефон. Пока эти поля пустые, переход в другие разделы будет недоступен.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="profile-hero-actions">
-              <button
-                type="submit"
-                className="profile-save-btn compact profile-hero-submit"
-                disabled={isSubmittingProfile || !isProfileDirty || isProfileLoading}
-              >
-                {isSubmittingProfile ? 'Сохранение...' : 'Сохранить'}
-              </button>
-              <button
-                type="button"
-                className="secondary-btn profile-hero-action"
-                onClick={handleCancelProfileEdit}
-                disabled={!isProfileDirty || isSubmittingProfile}
-              >
-                Сбросить
-              </button>
-              {!isProfileDirty ? (
+              <div className="profile-top-actions">
                 <button
                   type="button"
-                  className="profile-hero-hint-btn"
-                  disabled
+                  className="secondary-btn profile-top-btn"
+                  onClick={handleCancelProfileEdit}
+                  disabled={!isProfileDirty || isSubmittingProfile}
                 >
-                  Редактируйте прямо здесь
+                  Сбросить
                 </button>
-              ) : null}
+                <button
+                  type="submit"
+                  className="profile-save-btn profile-top-btn"
+                  disabled={isSubmittingProfile || !isProfileDirty || isProfileLoading}
+                >
+                  {isSubmittingProfile ? 'Сохранение...' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
+
+            <div className="profile-top-body">
+              <div className="profile-avatar-upload">
+                <label
+                  className={`profile-avatar-circle ${avatarPreview ? '' : 'is-empty'}`}
+                  htmlFor="avatar-upload"
+                >
+                  {avatarPreview ? <img src={avatarPreview} alt="Предпросмотр аватара" /> : <CameraIcon />}
+                </label>
+                <input
+                  id="avatar-upload"
+                  className="profile-avatar-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                />
+                <span className="profile-avatar-caption">Загрузить фото</span>
+              </div>
+
+              <div className="profile-content-grid">
+                <div className="profile-field-grid">
+                  <label className="field-block profile-dashboard-field">
+                    <span>ФИО</span>
+                    <input
+                      name="username"
+                      type="text"
+                      value={profile.username}
+                      onChange={handleProfileChange}
+                      placeholder="Введите ФИО"
+                      className="profile-input"
+                      required
+                    />
+                  </label>
+
+                  <label className="field-block profile-dashboard-field">
+                    <span>Email</span>
+                    <input
+                      type="text"
+                      value={userEmail || 'user@example.com'}
+                      className="profile-input profile-readonly-input"
+                      readOnly
+                    />
+                  </label>
+
+                  <label className="field-block profile-dashboard-field">
+                    <span>Телефон</span>
+                    <input
+                      name="phone"
+                      type="tel"
+                      value={profile.phone}
+                      onChange={handleProfileChange}
+                      placeholder="+79991234567"
+                      className="profile-input"
+                      required
+                    />
+                  </label>
+                </div>
+
+                <div className="profile-meta-grid">
+                  {userId ? (
+                    <div className="profile-meta-chip profile-id-chip">
+                      <span>ID: {userId}</span>
+                      <button type="button" className="profile-copy-btn" onClick={handleCopyUserId} aria-label="Скопировать ID">
+                        <CopyIcon />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="profile-meta-chip">
+                    <CalendarIcon />
+                    <span>Окон в месяце: {monthlyWindows.length}</span>
+                  </div>
+
+                  <div className={`profile-meta-chip profile-completion-chip ${isProfileReady ? 'is-complete' : ''}`}>
+                    <CheckCircleIcon />
+                    <span>Заполнено: {completionPercent}%</span>
+                  </div>
+                </div>
+
+                {!isProfileReady ? (
+                  <div className="profile-warning-banner">
+                    Заполните ФИО и телефон. Пока эти поля пустые, переход в другие разделы будет недоступен.
+                  </div>
+                ) : null}
+              </div>
             </div>
           </form>
 
-          <section className="profile-reference-layout profile-reference-layout-single">
-            <div className="profile-reference-column">
-              <div className="profile-panel-header">
+          <section className="profile-availability-layout">
+            <div className="profile-card-surface profile-calendar-section">
+              <div className="profile-section-head">
                 <div>
-                  <h3>Calendar</h3>
-                  <p>Личная доступность по дням</p>
+                  <h2 className="profile-panel-title">Доступность</h2>
+                  <p className="profile-panel-subtitle">Календарь доступности по дням</p>
                 </div>
-                <button
-                  type="button"
-                  className="secondary-btn profile-panel-action"
-                  onClick={handleCreateAvailability}
-                >
-                  {isAvailabilityFormVisible ? 'Скрыть форму' : 'Добавить окно'}
-                </button>
               </div>
 
-              <div className="profile-calendar-card">
+              <div className="profile-calendar-card profile-calendar-card-large">
                 <div className="profile-calendar-toolbar">
-                  <button
-                    type="button"
-                    className="calendar-nav-btn"
-                    onClick={() => handleMonthChange(-1)}
-                    aria-label="Предыдущий месяц"
-                  >
+                  <button type="button" className="calendar-nav-btn" onClick={() => handleMonthChange(-1)} aria-label="Предыдущий месяц">
                     ‹
                   </button>
                   <strong>{monthLabel}</strong>
-                  <button
-                    type="button"
-                    className="calendar-nav-btn"
-                    onClick={() => handleMonthChange(1)}
-                    aria-label="Следующий месяц"
-                  >
+                  <button type="button" className="calendar-nav-btn" onClick={() => handleMonthChange(1)} aria-label="Следующий месяц">
                     ›
                   </button>
                 </div>
 
                 <div className="profile-weekdays">
-                  {weekDayLabels.map((day, index) => (
-                    <span key={`${day}-${index}`}>{day}</span>
+                  {weekDayLabels.map((day) => (
+                    <span key={day}>{day}</span>
                   ))}
                 </div>
 
@@ -602,47 +675,70 @@ const ProfilePage = () => {
                         day.isSelected ? 'is-selected' : '',
                         day.availabilityCount > 0 ? 'has-availability' : '',
                         selectedAvailabilityDateSet.has(day.dateKey) ? 'is-pending-availability' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
+                      ].filter(Boolean).join(' ')}
                       onClick={() => handleCalendarDaySelect(day.dateKey)}
                     >
                       <span>{day.label}</span>
-                      {day.availabilityCount > 0 ? (
-                        <small>{day.availabilityCount}</small>
-                      ) : null}
+                      {day.availabilityCount > 1 ? <small>{day.availabilityCount}</small> : null}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              <div className="profile-day-summary">
-                <h4>{selectedDateLabel}</h4>
-                <p>
-                  {selectedDateWindows.length > 0
-                    ? `На этот день найдено ${selectedDateWindows.length} окно(а).`
-                    : 'На этот день пока нет доступных окон.'}
-                </p>
+                <div className="profile-calendar-legend">
+                  <span className="profile-legend-item">
+                    <i className="is-available" />
+                    Доступные окна
+                  </span>
+                  <span className="profile-legend-item">
+                    <i className="is-multiple" />
+                    Несколько окон
+                  </span>
+                  <span className="profile-legend-item">
+                    <i className="is-empty" />
+                    Нет доступных окон
+                  </span>
+                  <span className="profile-legend-item">
+                    <i className="is-muted" />
+                    Вне месяца
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <aside className="profile-card-surface profile-selected-panel">
+              <div className="profile-selected-panel-head">
+                <div>
+                  <h2 className="profile-panel-title">{selectedDateLabel}</h2>
+                  <p className="profile-panel-subtitle">
+                    {selectedDateWindows.length > 0
+                      ? `Найдено окон: ${selectedDateWindows.length}`
+                      : 'Нет доступных окон'}
+                  </p>
+                </div>
+                <button type="button" className="profile-save-btn profile-add-window-btn" onClick={handleCreateAvailability}>
+                  <PlusIcon />
+                  <span>Добавить окно</span>
+                </button>
               </div>
 
               {isSpareTimesLoading ? (
-                <div className="profile-empty-card">Загрузка окон доступности...</div>
+                <div className="profile-day-empty">Загрузка окон доступности...</div>
               ) : selectedDateWindows.length > 0 ? (
-                <div className="profile-window-list">
+                <div className="profile-window-stack">
                   {selectedDateWindows.map((item) => (
-                    <article key={item.oid} className="profile-window-card">
-                      <div>
-                        <strong>{formatDateTime(item.start_time)}</strong>
-                        <p>{formatDateTime(item.end_time)}</p>
+                    <article key={item.oid} className="profile-window-item">
+                      <div className="profile-window-copy">
+                        <strong className="profile-window-time">{formatDateTime(item.start_time)}</strong>
+                        <p className="profile-window-range">{formatDateTime(item.end_time)}</p>
                       </div>
-                      <div className="profile-window-actions">
+                      <div className="profile-window-action-row">
                         <button
                           type="button"
                           className="ghost-action-btn"
                           onClick={() => handleEditSpareTime(item.oid)}
                           disabled={loadingSpareTimeId === item.oid}
                         >
-                          {loadingSpareTimeId === item.oid ? '...' : 'Edit'}
+                          {loadingSpareTimeId === item.oid ? '...' : 'Изменить'}
                         </button>
                         <button
                           type="button"
@@ -650,25 +746,27 @@ const ProfilePage = () => {
                           onClick={() => handleDeleteSpareTime(item.oid)}
                           disabled={deletingSpareTimeId === item.oid}
                         >
-                          {deletingSpareTimeId === item.oid ? '...' : 'Delete'}
+                          {deletingSpareTimeId === item.oid ? '...' : 'Удалить'}
                         </button>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
-                <div className="profile-empty-card">
-                  Окна на выбранный день появятся здесь.
+                <div className="profile-day-empty">
+                  <CalendarIcon />
+                  <strong>Окна на выбранный день появятся здесь</strong>
+                  <p>Добавьте окно, чтобы сделать этот день доступным.</p>
                 </div>
               )}
 
               {isAvailabilityFormVisible ? (
-                <form className="profile-editor-card" onSubmit={handleSpareTimeSubmit}>
+                <form className="profile-quick-form" onSubmit={handleSpareTimeSubmit}>
                   <div className="profile-editor-head">
-                    <h4>{editingSpareTimeId ? 'Редактирование окна' : 'Новое окно доступности'}</h4>
+                    <h3>{editingSpareTimeId ? 'Редактирование окна' : 'Быстрое добавление окна'}</h3>
                     <p>
                       {editingSpareTimeId
-                        ? 'Измените точные дату и время для выбранного окна.'
+                        ? 'Измените дату и время для выбранного окна.'
                         : 'Выберите один или несколько дней в календаре и задайте общий интервал времени.'}
                     </p>
                   </div>
@@ -680,7 +778,7 @@ const ProfilePage = () => {
                     </div>
                   ) : null}
 
-                  <div className="grid-two-columns">
+                  <div className="profile-quick-form-grid">
                     <label className="field-block" htmlFor="spare-time-start">
                       <span>Начало</span>
                       <input
@@ -695,7 +793,7 @@ const ProfilePage = () => {
                     </label>
 
                     <label className="field-block" htmlFor="spare-time-end">
-                      <span>Окончание</span>
+                      <span>Конец</span>
                       <input
                         id="spare-time-end"
                         name="endTime"
@@ -709,38 +807,39 @@ const ProfilePage = () => {
                   </div>
 
                   <div className="inline-actions">
-                    <button
-                      type="submit"
-                      className="profile-save-btn compact"
-                      disabled={isSubmittingSpareTime}
-                    >
+                    <button type="button" className="secondary-btn" onClick={handleCancelAvailability}>
+                      Отмена
+                    </button>
+                    <button type="submit" className="profile-save-btn compact" disabled={isSubmittingSpareTime}>
                       {isSubmittingSpareTime
                         ? 'Сохранение...'
                         : editingSpareTimeId
                           ? 'Обновить окно'
-                          : `Добавить на ${selectedAvailabilityDateKeys.length || 0} дн.`}
+                          : 'Добавить окно'}
                     </button>
-                    {editingSpareTimeId ? (
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={resetSpareTimeForm}
-                      >
-                        Сбросить
-                      </button>
-                    ) : null}
                   </div>
                 </form>
-              ) : null}
-
-              {!isAvailabilityFormVisible ? (
-                <div className="profile-empty-card subtle">
-                  ФИО и телефон редактируются прямо в верхней карточке. Здесь можно открыть только
-                  форму доступности.
+              ) : (
+                <div className="profile-quick-form profile-quick-form-closed">
+                  <div className="profile-editor-head">
+                    <h3>Быстрое добавление окна</h3>
+                    <p>Нажмите кнопку выше, чтобы открыть форму для выбранного дня.</p>
+                  </div>
                 </div>
-              ) : null}
-            </div>
+              )}
+            </aside>
           </section>
+
+          <div className="profile-card-surface profile-footer-bar">
+            <div className="profile-footer-note">
+              <InfoIcon />
+              <span>Время указано по вашему часовому поясу: Москва (GMT+3)</span>
+            </div>
+            <button type="button" className="ghost-action-btn profile-footer-settings">
+              <SettingsIcon />
+              <span>Настройки доступности</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>

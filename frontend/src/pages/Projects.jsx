@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../constants';
 import { ApiError } from '../services/httpClient';
@@ -331,7 +332,129 @@ const getWindowPayload = (windowForm) => {
   return { start_time, end_time };
 };
 
+const CircleIconButton = ({ children, title }) => (
+  <button type="button" className="projects-icon-circle" title={title} aria-label={title}>
+    {children}
+  </button>
+);
+
+const MicrophoneIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 1 0 6 0V6a3 3 0 0 0-3-3Z" />
+    <path d="M6 11a6 6 0 0 0 12 0" />
+    <path d="M12 17v4" />
+    <path d="M8 21h8" />
+  </svg>
+);
+
+const CameraIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 8h4l1.5-2h5L16 8h4v10H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+);
+
+const TripodIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 4v7" />
+    <path d="M9 11h6" />
+    <path d="M12 4l4 7H8z" />
+    <path d="M12 11l-5 9" />
+    <path d="M12 11l5 9" />
+    <path d="M12 11v9" />
+  </svg>
+);
+
+const LightIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 3a6 6 0 0 0-4 10.5c.9.8 1.5 1.9 1.8 3h4.4c.3-1.1.9-2.2 1.8-3A6 6 0 0 0 12 3Z" />
+    <path d="M10 19h4" />
+    <path d="M10.5 21h3" />
+  </svg>
+);
+
+const SoundIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 10v4" />
+    <path d="M8 7v10" />
+    <path d="M12 5v14" />
+    <path d="M16 7v10" />
+    <path d="M20 10v4" />
+  </svg>
+);
+
+const PropsIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 7.5a2.5 2.5 0 1 1 5 0c0 1.4-1.1 2.5-2.5 2.5S6 8.9 6 7.5Z" />
+    <path d="M13 6a2 2 0 1 1 4 0c0 1.1-.9 2-2 2s-2-.9-2-2Z" />
+    <path d="M5 18v-2.5c0-2 1.6-3.5 3.5-3.5h0c2 0 3.5 1.6 3.5 3.5V18" />
+    <path d="M12.5 18v-2c0-1.7 1.3-3 3-3h0c1.7 0 3 1.3 3 3v2" />
+  </svg>
+);
+
+const ListIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M8 7h12" />
+    <path d="M8 12h12" />
+    <path d="M8 17h12" />
+    <path d="M4 7h.01" />
+    <path d="M4 12h.01" />
+    <path d="M4 17h.01" />
+  </svg>
+);
+
+const HelpIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 4.3 1.7c-.8.8-1.8 1.3-1.8 2.8" />
+    <path d="M12 17h.01" />
+  </svg>
+);
+
+const BellIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M7 10a5 5 0 1 1 10 0v3.5l1.5 2.5h-13L7 13.5z" />
+    <path d="M10 18a2 2 0 0 0 4 0" />
+  </svg>
+);
+
+const ArrowIcon = ({ direction = 'right' }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className={`projects-arrow projects-arrow-${direction}`}>
+    <path d="M5 12h14" />
+    <path d="M13 6l6 6-6 6" />
+  </svg>
+);
+
+const PhotoIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M8 13l2.5-2.5L16 16" />
+    <circle cx="15.5" cy="9" r="1.5" />
+  </svg>
+);
+
+const getResourceIcon = (resourceKey) => {
+  switch (resourceKey) {
+    case 'microfons':
+      return <MicrophoneIcon />;
+    case 'cameras':
+      return <CameraIcon />;
+    case 'camera-tripods':
+    case 'light-tripods':
+      return <TripodIcon />;
+    case 'lights':
+      return <LightIcon />;
+    case 'sounds':
+      return <SoundIcon />;
+    case 'requisites':
+      return <PropsIcon />;
+    default:
+      return <ListIcon />;
+  }
+};
+
 const Projects = () => {
+  const navigate = useNavigate();
   const { userData } = useAuth();
   const {
     activeProject,
@@ -375,6 +498,11 @@ const Projects = () => {
   const todayKey = useMemo(() => toDateKey(new Date()), []);
   const currentUserId = useMemo(() => getCurrentUserId(userData), [userData]);
   const activeProjectTitle = activeProject?.title || 'Проект не выбран';
+  const workspaceStatusLabel = !activeProject
+    ? 'Не выбран'
+    : isProjectResourcesLoading || loading
+      ? 'Загрузка'
+      : 'Активен';
   const projectResourceIds = useMemo(
     () => getProjectResourceIds(projectResources, activeResource),
     [activeResource, projectResources],
@@ -454,7 +582,42 @@ const Projects = () => {
 
     return entries.map(([kind, count]) => `${kind}: ${count}`).join(', ');
   }, [projectResourceSummary]);
+  const categoryCounts = useMemo(
+    () =>
+      resourceOrder.reduce((acc, resourceKey) => {
+        acc[resourceKey] = getProjectResourceIds(projectResources, resourceKey).size;
+        return acc;
+      }, {}),
+    [projectResources],
+  );
+  const totalWindows = useMemo(
+    () =>
+      projectResources.reduce(
+        (acc, resource) => acc + (Array.isArray(resource.windows) ? resource.windows.length : 0),
+        0,
+      ),
+    [projectResources],
+  );
+  const totalReservedWindows = useMemo(
+    () =>
+      projectResources.reduce(
+        (acc, resource) =>
+          acc + (Array.isArray(resource.windows)
+            ? resource.windows.filter((window) => /(reserved|booked|busy|taken|occupied)/i.test(window.status || '')).length
+            : 0),
+        0,
+      ),
+    [projectResources],
+  );
+  const totalAvailableWindows = Math.max(totalWindows - totalReservedWindows, 0);
+  const selectedDayStatLabel = activeDateFilterKey
+    ? selectedDateFormatter.format(new Date(`${activeDateFilterKey}T00:00:00`))
+    : selectedDateFormatter.format(new Date(`${selectedDateKey}T00:00:00`));
   const isWorkspaceLoading = loading || isProjectResourcesLoading;
+
+  const handleScrollToForm = useCallback(() => {
+    document.getElementById('workspace-resource-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
@@ -1021,24 +1184,64 @@ const Projects = () => {
             <p>
               {activeProject
                 ? `Открыт раздел: ${currentResource.label}. ${projectResourceSummaryLabel}.`
-                : 'Выберите проект, чтобы рабочая область показывала нужный контекст.'}
+                : 'Выберите проект, чтобы рабочая область показала нужный контекст.'}
             </p>
+            <div className="project-switcher-inline project-switcher-readonly">
+              <div className="active-project-readout">
+                <span>Проект</span>
+                <strong>{activeProject ? activeProject.title : 'Выберите проект'}</strong>
+              </div>
+              <button type="button" className="ghost-action-btn" onClick={() => navigate('/my-projects')}>
+                Перейти к проектам
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            className="secondary-btn projects-layout-toggle"
-            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            aria-expanded={!isSidebarCollapsed}
-            aria-controls="projects-categories-panel"
-          >
-            <span className="projects-layout-toggle-icon" aria-hidden="true">
-              {isSidebarCollapsed ? '↓' : '↑'}
-            </span>
-            <span>{isSidebarCollapsed ? 'Показать категории' : 'Скрыть категории'}</span>
-          </button>
-        </div>
+          <div className="projects-overview-controls">
+            <div className="projects-status-chip-wrap">
+              <span>Статус</span>
+              <strong className="projects-status-chip">{workspaceStatusLabel}</strong>
+              <div className="projects-header-tools" aria-hidden="true">
+                <CircleIconButton title="Помощь">
+                  <HelpIcon />
+                </CircleIconButton>
+                <CircleIconButton title="Уведомления">
+                  <BellIcon />
+                </CircleIconButton>
+                <CircleIconButton title="AI">
+                  <strong>AI</strong>
+                </CircleIconButton>
+              </div>
+            </div>
 
+            <div className="projects-overview-stats">
+              <article className="projects-stat-card">
+                <span>Объектов</span>
+                <strong>{projectResources.length}</strong>
+              </article>
+              <article className="projects-stat-card">
+                <span>Доступно</span>
+                <strong>{totalAvailableWindows}</strong>
+              </article>
+              <article className="projects-stat-card">
+                <span>Занято</span>
+                <strong>{totalReservedWindows}</strong>
+              </article>
+            </div>
+
+            <div className="projects-overview-actions">
+              <button
+                type="button"
+                className="secondary-btn projects-layout-toggle"
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                aria-expanded={!isSidebarCollapsed}
+                aria-controls="projects-categories-panel"
+              >
+                <span>{isSidebarCollapsed ? 'Показать категории' : 'Скрыть категории'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
         <aside id="projects-categories-panel" className="dashboard-panel projects-sidebar">
           <div className="projects-sidebar-heading">
             <span className="projects-panel-eyebrow">Разделы инвентаря</span>
@@ -1057,8 +1260,11 @@ const Projects = () => {
                   className={`projects-sidebar-button ${isActive ? 'is-active' : ''}`}
                   onClick={() => switchResource(resourceKey)}
                 >
+                  <span className="projects-sidebar-button-icon" aria-hidden="true">
+                    {getResourceIcon(resourceKey)}
+                  </span>
                   <span>{resource.label}</span>
-                  <small>{isActive ? `${pagination.totalCount} позиций` : 'Открыть'}</small>
+                  <small>{isActive ? `${categoryCounts[resourceKey] || 0} позиций` : 'Открыть'}</small>
                 </button>
               );
             })}
@@ -1066,100 +1272,127 @@ const Projects = () => {
 
           <div className="projects-sidebar-note">
             <strong>{currentResource.label}</strong>
-            <span>{pagination.totalCount} позиций</span>
+            <span>{categoryCounts[activeResource] || 0} позиций</span>
           </div>
         </aside>
 
         <div className="projects-center-column">
           <section className="dashboard-panel project-context-panel">
-            <div className="section-heading">
+            <div className="section-heading project-context-heading">
               <div>
                 <span className="projects-panel-eyebrow">Данные проекта</span>
                 <h2>{activeProject ? activeProject.title : 'Проект не выбран'}</h2>
               </div>
               <p>
                 {isProjectResourcesLoading
-                  ? 'Загружаем ресурсы проекта...'
+                  ? 'Загружаем данные проекта...'
                   : `Ресурсов в проекте: ${projectResources.length}`}
               </p>
             </div>
 
+            <div className="project-context-summary-grid">
+              <article className="project-context-summary-card is-blue">
+                <span>Объектов</span>
+                <strong>{projectResources.length}</strong>
+              </article>
+              <article className="project-context-summary-card">
+                <span>Забронировано</span>
+                <strong>{totalReservedWindows}</strong>
+              </article>
+              <article className="project-context-summary-card is-green">
+                <span>Доступно</span>
+                <strong>{totalAvailableWindows}</strong>
+              </article>
+            </div>
+
             {activeProject ? (
-              <div className="project-context-grid">
-                {projectResources.slice(0, 6).map((resource) => (
-                  <article key={`${resource.resource_kind}-${resource.resource_id}`} className="project-context-card">
-                    <span>{resource.resource_kind || resource.resource_type || 'Ресурс'}</span>
-                    <strong>{resource.title}</strong>
-                    <p>{resource.description || 'Без описания'}</p>
-                    <small>
-                      Окон доступности: {Array.isArray(resource.windows) ? resource.windows.length : 0}
-                    </small>
-                  </article>
-                ))}
+              <>
+                <div className="project-context-grid">
+                  {projectResources.slice(0, 6).map((resource) => (
+                    <article key={`${resource.resource_kind}-${resource.resource_id}`} className="project-context-card">
+                      <span>{resource.resource_kind || resource.resource_type || 'Ресурс'}</span>
+                      <strong>{resource.title}</strong>
+                      <p>{resource.description || 'Без описания'}</p>
+                      <small>
+                        Окон доступности: {Array.isArray(resource.windows) ? resource.windows.length : 0}
+                      </small>
+                    </article>
+                  ))}
+                </div>
 
                 {!isProjectResourcesLoading && projectResources.length === 0 ? (
                   <p className="helper-note">
-                    Для этого проекта пока нет назначенных ресурсов или backend не вернул их для вашей роли.
+                    Для этого проекта пока не назначены ресурсы или backend еще не вернул их для вашей роли.
                   </p>
                 ) : null}
-              </div>
+              </>
             ) : (
               <p className="helper-note">Создайте или выберите проект на странице проектов.</p>
             )}
           </section>
-
           <section className="dashboard-panel">
             <div className="section-heading">
               <h2>{editingId ? `Редактирование: ${currentResource.one}` : `Новый объект: ${currentResource.one}`}</h2>
               <p>Центральная панель отвечает за создание и редактирование элементов выбранной категории.</p>
             </div>
 
-            <form className="stacked-form resource-form" onSubmit={handleSubmit}>
-              <label className="field-block">
-                <span>Название</span>
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleChange}
-                  placeholder={currentResource.placeholders.title}
-                />
-              </label>
+            <form id="workspace-resource-form" className="stacked-form resource-form" onSubmit={handleSubmit}>
+              <div className="projects-resource-form-grid">
+                <div className="projects-resource-form-fields">
+                  <label className="field-block">
+                    <span>Название</span>
+                    <input
+                      name="title"
+                      value={form.title}
+                      onChange={handleChange}
+                      placeholder={currentResource.placeholders.title}
+                    />
+                  </label>
 
-              <label className="field-block">
-                <span>Описание</span>
-                <textarea
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder={currentResource.placeholders.description}
-                  rows={4}
-                />
-              </label>
+                  <div className="grid-two-columns">
+                    <label className="field-block">
+                      <span>Тип</span>
+                      <input
+                        name="type"
+                        value={form.type}
+                        onChange={handleChange}
+                        placeholder={currentResource.placeholders.type}
+                      />
+                    </label>
 
-              <div className="grid-two-columns">
-                <label className="field-block">
-                  <span>Тип</span>
-                  <input
-                    name="type"
-                    value={form.type}
+                    {activeResource === 'requisites' ? (
+                      <label className="field-block">
+                        <span>Размер</span>
+                        <input
+                          name="size"
+                          value={form.size}
+                          onChange={handleChange}
+                          placeholder={currentResource.placeholders.size}
+                        />
+                      </label>
+                    ) : (
+                      <div className="projects-form-placeholder" aria-hidden="true" />
+                    )}
+                  </div>
+                </div>
+
+                <label className="field-block projects-form-description">
+                  <span>Описание</span>
+                  <textarea
+                    name="description"
+                    value={form.description}
                     onChange={handleChange}
-                    placeholder={currentResource.placeholders.type}
+                    placeholder={currentResource.placeholders.description}
+                    rows={4}
                   />
                 </label>
 
-                {activeResource === 'requisites' ? (
-                  <label className="field-block">
-                    <span>Размер</span>
-                    <input
-                      name="size"
-                      value={form.size}
-                      onChange={handleChange}
-                      placeholder={currentResource.placeholders.size}
-                    />
-                  </label>
-                ) : (
-                  <div className="projects-form-placeholder" aria-hidden="true" />
-                )}
+                <div className="projects-upload-tile" aria-hidden="true">
+                  <PhotoIcon />
+                  <strong>Добавьте фото</strong>
+                  <span>(необязательно)</span>
+                  <small>JPG, PNG до 5 МБ</small>
+                </div>
               </div>
 
               <div className="inline-actions">
@@ -1423,7 +1656,7 @@ const Projects = () => {
             <div className="projects-calendar-header">
               <div>
                 <span className="projects-panel-eyebrow">Календарь</span>
-                <h2>{currentResource.label}</h2>
+                <h2>{monthFormatter.format(visibleMonth)}</h2>
               </div>
               <div className="profile-calendar-toolbar">
                 <button
@@ -1431,15 +1664,17 @@ const Projects = () => {
                   className="ghost-action-btn"
                   onClick={() => setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
                 >
-                  ‹
+                  <ArrowIcon direction="left" />
                 </button>
-                <strong>{monthFormatter.format(visibleMonth)}</strong>
                 <button
                   type="button"
                   className="ghost-action-btn"
                   onClick={() => setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
                 >
-                  ›
+                  <ArrowIcon direction="right" />
+                </button>
+                <button type="button" className="ghost-action-btn" onClick={() => setVisibleMonth(startOfMonth(new Date()))}>
+                  Сегодня
                 </button>
               </div>
             </div>
@@ -1475,20 +1710,63 @@ const Projects = () => {
             <div className="projects-calendar-summary">
               <p>
                 {selectedItem
-                  ? 'Кликайте по дням, чтобы добавить или убрать их из нового окна доступности.'
+                  ? 'Нажмите на день, чтобы отметить его для нового окна доступности.'
                   : activeDateFilterKey
-                  ? `Фильтр по дате: ${activeDayLabel}. Элементов: ${selectedDayItems.length}.`
-                  : 'Нажмите на день, чтобы отфильтровать таблицу по дате создания.'}
+                    ? `Записи за день: ${activeDayLabel}. Найдено: ${selectedDayItems.length}.`
+                    : 'Нажмите на день, чтобы открыть таблицу по дате создания.'}
               </p>
               {selectedItem && selectedFreeTimeDateKeys.length > 0 ? (
                 <button type="button" className="ghost-action-btn" onClick={() => setSelectedFreeTimeDateKeys([])}>
-                  Очистить выбор
+                  Сбросить выбор
                 </button>
               ) : activeDateFilterKey ? (
                 <button type="button" className="ghost-action-btn" onClick={() => setActiveDateFilterKey(null)}>
-                  Показать все
+                  Очистить день
                 </button>
               ) : null}
+            </div>
+          </section>
+
+          <section className="dashboard-panel projects-side-info-card">
+            <div className="section-heading compact-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Доступность на выбранный день</span>
+                <h2>{selectedDayStatLabel}</h2>
+              </div>
+            </div>
+            <div className="projects-mini-stats-grid">
+              <article className="projects-mini-stat is-green">
+                <span>Доступно</span>
+                <strong>{selectedItem ? selectedFreeTimeDateKeys.length : selectedDayItems.length}</strong>
+              </article>
+              <article className="projects-mini-stat">
+                <span>Занято</span>
+                <strong>{selectedItem ? selectedItemFreeTimes.length : totalReservedWindows}</strong>
+              </article>
+              <article className="projects-mini-stat is-blue">
+                <span>Всего</span>
+                <strong>{selectedItem ? selectedItemFreeTimes.length + selectedFreeTimeDateKeys.length : projectResources.length}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="dashboard-panel projects-side-info-card">
+            <div className="section-heading compact-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Последняя активность</span>
+                <h2>Журнал рабочей зоны</h2>
+              </div>
+            </div>
+            <div className="projects-activity-card">
+              <p>
+                {selectedItem
+                  ? `Сейчас в фокусе: ${selectedItem.title}. Вы можете редактировать доступность, бронирование и медиа.`
+                  : 'Нет данных о действиях. Выберите объект в таблице или день в календаре.'}
+              </p>
+              <button type="button" className="ghost-action-btn">
+                <ListIcon />
+                <span>Журнал активности</span>
+              </button>
             </div>
           </section>
         </aside>
