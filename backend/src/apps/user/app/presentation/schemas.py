@@ -121,6 +121,22 @@ class BrokerUserExistenceRequested(BaseModel):
     user_id: UUID
 
 
+class BrokerUserEmailLookupRequested(BaseModel):
+    correlation_id: UUID
+    reply_topic: str
+    email: str
+
+
+class BrokerProjectMemberInvitationRequested(BaseModel):
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    member_id: UUID
+    user_id: UUID
+    role: str
+    invited_by_user_id: UUID
+
+
 class BrokerShiftParticipantReservationCheckRequested(BaseModel):
     request_id: UUID
     project_id: UUID

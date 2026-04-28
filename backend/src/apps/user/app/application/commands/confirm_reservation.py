@@ -57,7 +57,13 @@ class ConfirmReservationByTokenHandler:
 
         if isinstance(payload, ParticipantConfirmationTokenData):
             return await self._confirm_participant(payload)
-        return await self._confirm_resource(payload)
+        if isinstance(payload, ResourceConfirmationTokenData):
+            return await self._confirm_resource(payload)
+        return ReservationConfirmationResult(
+            page="invalid",
+            title="Invalid link",
+            message="This confirmation link is invalid.",
+        )
 
     async def _confirm_participant(
         self,

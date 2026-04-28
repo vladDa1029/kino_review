@@ -5,11 +5,19 @@ from uuid import uuid4
 import jwt
 
 from app.application.commands.approval_notifications import (
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedCommand,
     HandleParticipantApprovalRequestedHandler,
 )
+from app.application.commands.confirm_project_invitation import (
+    ConfirmProjectInvitationByTokenHandler,
+)
 from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
-from app.application.ports.approvals import ParticipantApprovalState
+from app.application.ports.approvals import (
+    ParticipantApprovalState,
+    ProjectMemberInvitationTokenData,
+)
 from app.config import ConfirmationSettings
 from app.infrastructure.security.confirmation_token import JWTConfirmationTokenService
 from test.helpers import FakeEntityRepository, make_user
@@ -96,6 +104,42 @@ def test_participant_approval_request_publishes_email_event() -> None:
     asyncio.run(scenario())
 
 
+def test_project_member_invitation_request_publishes_email_event() -> None:
+    async def scenario() -> None:
+        settings = _settings()
+        user_id = uuid4()
+        handler = HandleProjectMemberInvitationRequestedHandler(
+            users=FakeEntityRepository([make_user(user_id)]),
+            publisher=FakePublisher(),
+            confirmation_tokens=JWTConfirmationTokenService(settings),
+            confirmation=settings,
+        )
+        publisher = handler._publisher  # type: ignore[attr-defined]
+
+        await handler(
+            HandleProjectMemberInvitationRequestedCommand(
+                request_id=uuid4(),
+                project_id=uuid4(),
+                project_title="Feature film",
+                member_id=uuid4(),
+                user_id=user_id,
+                role="CAMERA",
+                invited_by_user_id=uuid4(),
+            )
+        )
+
+        assert publisher.events[0][0] == "notification.email_requested"
+        event = publisher.events[0][1]
+        assert event["template"] == "project_member_invitation"
+        assert event["payload"]["project_title"] == "Feature film"
+        assert event["payload"]["role"] == "CAMERA"
+        assert event["payload"]["accept_url"].startswith(
+            "http://localhost:8000/user/project-invitations/"
+        )
+
+    asyncio.run(scenario())
+
+
 def test_confirmation_token_service_detects_tampered_and_expired_tokens() -> None:
     settings = _settings()
     service = JWTConfirmationTokenService(settings)
@@ -157,6 +201,71 @@ def test_confirmation_token_service_detects_tampered_and_expired_tokens() -> Non
     )
     expired = asyncio.run(invalid_handler(expired_token))
     assert expired.page == "expired"
+
+
+def test_project_member_invitation_token_decodes_project_invitation_payload() -> None:
+    settings = _settings()
+    service = JWTConfirmationTokenService(settings)
+    request_id = uuid4()
+    project_id = uuid4()
+    member_id = uuid4()
+    user_id = uuid4()
+
+    token = service.issue_project_member_invitation_token(
+        request_id=request_id,
+        project_id=project_id,
+        member_id=member_id,
+        user_id=user_id,
+        role="ACTOR",
+    )
+
+    payload = service.decode_confirmation_token(token)
+
+    assert isinstance(payload, ProjectMemberInvitationTokenData)
+    assert payload.request_id == request_id
+    assert payload.project_id == project_id
+    assert payload.member_id == member_id
+    assert payload.user_id == user_id
+    assert payload.role == "ACTOR"
+
+
+def test_confirm_project_invitation_requires_matching_logged_in_user() -> None:
+    async def scenario() -> None:
+        settings = _settings()
+        token_service = JWTConfirmationTokenService(settings)
+        invited_user_id = uuid4()
+        token = token_service.issue_project_member_invitation_token(
+            request_id=uuid4(),
+            project_id=uuid4(),
+            member_id=uuid4(),
+            user_id=invited_user_id,
+            role="ACTOR",
+        )
+        publisher = FakePublisher()
+        handler = ConfirmProjectInvitationByTokenHandler(
+            confirmation_tokens=token_service,
+            publisher=publisher,
+        )
+
+        mismatch = await handler(token=token, actor_user_id=uuid4())
+        accepted = await handler(token=token, actor_user_id=invited_user_id)
+
+        assert mismatch.page == "invalid"
+        assert accepted.page == "success"
+        assert publisher.events == [
+            (
+                "project.member.approved",
+                {
+                    "project_id": str(
+                        token_service.decode_confirmation_token(token).project_id
+                    ),
+                    "user_id": str(invited_user_id),
+                    "approved_by_user_id": str(invited_user_id),
+                },
+            )
+        ]
+
+    asyncio.run(scenario())
 
 
 def test_confirm_reservation_handler_reserves_and_publishes_success_event() -> None:

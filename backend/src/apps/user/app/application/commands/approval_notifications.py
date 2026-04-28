@@ -91,6 +91,17 @@ class HandleResourceApprovalRequestedCommand:
     time_to: datetime
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HandleProjectMemberInvitationRequestedCommand:
+    request_id: UUID
+    project_id: UUID
+    project_title: str
+    member_id: UUID
+    user_id: UUID
+    role: str
+    invited_by_user_id: UUID
+
+
 class HandleResourceApprovalRequestedHandler:
     def __init__(
         self,
@@ -142,8 +153,57 @@ class HandleResourceApprovalRequestedHandler:
         )
 
 
+class HandleProjectMemberInvitationRequestedHandler:
+    def __init__(
+        self,
+        *,
+        users: UserRepository,
+        publisher: EventPublisher,
+        confirmation_tokens: ConfirmationTokenPort,
+        confirmation: ConfirmationSettings,
+    ) -> None:
+        self._users = users
+        self._publisher = publisher
+        self._confirmation_tokens = confirmation_tokens
+        self._confirmation = confirmation
+
+    async def __call__(
+        self,
+        command: HandleProjectMemberInvitationRequestedCommand,
+    ) -> None:
+        user = await self._users.get(BaseId(command.user_id))
+        if user is None:
+            return
+        token = self._confirmation_tokens.issue_project_member_invitation_token(
+            request_id=command.request_id,
+            project_id=command.project_id,
+            member_id=command.member_id,
+            user_id=command.user_id,
+            role=command.role,
+        )
+        await self._publisher.publish(
+            EMAIL_REQUESTED_TOPIC,
+            {
+                "notification_id": str(command.request_id),
+                "template": "project_member_invitation",
+                "recipient_email": str(user.email),
+                "subject": _project_member_invitation_subject(command.project_title),
+                "payload": {
+                    "accept_url": _project_invitation_url(self._confirmation, token),
+                    "project_title": command.project_title,
+                    "role": command.role,
+                    "invited_by_user_id": str(command.invited_by_user_id),
+                },
+            },
+        )
+
+
 def _confirm_url(settings: ConfirmationSettings, token: str) -> str:
     return f"{settings.public_base_url.rstrip('/')}/user/confirmations/{token}"
+
+
+def _project_invitation_url(settings: ConfirmationSettings, token: str) -> str:
+    return f"{settings.public_base_url.rstrip('/')}/user/project-invitations/{token}"
 
 
 def _participant_subject(shift_title: str) -> str:
@@ -152,3 +212,7 @@ def _participant_subject(shift_title: str) -> str:
 
 def _resource_subject(shift_title: str) -> str:
     return f"Confirm resource reservation for shift '{shift_title}'"
+
+
+def _project_member_invitation_subject(project_title: str) -> str:
+    return f"Project invitation: {project_title}"

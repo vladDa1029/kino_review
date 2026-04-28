@@ -159,8 +159,17 @@ class UserResourceItem:
     windows: tuple[UserResourceTimeWindow, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class UserIdentity:
+    user_id: UUID
+    email: str
+
+
 class UserServicePort(Protocol):
     async def ensure_user_exists(self, user_id: UUID) -> None:
+        raise NotImplementedError
+
+    async def get_user_by_email(self, email: str) -> UserIdentity:
         raise NotImplementedError
 
     async def ensure_user_resource_exists(

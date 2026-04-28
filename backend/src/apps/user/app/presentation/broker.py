@@ -2,6 +2,8 @@ from dishka import AsyncContainer
 from faststream.rabbit import RabbitRouter
 
 from app.application.commands.approval_notifications import (
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedCommand,
     HandleParticipantApprovalRequestedHandler,
     HandleResourceApprovalRequestedCommand,
@@ -19,7 +21,12 @@ from app.application.commands.user_registered import (
     UserRegisteredCommand,
     UserRegisteredHandler,
 )
-from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
+from app.application.queries.users import (
+    GetUserByEmailHandler,
+    GetUserByEmailQuery,
+    GetUserExistsHandler,
+    GetUserExistsQuery,
+)
 from app.application.queries.report_snapshot import (
     ProvideShiftReportSnapshotHandler,
     ProvideShiftReportSnapshotQuery,
@@ -30,6 +37,7 @@ from app.application.ports.broker import EventPublisher
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
+    PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
     SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
@@ -38,6 +46,7 @@ from app.infrastructure.adapters.broker import (
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
     USER_EVENTS_EXCHANGE,
+    USER_EMAIL_LOOKUP_REQUESTED_QUEUE,
     USER_EXISTENCE_REQUESTED_QUEUE,
     USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
@@ -45,6 +54,7 @@ from app.infrastructure.adapters.broker import (
 from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
 from app.presentation.schemas import (
     BrokerUserExistenceRequested,
+    BrokerProjectMemberInvitationRequested,
     BrokerShiftParticipantApprovalRequested,
     BrokerShiftReportSnapshotRequested,
     BrokerShiftParticipantReservationCheckRequested,
@@ -53,6 +63,7 @@ from app.presentation.schemas import (
     BrokerShiftResourceRequestReservationCheckRequested,
     BrokerShiftResourceRequestReservationRequested,
     BrokerUserRegistered,
+    BrokerUserEmailLookupRequested,
 )
 
 
@@ -98,6 +109,35 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
                         "response_type": "user.existence_provided",
                         "user_id": str(event.user_id),
                         "exists": exists,
+                    },
+                )
+
+    @router.subscriber(USER_EMAIL_LOOKUP_REQUESTED_QUEUE, exchange=PROJECT_EVENTS_EXCHANGE)
+    async def handle_user_email_lookup_requested(event: BrokerUserEmailLookupRequested) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(GetUserByEmailHandler)
+            publisher = await request_container.get(EventPublisher)
+            try:
+                result = await handler(GetUserByEmailQuery(email=event.email))
+            except Exception as exc:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "user.email_lookup_failed",
+                        "email": event.email,
+                        "reason": str(exc),
+                    },
+                )
+            else:
+                await publisher.publish(
+                    event.reply_topic,
+                    {
+                        "correlation_id": str(event.correlation_id),
+                        "response_type": "user.email_lookup_provided",
+                        "email": result.email if result is not None else event.email,
+                        "user_id": str(result.user_id) if result is not None else None,
+                        "exists": result is not None,
                     },
                 )
 
@@ -253,6 +293,27 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
                         "resource_id": str(event.resource_id),
                     },
                 )
+
+    @router.subscriber(
+        PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_project_member_invitation_requested(
+        event: BrokerProjectMemberInvitationRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(HandleProjectMemberInvitationRequestedHandler)
+            await handler(
+                HandleProjectMemberInvitationRequestedCommand(
+                    request_id=event.request_id,
+                    project_id=event.project_id,
+                    project_title=event.project_title,
+                    member_id=event.member_id,
+                    user_id=event.user_id,
+                    role=event.role,
+                    invited_by_user_id=event.invited_by_user_id,
+                )
+            )
 
     @router.subscriber(
         SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,

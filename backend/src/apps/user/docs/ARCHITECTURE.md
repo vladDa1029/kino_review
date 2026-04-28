@@ -71,7 +71,8 @@ Key adapters:
 | Equipment availability | `/users/{user_id}/{resource-kind}/{resource_id}/free-times` | `X-User-Id` | Manage or list resource windows |
 | Requisite images | `/users/{user_id}/requisites/{requisite_id}/images` | `X-User-Id` | Upload, list, read, and delete image metadata |
 | Legacy direct reserve | `/users/{user_id}/availability/reserve` | `X-User-Id` | Compatibility endpoint for direct reserve contract |
-| Public confirmation | `/confirmations/{token}` | public | One-click approval flow from email |
+| Public confirmation | `/confirmations/{token}` | public | One-click reservation approval flow from email |
+| Project invitation confirmation | `/project-invitations/{token}` | `X-User-Id` | Accept project invitation links; caller must match the invited user |
 
 ### Inbound Events
 
@@ -79,6 +80,8 @@ Key adapters:
 | --- | --- | --- | --- | --- |
 | `user.registered` | `user.registered` | `user.registered.user` | `auth` | Build or refresh local user projection |
 | `user.existence_requested` | `project.events` | `user.existence_requested.user` | `project` | V1 broker request/reply for invited user existence validation |
+| `user.email_lookup_requested` | `project.events` | `user.email_lookup_requested.user` | `project` | Resolve registered user id from invite email |
+| `project.member_invitation_requested` | `project.events` | `project.member_invitation_requested.user` | `project` | Build project invitation email request |
 | `shift.participant_reservation_check_requested` | `project.events` | `shift.participant_reservation_check_requested.user` | `project` | Check participant availability without final reserve |
 | `shift.resource_request_reservation_check_requested` | `project.events` | `shift.resource_request_reservation_check_requested.user` | `project` | Check resource availability without final reserve |
 | `shift.report_snapshot_requested` | `project.events` | `shift.report_snapshot_requested.user` | `project` | Provide user-owned enrichment for generated shift reports |
@@ -94,12 +97,14 @@ Key adapters:
 | Routing key | Exchange | Consumer | Trigger |
 | --- | --- | --- | --- |
 | `user.existence_provided` / `user.existence_failed` | `user.events` via `project.reply.<instance_id>` | `project` | V1 reply to invited-user existence lookup |
+| `user.email_lookup_provided` / `user.email_lookup_failed` | `user.events` via `project.reply.<instance_id>` | `project` | Reply to project email-invite lookup |
 | `shift.report_snapshot_provided` / `shift.report_snapshot_failed` | `user.events` via `project.reply.<instance_id>` | `project` | Reply with report enrichment snapshot |
 | `shift.participant_reservation_check_succeeded` | `user.events` | `project` | Participant interval is currently reservable |
 | `shift.participant_reservation_check_failed` | `user.events` | `project` | Participant interval cannot be reserved |
 | `shift.resource_request_reservation_check_succeeded` | `user.events` | `project` | Resource interval is currently reservable |
 | `shift.resource_request_reservation_check_failed` | `user.events` | `project` | Resource interval cannot be reserved |
 | `notification.email_requested` | `user.events` | `notificate` | Confirmation email must be delivered |
+| `project.member.approved` | `user.events` | `project` | Authenticated invitee accepted project invitation link |
 | `shift.participant_approval_state_requested` | `user.events` | `project` | V3 approval-state request before final participant reserve |
 | `shift.resource_request_approval_state_requested` | `user.events` | `project` | V3 approval-state request before final resource reserve |
 | `shift.participant_reserved.user` | `user.events` | `project` | Final participant reserve succeeded |
@@ -115,21 +120,23 @@ Key adapters:
 
 ### Confirmation Token Claims
 
-| Claim | Participant approval | Resource approval | Notes |
-| --- | --- | --- | --- |
-| `type` | `participant_approval` | `resource_request_approval` | Distinguishes token payload shape |
-| `request_id` | required | required | Correlates token to project-side request |
-| `project_id` | required | required | Project ownership check |
-| `shift_id` | required | required | Shift ownership check |
-| `participant_id` | required | - | Present only for participant approval |
-| `user_id` | required | - | Participant user id |
-| `resource_request_id` | - | required | Present only for resource approval |
-| `owner_user_id` | - | required | Resource owner user id |
-| `resource_id` | - | required | Reserved resource id |
-| `time_from` | required | required | Expected start time |
-| `time_to` | required | required | Expected end time |
-| `iat` | required | required | Issued-at timestamp |
-| `exp` | required | required | Expiration timestamp |
+| Claim | Participant approval | Resource approval | Project invitation | Notes |
+| --- | --- | --- | --- | --- |
+| `type` | `participant_approval` | `resource_request_approval` | `project_member_invitation` | Distinguishes token payload shape |
+| `request_id` | required | required | required | Correlates token to project-side request |
+| `project_id` | required | required | required | Project ownership check |
+| `shift_id` | required | required | - | Shift ownership check |
+| `participant_id` | required | - | - | Present only for participant approval |
+| `user_id` | required | - | required | Participant or invited user id |
+| `member_id` | - | - | required | Project membership row id |
+| `role` | - | - | required | Invited project role |
+| `resource_request_id` | - | required | - | Present only for resource approval |
+| `owner_user_id` | - | required | - | Resource owner user id |
+| `resource_id` | - | required | - | Reserved resource id |
+| `time_from` | required | required | - | Expected start time |
+| `time_to` | required | required | - | Expected end time |
+| `iat` | required | required | required | Issued-at timestamp |
+| `exp` | required | required | required | Expiration timestamp |
 
 ## Key Flows
 
@@ -155,6 +162,16 @@ Key adapters:
 4. `notificate` sends the email.
 5. The user clicks `/user/confirmations/{token}` through the gateway.
 
+### Project invitation email flow
+
+1. `project` resolves the invite email through `user.email_lookup_requested`; only registered users can be invited by email.
+2. `project` writes the project member as `INVITED` and emits `project.member_invitation_requested`.
+3. `user` loads the invitee, issues a signed `project_member_invitation` token, and emits `notification.email_requested`.
+4. `notificate` sends the email.
+5. The invitee clicks `/user/project-invitations/{token}` through the gateway while authenticated.
+6. `user` verifies the token user id matches `X-User-Id` and emits `project.member.approved`.
+7. `project` activates the invited member if the invitation is still in `INVITED`.
+
 ### Report enrichment for generated shift reports
 
 1. `project` emits `shift.report_snapshot_requested` with project-owned participant and resource context.
@@ -177,6 +194,7 @@ Key adapters:
 - If you change confirmation-token claims, update [app/infrastructure/security/confirmation_token.py](../app/infrastructure/security/confirmation_token.py), the confirmation endpoint, tests, and the architecture table above in one change.
 - If you change any reservation event payload, update producer, consumer, Pydantic schema, and interservice tests together. Do not treat broker payloads as informal.
 - If you change the approval email flow, keep the broker-based recheck in `project`. Do not replace it with local assumptions inside `user`.
+- If you change the project invitation email flow, update `project` invite producer, `user` token/link handling, `notificate` template schema, gateway public/protected assumptions, docs, and tests together.
 - If you change report snapshot enrichment, update the broker consumer, payload schemas, project-side reply handling, docs, and tests together.
 - If you change image storage behavior, update storage adapter, config docs, and tests for both metadata and binary backend behavior.
 - If you add a new public route, verify whether it must stay public through the gateway or still require `X-User-Id`.

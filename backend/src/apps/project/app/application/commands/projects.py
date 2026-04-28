@@ -211,8 +211,9 @@ class UpdateProjectHandler:
 class InviteProjectMemberCommand:
     project_id: UUID
     actor_user_id: UUID
-    invited_user_id: UUID
     role: ProjectRole
+    invited_user_id: UUID | None = None
+    email: str | None = None
 
 
 class InviteProjectMemberHandler:
@@ -243,21 +244,30 @@ class InviteProjectMemberHandler:
             project = await self._projects.get_by_id(command.project_id)
             if project is None:
                 raise EntityNotFoundError("Project is not found.")
-            await self._user_service.ensure_user_exists(command.invited_user_id)
             actor = await get_actor_member(
                 project_members=self._project_members,
                 project_id=command.project_id,
                 user_id=command.actor_user_id,
             )
+            if (command.invited_user_id is None) == (command.email is None):
+                raise StateTransitionError("Provide exactly one of invited_user_id or email.")
+            if command.invited_user_id is None:
+                assert command.email is not None
+                invited_user = await self._user_service.get_user_by_email(command.email.strip())
+                invited_user_id = invited_user.user_id
+            else:
+                invited_user_id = command.invited_user_id
+                await self._user_service.ensure_user_exists(invited_user_id)
+
             existing = await self._project_members.get_by_project_and_user(
                 project_id=command.project_id,
-                user_id=command.invited_user_id,
+                user_id=invited_user_id,
             )
             member = self._membership_service.invite_member(
                 actor=actor,
                 member_id=self._id_generator(),
                 project_id=command.project_id,
-                invited_user_id=command.invited_user_id,
+                invited_user_id=invited_user_id,
                 invited_by=command.actor_user_id,
                 role=command.role,
                 now=now,
@@ -277,9 +287,22 @@ class InviteProjectMemberHandler:
             topic="project.member_invited",
             payload={
                 "project_id": str(command.project_id),
-                "invited_user_id": str(command.invited_user_id),
+                "invited_user_id": str(member.user_id),
                 "role": int(command.role),
                 "invited_by": str(command.actor_user_id),
+            },
+        )
+        await publish_best_effort(
+            publisher=self._publisher,
+            topic="project.member_invitation_requested",
+            payload={
+                "request_id": str(member.oid),
+                "project_id": str(command.project_id),
+                "project_title": project.title,
+                "member_id": str(member.oid),
+                "user_id": str(member.user_id),
+                "role": member.role.name,
+                "invited_by_user_id": str(command.actor_user_id),
             },
         )
         return member

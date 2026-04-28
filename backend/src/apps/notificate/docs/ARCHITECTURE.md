@@ -75,14 +75,16 @@ Core adapters:
 | `notification_id` | yes | Correlation identifier from producer |
 | `recipient_email` | yes | Target email |
 | `subject` | yes | Rendered subject supplied by producer |
-| `template` | yes | Current value is `reservation_confirmation` |
-| `payload.confirm_url` | yes | Public confirmation link |
+| `template` | yes | Supported values: `reservation_confirmation`, `project_member_invitation` |
+| `payload.confirm_url` | reservation | Public reservation confirmation link |
+| `payload.accept_url` | project invitation | Authenticated project invitation accept link |
 | `payload.project_title` | yes | Used in email body |
-| `payload.shift_title` | yes | Used in email body |
-| `payload.time_from` | yes | ISO string for email body |
-| `payload.time_to` | yes | ISO string for email body |
-| `payload.role` | conditional | Present for participant approval emails |
+| `payload.shift_title` | reservation | Used in reservation email body |
+| `payload.time_from` | reservation | ISO string for reservation email body |
+| `payload.time_to` | reservation | ISO string for reservation email body |
+| `payload.role` | conditional | Present for participant approval and project invitation emails |
 | `payload.resource_type` | conditional | Present for resource-owner approval emails |
+| `payload.invited_by_user_id` | project invitation | Optional context for project invitation emails |
 
 ### Outbound Delivery Interfaces
 
@@ -132,6 +134,6 @@ Core adapters:
 ## Current Limitations
 
 - Only email delivery is implemented.
-- Only one template, `reservation_confirmation`, is implemented.
+- Implemented templates are `reservation_confirmation` and `project_member_invitation`.
 - There is no delivery persistence, bounce handling, or dead-letter strategy.
 - Retry policy is generic and not template-specific.

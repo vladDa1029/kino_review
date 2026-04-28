@@ -32,6 +32,18 @@ USER_EXISTENCE_REQUESTED_QUEUE = RabbitQueue(
     routing_key="user.existence_requested",
 )
 
+USER_EMAIL_LOOKUP_REQUESTED_QUEUE = RabbitQueue(
+    name="user.email_lookup_requested.user",
+    durable=True,
+    routing_key="user.email_lookup_requested",
+)
+
+PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE = RabbitQueue(
+    name="project.member_invitation_requested.user",
+    durable=True,
+    routing_key="project.member_invitation_requested",
+)
+
 SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE = RabbitQueue(
     name="shift.participant_reservation_check_requested.user",
     durable=True,

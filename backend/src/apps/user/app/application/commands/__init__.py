@@ -47,7 +47,13 @@ from app.application.commands.confirm_reservation import (
     ConfirmReservationByTokenHandler,
     ReservationConfirmationResult,
 )
+from app.application.commands.confirm_project_invitation import (
+    ConfirmProjectInvitationByTokenHandler,
+    ProjectInvitationConfirmationResult,
+)
 from app.application.commands.approval_notifications import (
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedCommand,
     HandleParticipantApprovalRequestedHandler,
     HandleResourceApprovalRequestedCommand,
@@ -127,6 +133,8 @@ __all__ = [
     "AddSoundFreeTimeHandler",
     "CheckAvailabilityCommand",
     "CheckAvailabilityHandler",
+    "ConfirmProjectInvitationByTokenHandler",
+    "ProjectInvitationConfirmationResult",
     "ConfirmReservationByTokenHandler",
     "ReservationConfirmationResult",
     "AddSpareTimeCommand",
@@ -167,6 +175,8 @@ __all__ = [
     "RemoveImageHandler",
     "ReserveAvailabilityCommand",
     "ReserveAvailabilityHandler",
+    "HandleProjectMemberInvitationRequestedCommand",
+    "HandleProjectMemberInvitationRequestedHandler",
     "HandleParticipantApprovalRequestedCommand",
     "HandleParticipantApprovalRequestedHandler",
     "HandleResourceApprovalRequestedCommand",

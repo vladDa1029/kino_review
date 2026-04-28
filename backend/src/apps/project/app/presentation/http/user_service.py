@@ -6,6 +6,7 @@ import httpx
 
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
+    UserIdentity,
     UserResourceItem,
     UserResourceTimeWindow,
     UserServicePort,
@@ -13,11 +14,14 @@ from app.application.ports.domain import (
 from app.config import UserService
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
-from app.presentation.schemas import BrokerUserExistenceReply
+from app.presentation.schemas import BrokerUserEmailLookupReply, BrokerUserExistenceReply
 
 USER_EXISTENCE_REQUESTED_TOPIC = "user.existence_requested"
 USER_EXISTENCE_PROVIDED = "user.existence_provided"
 USER_EXISTENCE_FAILED = "user.existence_failed"
+USER_EMAIL_LOOKUP_REQUESTED_TOPIC = "user.email_lookup_requested"
+USER_EMAIL_LOOKUP_PROVIDED = "user.email_lookup_provided"
+USER_EMAIL_LOOKUP_FAILED = "user.email_lookup_failed"
 
 
 class UserServiceHttpClient(UserServicePort):
@@ -92,6 +96,46 @@ class UserServiceHttpClient(UserServicePort):
             raise EntityNotFoundError(f"User {user_id} does not exist.")
         if event.exists is not True:
             raise ExternalServiceError("User-service existence reply is missing 'exists'.")
+
+    async def get_user_by_email(self, email: str) -> UserIdentity:
+        normalized_email = email.strip()
+        correlation_id = str(uuid4())
+        self._reply_inbox.register(correlation_id)
+        try:
+            await self._publisher.publish(
+                USER_EMAIL_LOOKUP_REQUESTED_TOPIC,
+                {
+                    "correlation_id": correlation_id,
+                    "reply_topic": self._reply_inbox.reply_topic,
+                    "email": normalized_email,
+                },
+            )
+        except Exception as exc:
+            self._reply_inbox.discard(correlation_id)
+            raise ExternalServiceError(f"User-service email lookup publish failed: {exc}") from exc
+
+        try:
+            payload = await self._reply_inbox.wait_for(
+                correlation_id,
+                timeout=self._settings.timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise ExternalServiceError("User-service email lookup reply timed out.") from exc
+
+        try:
+            event = BrokerUserEmailLookupReply.model_validate(payload)
+        except Exception as exc:
+            raise ExternalServiceError("User-service email lookup reply payload is invalid.") from exc
+
+        if str(event.correlation_id) != correlation_id:
+            raise ExternalServiceError("User-service email lookup reply correlation mismatch.")
+        if event.response_type == USER_EMAIL_LOOKUP_FAILED:
+            raise ExternalServiceError(event.reason or "User-service email lookup failed.")
+        if event.exists is False or event.user_id is None:
+            raise EntityNotFoundError(f"User with email {normalized_email} does not exist.")
+        if event.exists is not True:
+            raise ExternalServiceError("User-service email lookup reply is missing 'exists'.")
+        return UserIdentity(user_id=event.user_id, email=event.email)
 
     async def list_user_resources(
         self,

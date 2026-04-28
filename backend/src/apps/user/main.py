@@ -23,6 +23,7 @@ from app.domain.errors.base import ApplicationError
 from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
+    PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
     SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
@@ -31,6 +32,7 @@ from app.infrastructure.adapters.broker import (
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
     USER_EVENTS_EXCHANGE,
+    USER_EMAIL_LOOKUP_REQUESTED_QUEUE,
     USER_REGISTERED_EXCHANGE,
     USER_EXISTENCE_REQUESTED_QUEUE,
     USER_REGISTERED_QUEUE,
@@ -59,6 +61,8 @@ async def lifespan(app: FastAPI):
     await broker.declare_queue(build_reply_queue(reply_inbox))
     await broker.declare_queue(USER_REGISTERED_QUEUE)
     await broker.declare_queue(USER_EXISTENCE_REQUESTED_QUEUE)
+    await broker.declare_queue(USER_EMAIL_LOOKUP_REQUESTED_QUEUE)
+    await broker.declare_queue(PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE)
     await broker.declare_queue(SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE)

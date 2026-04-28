@@ -6,6 +6,7 @@ import jwt
 from app.application.ports.approvals import (
     ConfirmationTokenPort,
     ParticipantConfirmationTokenData,
+    ProjectMemberInvitationTokenData,
     ResourceConfirmationTokenData,
 )
 from app.config import ConfirmationSettings
@@ -69,10 +70,34 @@ class JWTConfirmationTokenService(ConfirmationTokenPort):
             }
         )
 
+    def issue_project_member_invitation_token(
+        self,
+        *,
+        request_id,
+        project_id,
+        member_id,
+        user_id,
+        role,
+    ) -> str:
+        return self._encode(
+            {
+                "type": "project_member_invitation",
+                "request_id": str(request_id),
+                "project_id": str(project_id),
+                "member_id": str(member_id),
+                "user_id": str(user_id),
+                "role": role,
+            }
+        )
+
     def decode_confirmation_token(
         self,
         token: str,
-    ) -> ParticipantConfirmationTokenData | ResourceConfirmationTokenData:
+    ) -> (
+        ParticipantConfirmationTokenData
+        | ResourceConfirmationTokenData
+        | ProjectMemberInvitationTokenData
+    ):
         try:
             payload = jwt.decode(
                 jwt=token,
@@ -106,6 +131,14 @@ class JWTConfirmationTokenService(ConfirmationTokenPort):
                     resource_id=UUID(payload["resource_id"]),
                     time_from=datetime.fromisoformat(payload["time_from"]),
                     time_to=datetime.fromisoformat(payload["time_to"]),
+                )
+            if token_type == "project_member_invitation":
+                return ProjectMemberInvitationTokenData(
+                    request_id=UUID(payload["request_id"]),
+                    project_id=UUID(payload["project_id"]),
+                    member_id=UUID(payload["member_id"]),
+                    user_id=UUID(payload["user_id"]),
+                    role=str(payload["role"]),
                 )
         except (KeyError, TypeError, ValueError) as exc:
             raise ConfirmationTokenInvalidError() from exc

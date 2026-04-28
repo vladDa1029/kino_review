@@ -41,6 +41,7 @@ from app.application.commands.resources import (
 )
 from app.application.ports.domain import (
     StoredFile,
+    UserIdentity,
     UserResourceItem,
     UserResourceTimeWindow,
 )
@@ -128,11 +129,18 @@ class FakeUserService:
     def __init__(self, fail_reserve_user: bool = False) -> None:
         self.fail_reserve_user = fail_reserve_user
         self.existing_users: set[UUID] = set()
+        self.users_by_email: dict[str, UUID] = {}
         self.resources: dict[tuple[UUID, str], list[UserResourceItem]] = {}
         self.request_ids: list[UUID] = []
 
     async def ensure_user_exists(self, user_id: UUID) -> None:
         self.existing_users.add(user_id)
+
+    async def get_user_by_email(self, email: str) -> UserIdentity:
+        user_id = self.users_by_email.get(email)
+        if user_id is None:
+            raise EntityNotFoundError("User is not found by email.")
+        return UserIdentity(user_id=user_id, email=email)
 
     async def ensure_user_resource_exists(
         self,
@@ -627,6 +635,70 @@ def test_invite_project_member_still_checks_invited_user_exists() -> None:
         assert member.user_id == invited_user_id
         assert member.status == ProjectMemberStatus.INVITED
         assert invited_user_id in user_service.existing_users
+        assert publisher.events[-1][0] == "project.member_invitation_requested"
+        assert publisher.events[-1][1]["user_id"] == str(invited_user_id)
+        assert publisher.events[-1][1]["project_title"] == "Invite members"
+
+    asyncio.run(scenario())
+
+
+def test_invite_project_member_can_resolve_invitee_by_email() -> None:
+    async def scenario():
+        (
+            create_project_handler,
+            _,
+            _,
+            tx,
+            publisher,
+            user_service,
+            projects,
+            members,
+            _,
+            _,
+            _,
+            _,
+        ) = build_context()
+        owner_id = uuid4()
+        invited_user_id = uuid4()
+        invitee_email = "invitee@example.com"
+        user_service.users_by_email[invitee_email] = invited_user_id
+        project = await create_project_handler(
+            CreateProjectCommand(
+                owner_id=owner_id,
+                title="Email invite project",
+                description="Desc",
+            )
+        )
+        handler = InviteProjectMemberHandler(
+            transaction_manager=tx,
+            clock=SystemClock(),
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=members,
+            projects=projects,
+            membership_service=ProjectMembershipService(),
+        )
+
+        member = await handler(
+            InviteProjectMemberCommand(
+                project_id=project.oid,
+                actor_user_id=owner_id,
+                email=invitee_email,
+                role=ProjectRole.ACTOR,
+            )
+        )
+
+        assert member.user_id == invited_user_id
+        assert member.status == ProjectMemberStatus.INVITED
+        assert invited_user_id not in user_service.existing_users
+        invite_event = publisher.events[-1]
+        assert invite_event[0] == "project.member_invitation_requested"
+        assert invite_event[1]["request_id"] == str(member.oid)
+        assert invite_event[1]["project_id"] == str(project.oid)
+        assert invite_event[1]["project_title"] == "Email invite project"
+        assert invite_event[1]["user_id"] == str(invited_user_id)
+        assert invite_event[1]["role"] == "ACTOR"
 
     asyncio.run(scenario())
 

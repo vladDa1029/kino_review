@@ -131,6 +131,32 @@ def test_send_email_renders_resource_type_when_present() -> None:
     asyncio.run(scenario())
 
 
+def test_send_email_renders_project_member_invitation_body() -> None:
+    async def scenario() -> None:
+        sender = FakeSender()
+        handler = SendNotificationEmailHandler(sender=sender)
+        command = SendNotificationEmailCommand(
+            recipient_email="invitee@example.com",
+            subject="Project invitation: Feature film",
+            template="project_member_invitation",
+            payload={
+                "accept_url": "http://localhost:8000/user/project-invitations/token",
+                "project_title": "Feature film",
+                "role": "CAMERA",
+                "invited_by_user_id": "director-id",
+            },
+        )
+
+        await handler(command)
+
+        assert sender.messages[0].recipient_email == "invitee@example.com"
+        assert "Feature film" in sender.messages[0].body
+        assert "Role: CAMERA" in sender.messages[0].body
+        assert "http://localhost:8000/user/project-invitations/token" in sender.messages[0].body
+
+    asyncio.run(scenario())
+
+
 def test_taskiq_dispatcher_uses_registered_task() -> None:
     async def scenario() -> None:
         task = FakeTask()

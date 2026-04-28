@@ -160,6 +160,62 @@ def test_ensure_user_exists_raises_external_error_on_timeout_and_cleans_waiter()
     asyncio.run(scenario())
 
 
+def test_get_user_by_email_publishes_lookup_request_and_returns_identity() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(
+            inbox=inbox,
+            responder=lambda topic, payload: {
+                "correlation_id": payload["correlation_id"],
+                "response_type": "user.email_lookup_provided",
+                "email": payload["email"],
+                "user_id": str(user_id),
+                "exists": True,
+            },
+        )
+        client = UserServiceHttpClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        identity = await client.get_user_by_email("invitee@example.com")
+
+        assert identity.user_id == user_id
+        assert identity.email == "invitee@example.com"
+        assert publisher.events[0][0] == "user.email_lookup_requested"
+        assert publisher.events[0][1]["reply_topic"] == inbox.reply_topic
+        assert publisher.events[0][1]["email"] == "invitee@example.com"
+
+    asyncio.run(scenario())
+
+
+def test_get_user_by_email_raises_not_found_when_reply_reports_missing_user() -> None:
+    async def scenario() -> None:
+        inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")
+        publisher = ReplyingPublisher(
+            inbox=inbox,
+            responder=lambda topic, payload: {
+                "correlation_id": payload["correlation_id"],
+                "response_type": "user.email_lookup_provided",
+                "email": payload["email"],
+                "user_id": None,
+                "exists": False,
+            },
+        )
+        client = UserServiceHttpClient(
+            settings=_settings(),
+            publisher=publisher,
+            reply_inbox=inbox,
+        )
+
+        with pytest.raises(EntityNotFoundError):
+            await client.get_user_by_email("missing@example.com")
+
+    asyncio.run(scenario())
+
+
 def test_resolve_ignores_duplicate_and_unknown_replies() -> None:
     async def scenario() -> None:
         inbox = BrokerReplyInbox(service_name="project", instance_id="test-instance")

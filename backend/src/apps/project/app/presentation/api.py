@@ -256,7 +256,7 @@ async def delete_project(
     response_model=ProjectMemberResponse,
     tags=["members"],
     summary="Invite member to project",
-    description="Invites a user into the project with the selected role. Invited-user existence is validated through the V1 broker request/reply flow.",
+    description="Invites a registered user into the project by user id or email. The invitee receives an email link and must accept it while authenticated.",
 )
 async def invite_project_member(
     project_id: UUID,
@@ -269,6 +269,7 @@ async def invite_project_member(
             project_id=project_id,
             actor_user_id=x_user_id,
             invited_user_id=payload.user_id,
+            email=payload.email,
             role=payload.role.to_domain(),
         )
     )

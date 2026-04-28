@@ -41,6 +41,9 @@ from app.application.commands.delete_spare_time import (
     DeleteSpareTimeHandler,
 )
 from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
+from app.application.commands.confirm_project_invitation import (
+    ConfirmProjectInvitationByTokenHandler,
+)
 from app.application.commands.create_description import (
     CreateDescriptionCommand,
     CreateDescriptionHandler,
@@ -430,6 +433,22 @@ async def confirm_reservation(
     handler: FromDishka[ConfirmReservationByTokenHandler],
 ) -> HTMLResponse:
     result = await handler(token)
+    return _confirmation_page(result.title, result.message, result.page)
+
+
+@router.get(
+    "/project-invitations/{token}",
+    response_class=HTMLResponse,
+    tags=["confirmations"],
+    summary="Accept project invitation from email link",
+    description="Accepts a project invitation by signed email link. The caller must be authenticated and match the invited user.",
+)
+async def confirm_project_invitation(
+    token: str,
+    handler: FromDishka[ConfirmProjectInvitationByTokenHandler],
+    x_user_id: UUID = Header(alias="x-user-id"),
+) -> HTMLResponse:
+    result = await handler(token=token, actor_user_id=x_user_id)
     return _confirmation_page(result.title, result.message, result.page)
 
 

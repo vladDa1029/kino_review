@@ -18,10 +18,14 @@ from app.application.commands.add_equipment_free_time import (
 )
 from app.application.commands.add_spare_time import AddSpareTimeHandler
 from app.application.commands.approval_notifications import (
+    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedHandler,
     HandleResourceApprovalRequestedHandler,
 )
 from app.application.commands.check_availability import CheckAvailabilityHandler
+from app.application.commands.confirm_project_invitation import (
+    ConfirmProjectInvitationByTokenHandler,
+)
 from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
 from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.create_description import CreateDescriptionHandler
@@ -80,7 +84,7 @@ from app.application.queries.equipment_free_times import (
     ListRequisiteFreeTimesHandler,
     ListSoundFreeTimesHandler,
 )
-from app.application.queries.users import GetUserExistsHandler
+from app.application.queries.users import GetUserByEmailHandler, GetUserExistsHandler
 from app.application.queries.report_snapshot import ProvideShiftReportSnapshotHandler
 from app.application.queries.spare_times import (
     GetUserSpareTimeHandler,
@@ -339,8 +343,10 @@ def use_case_provider() -> Provider:
     provider.provide(source=DeleteSoundHandler)
     provider.provide(source=RemoveImageHandler)
     provider.provide(source=CheckAvailabilityHandler)
+    provider.provide(source=HandleProjectMemberInvitationRequestedHandler)
     provider.provide(source=HandleParticipantApprovalRequestedHandler)
     provider.provide(source=HandleResourceApprovalRequestedHandler)
+    provider.provide(source=ConfirmProjectInvitationByTokenHandler)
     provider.provide(source=ConfirmReservationByTokenHandler)
     provider.provide(source=ReserveAvailabilityHandler)
     provider.provide(source=UserRegisteredHandler)
@@ -354,6 +360,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=ListRequisiteImagesHandler)
     provider.provide(source=GetRequisiteImageHandler)
     provider.provide(source=GetDescriptionHandler)
+    provider.provide(source=GetUserByEmailHandler)
     provider.provide(source=GetUserExistsHandler)
     provider.provide(source=ProvideShiftReportSnapshotHandler)
     provider.provide(source=ListMicrofonFreeTimesHandler)

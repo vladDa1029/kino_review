@@ -26,6 +26,8 @@ class SendNotificationEmailHandler:
 
 
 def _render_email(template: str, payload: dict[str, str | None]) -> str:
+    if template == "project_member_invitation":
+        return _render_project_member_invitation(payload)
     if template != "reservation_confirmation":
         raise ValueError(f"Unsupported email template: {template}")
 
@@ -49,4 +51,17 @@ def _render_email(template: str, payload: dict[str, str | None]) -> str:
         f"{details}\n\n"
         "Open the link below to confirm the reservation:\n"
         f"{confirm_url}\n"
+    )
+
+
+def _render_project_member_invitation(payload: dict[str, str | None]) -> str:
+    accept_url = payload.get("accept_url") or ""
+    project_title = payload.get("project_title") or "Untitled project"
+    role = payload.get("role") or "member"
+
+    return (
+        f"Project: {project_title}\n"
+        f"Role: {role}\n\n"
+        "Open the link below while signed in to accept the project invitation:\n"
+        f"{accept_url}\n"
     )

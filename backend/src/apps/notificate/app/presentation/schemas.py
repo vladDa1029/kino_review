@@ -16,9 +16,16 @@ class ReservationConfirmationPayload(BaseModel):
     resource_type: str | None = None
 
 
+class ProjectMemberInvitationPayload(BaseModel):
+    accept_url: str
+    project_title: str
+    role: str
+    invited_by_user_id: str | None = None
+
+
 class BrokerNotificationEmailRequested(BaseModel):
     notification_id: str
     recipient_email: str
     subject: str
     template: str
-    payload: ReservationConfirmationPayload
+    payload: ReservationConfirmationPayload | ProjectMemberInvitationPayload

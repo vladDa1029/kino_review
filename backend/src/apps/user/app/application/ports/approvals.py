@@ -64,6 +64,15 @@ class ResourceConfirmationTokenData:
     time_to: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class ProjectMemberInvitationTokenData:
+    request_id: UUID
+    project_id: UUID
+    member_id: UUID
+    user_id: UUID
+    role: str
+
+
 class ProjectApprovalStatePort(Protocol):
     async def get_participant_approval_state(
         self,
@@ -108,8 +117,23 @@ class ConfirmationTokenPort(Protocol):
     ) -> str:
         raise NotImplementedError
 
+    def issue_project_member_invitation_token(
+        self,
+        *,
+        request_id: UUID,
+        project_id: UUID,
+        member_id: UUID,
+        user_id: UUID,
+        role: str,
+    ) -> str:
+        raise NotImplementedError
+
     def decode_confirmation_token(
         self,
         token: str,
-    ) -> ParticipantConfirmationTokenData | ResourceConfirmationTokenData:
+    ) -> (
+        ParticipantConfirmationTokenData
+        | ResourceConfirmationTokenData
+        | ProjectMemberInvitationTokenData
+    ):
         raise NotImplementedError
