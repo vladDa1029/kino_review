@@ -16,6 +16,7 @@ from app.application.ports.repositories import (
     UserRepository,
 )
 from app.application.ports.transaction import TransactionManager
+from app.application.resource_ownership import ResourceOwnershipResolver
 from app.domain.entity.base import AvailabilityReservation, BaseId, Spare_time
 from app.domain.service.availability_service import AvailabilityService
 from app.infrastructure.generation import AbstractGenerationID
@@ -46,6 +47,7 @@ class ReserveAvailabilityHandler:
         requisite_free_time_repository: RequisiteFreeTimeRepository,
         transaction: TransactionManager,
         id_generator: AbstractGenerationID,
+        resource_ownership: ResourceOwnershipResolver,
         service: AvailabilityService,
     ) -> None:
         self._user_repository = user_repository
@@ -63,6 +65,7 @@ class ReserveAvailabilityHandler:
         )
         self._transaction = transaction
         self._id_generator = id_generator
+        self._resource_ownership = resource_ownership
         self._service = service
 
     async def __call__(self, command: ReserveAvailabilityCommand) -> BaseId:
@@ -80,6 +83,10 @@ class ReserveAvailabilityHandler:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
+        await self._resource_ownership.ensure_owned_by_user(
+            user_id=command.user_id,
+            obj_id=command.obj_id,
+        )
 
         free_time_repository, windows = await self._resolve_free_time_repository(
             command.obj_id

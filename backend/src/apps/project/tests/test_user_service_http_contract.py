@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.config import UserService
+from app.application.ports.domain import UserResourceItem
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.presentation.http.user_service import UserServiceHttpClient
@@ -31,6 +32,28 @@ class ReplyingPublisher(FakePublisher):
         reply = self._responder(topic, payload)
         if reply is not None:
             self._inbox.resolve(payload["correlation_id"], reply)
+
+
+class StubResourceClient(UserServiceHttpClient):
+    def __init__(self, resources: list[UserResourceItem]) -> None:
+        super().__init__(
+            settings=_settings(),
+            publisher=FakePublisher(),
+            reply_inbox=BrokerReplyInbox(service_name="project", instance_id="test-instance"),
+        )
+        self._resources = resources
+
+    async def list_user_resources(
+        self,
+        *,
+        user_id,
+        resource_kinds: tuple[str, ...],
+    ) -> list[UserResourceItem]:
+        return [
+            item
+            for item in self._resources
+            if item.resource_kind in resource_kinds
+        ]
 
 
 def _settings(timeout_seconds: float = 1.0) -> UserService:
@@ -191,6 +214,40 @@ def test_reserve_user_time_publishes_participant_check_event() -> None:
             },
         )
     ]
+
+
+def test_ensure_user_resource_exists_checks_resource_kind_and_id() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        resource_id = uuid4()
+        client = StubResourceClient(
+            [
+                UserResourceItem(
+                    resource_kind="cameras",
+                    resource_id=resource_id,
+                    title="Sony",
+                    description="Camera",
+                    resource_type="mirrorless",
+                    size=None,
+                    created_at=None,
+                    windows=(),
+                )
+            ]
+        )
+
+        await client.ensure_user_resource_exists(
+            user_id=user_id,
+            resource_kind="cameras",
+            resource_id=resource_id,
+        )
+        with pytest.raises(EntityNotFoundError):
+            await client.ensure_user_resource_exists(
+                user_id=user_id,
+                resource_kind="lights",
+                resource_id=resource_id,
+            )
+
+    asyncio.run(scenario())
 
 
 def test_reserve_resource_time_publishes_resource_check_event() -> None:

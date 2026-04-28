@@ -40,6 +40,7 @@ from app.application.ports.domain import (
     ShiftParticipantRepository,
     ShiftReportRepository,
     ShiftRepository,
+    UserResourceItem,
 )
 from app.application.ports.transaction import TransactionManager
 from app.application.queries.projects import (
@@ -54,10 +55,12 @@ from app.application.queries.resources import (
 from app.application.support import SystemClock
 from app.domain.enums import (
     ProjectMemberStatus,
+    ProjectRole,
     ResourceRequestStatus,
     ShiftParticipantStatus,
     ShiftStatus,
 )
+from app.domain.entities import ProjectMember
 from app.domain.errors.base import ApplicationError
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
@@ -239,6 +242,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         clock=clock,
         publisher=publisher,
         reservation_outbox=reservation_outbox,
+        project_members=members,
         shifts=shifts,
         shift_participants=participants,
         shift_reports=reports,
@@ -306,6 +310,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         clock=clock,
         id_generator=id_generator,
         publisher=publisher,
+        user_service=user_service,
         project_members=members,
         shifts=shifts,
         resource_requests=requests,
@@ -317,6 +322,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         clock=clock,
         publisher=publisher,
         reservation_outbox=reservation_outbox,
+        project_members=members,
         resource_requests=requests,
         shift_reports=reports,
         resource_request_service=ResourceRequestService(),
@@ -325,6 +331,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         transaction_manager=tx,
         clock=clock,
         publisher=publisher,
+        project_members=members,
         resource_requests=requests,
         shift_reports=reports,
         resource_request_service=ResourceRequestService(),
@@ -600,6 +607,8 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
     declining_participant_id = uuid4()
     owner_user_id = uuid4()
     rejected_owner_user_id = uuid4()
+    resource_id = uuid4()
+    rejected_resource_id = uuid4()
     start_time = now_utc() + timedelta(hours=2)
     end_time = start_time + timedelta(hours=2)
 
@@ -652,6 +661,47 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
             )
             assert remove_member_response.status_code == 200
             assert remove_member_response.json()["status"] == int(ProjectMemberStatus.REMOVED)
+
+            for member_id, role in (
+                (participant_id, "ACTOR"),
+                (declining_participant_id, "LIGHT"),
+                (owner_user_id, "CAMERA"),
+                (rejected_owner_user_id, "LIGHT"),
+            ):
+                ctx.members.data[(UUID(project_id), member_id)] = ProjectMember(
+                    oid=uuid4(),
+                    project_id=UUID(project_id),
+                    user_id=member_id,
+                    role=ProjectRole[role],
+                    status=ProjectMemberStatus.ACTIVE,
+                    invited_by=director_id,
+                    created_at=start_time,
+                    updated_at=start_time,
+                )
+            ctx.user_service.resources[(owner_user_id, "cameras")] = [
+                UserResourceItem(
+                    resource_kind="cameras",
+                    resource_id=resource_id,
+                    title="Camera",
+                    description="Main camera",
+                    resource_type="mirrorless",
+                    size=None,
+                    created_at=start_time,
+                    windows=(),
+                )
+            ]
+            ctx.user_service.resources[(rejected_owner_user_id, "lights")] = [
+                UserResourceItem(
+                    resource_kind="lights",
+                    resource_id=rejected_resource_id,
+                    title="Light",
+                    description="Fill light",
+                    resource_type="led",
+                    size=None,
+                    created_at=start_time,
+                    windows=(),
+                )
+            ]
 
             shift_response = client.post(
                 f"/projects/{project_id}/shifts",
@@ -717,7 +767,7 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
                 headers={"X-User-Id": str(director_id)},
                 json={
                     "resource_type": "camera",
-                    "resource_id": str(uuid4()),
+                    "resource_id": str(resource_id),
                     "resource_owner_user_id": str(owner_user_id),
                     "time_from": start_time.isoformat(),
                     "time_to": end_time.isoformat(),
@@ -743,7 +793,7 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
                 headers={"X-User-Id": str(director_id)},
                 json={
                     "resource_type": "light",
-                    "resource_id": str(uuid4()),
+                    "resource_id": str(rejected_resource_id),
                     "resource_owner_user_id": str(rejected_owner_user_id),
                     "time_from": start_time.isoformat(),
                     "time_to": end_time.isoformat(),

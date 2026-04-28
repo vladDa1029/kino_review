@@ -55,6 +55,22 @@ async def get_actor_member(
     return member
 
 
+async def require_active_project_member(
+    *,
+    project_members: ProjectMemberRepository,
+    project_id: UUID,
+    user_id: UUID,
+    message: str = "User is not an active project member.",
+) -> ProjectMember:
+    member = await project_members.get_by_project_and_user(
+        project_id=project_id,
+        user_id=user_id,
+    )
+    if member is None or not member.is_active:
+        raise EntityNotFoundError(message)
+    return member
+
+
 async def require_shift(*, shifts: ShiftRepository, shift_id: UUID) -> Shift:
     shift = await shifts.get_by_id(shift_id)
     if shift is None:

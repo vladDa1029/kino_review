@@ -163,6 +163,15 @@ class UserServicePort(Protocol):
     async def ensure_user_exists(self, user_id: UUID) -> None:
         raise NotImplementedError
 
+    async def ensure_user_resource_exists(
+        self,
+        *,
+        user_id: UUID,
+        resource_kind: str,
+        resource_id: UUID,
+    ) -> None:
+        raise NotImplementedError
+
     async def list_user_resources(
         self,
         *,

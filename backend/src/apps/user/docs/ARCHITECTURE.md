@@ -143,8 +143,9 @@ Key adapters:
 
 1. `project` emits a reservation-check event.
 2. `user` validates the interval against current free windows.
-3. `user` emits either `*_reservation_check_succeeded` or `*_reservation_check_failed`.
-4. No final reserve is written in this stage.
+3. For resource reservations, `user` first verifies that the requested resource exists and belongs to the supplied owner user id.
+4. `user` emits either `*_reservation_check_succeeded` or `*_reservation_check_failed`.
+5. No final reserve is written in this stage.
 
 ### Approval email flow
 
@@ -168,7 +169,8 @@ Key adapters:
 1. `user` decodes the token and validates signature and TTL.
 2. `user` publishes an approval-state request with a transport `correlation_id` and waits on its process-local reply queue.
 3. If the project-side context still matches and remains `RESERVING`, `user` performs the final reserve.
-4. `user` emits the final success or failure event back to `project`.
+4. For resource reservations, the final reserve rechecks that `resource_id` still belongs to `owner_user_id` before slicing availability windows.
+5. `user` emits the final success or failure event back to `project`.
 
 ## Change Playbooks
 

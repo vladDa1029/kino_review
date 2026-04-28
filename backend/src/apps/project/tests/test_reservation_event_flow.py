@@ -19,8 +19,16 @@ from app.application.commands.reservation_outbox import (
     PARTICIPANT_RESERVE_OPERATION,
     ProcessReservationOutboxHandler,
 )
-from app.domain.entities import Project, ReservationOutboxMessage, Shift, ShiftParticipant, ShiftResourceRequest
+from app.domain.entities import (
+    Project,
+    ProjectMember,
+    ReservationOutboxMessage,
+    Shift,
+    ShiftParticipant,
+    ShiftResourceRequest,
+)
 from app.domain.enums import (
+    ProjectMemberStatus,
     ProjectRole,
     ProjectStatus,
     ResourceRequestStatus,
@@ -72,6 +80,15 @@ class FakeUserService:
     async def list_user_resources(self, *, user_id: UUID, resource_kinds: tuple[str, ...]):
         raise AssertionError("not used")
 
+    async def ensure_user_resource_exists(
+        self,
+        *,
+        user_id: UUID,
+        resource_kind: str,
+        resource_id: UUID,
+    ) -> None:
+        raise AssertionError("not used")
+
     async def reserve_user_time(self, **kwargs) -> None:
         self.participant_calls.append(kwargs)
 
@@ -93,6 +110,18 @@ class FakeShiftRepo:
 
     async def get_by_id(self, shift_id: UUID) -> Shift | None:
         return self.data.get(shift_id)
+
+
+class FakeProjectMemberRepo:
+    def __init__(self, items: list[ProjectMember] | None = None) -> None:
+        self.data = {(item.project_id, item.user_id): item for item in items or []}
+
+    async def get_by_project_and_user(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+    ) -> ProjectMember | None:
+        return self.data.get((project_id, user_id))
 
 
 class FakeParticipantRepo:
@@ -188,6 +217,20 @@ def test_process_reservation_outbox_dispatches_participant_check_request() -> No
             clock=FakeClock(now),
             publisher=FakePublisher(),
             user_service=user_service,
+            project_members=FakeProjectMemberRepo(
+                [
+                    ProjectMember(
+                        oid=uuid4(),
+                        project_id=project_id,
+                        user_id=participant.user_id,
+                        role=ProjectRole.CAMERA,
+                        status=ProjectMemberStatus.ACTIVE,
+                        invited_by=shift.created_by,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                ]
+            ),
             shifts=FakeShiftRepo([shift]),
             shift_participants=FakeParticipantRepo([participant]),
             resource_requests=FakeResourceRequestRepo(),

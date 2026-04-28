@@ -64,6 +64,15 @@ class FakeUserService:
     def __init__(self) -> None:
         self.request_ids: list = []
 
+    async def ensure_user_exists(self, user_id) -> None:
+        return None
+
+    async def ensure_user_resource_exists(self, *, user_id, resource_kind, resource_id) -> None:
+        return None
+
+    async def list_user_resources(self, *, user_id, resource_kinds):
+        return []
+
     async def reserve_user_time(
         self,
         *,
@@ -106,6 +115,14 @@ class InMemoryProjectRepo:
 
     async def get_by_id(self, project_id):
         return self.data.get(project_id)
+
+
+class InMemoryProjectMemberRepo:
+    def __init__(self) -> None:
+        self.data: dict = {}
+
+    async def get_by_project_and_user(self, project_id, user_id):
+        return self.data.get((project_id, user_id))
 
 
 class InMemoryParticipantRepo:
@@ -168,9 +185,10 @@ def test_outbox_handler_accepts_plain_int_participant_status() -> None:
         updated_at=now,
     )
     shift_repo = InMemoryShiftRepo()
+    shift_project_id = uuid4()
     shift_repo.data[participant.shift_id] = Shift(
         oid=participant.shift_id,
-        project_id=uuid4(),
+        project_id=shift_project_id,
         title="Shift",
         description="",
         start_time=now,
@@ -179,6 +197,17 @@ def test_outbox_handler_accepts_plain_int_participant_status() -> None:
         created_by=uuid4(),
         approved_by=None,
         approved_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    project_members = InMemoryProjectMemberRepo()
+    project_members.data[(shift_project_id, participant.user_id)] = ProjectMember(
+        oid=uuid4(),
+        project_id=shift_project_id,
+        user_id=participant.user_id,
+        role=ProjectRole.SOUND,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=participant.added_by,
         created_at=now,
         updated_at=now,
     )
@@ -203,6 +232,7 @@ def test_outbox_handler_accepts_plain_int_participant_status() -> None:
         clock=FakeClock(),
         publisher=FakePublisher(),
         user_service=user_service,
+        project_members=project_members,
         shifts=shift_repo,
         shift_participants=participants,
         resource_requests=InMemoryResourceRequestRepo(),
@@ -249,12 +279,24 @@ def test_outbox_handler_accepts_plain_int_resource_request_status() -> None:
     outbox.data[outbox_message.oid] = outbox_message
     requests = InMemoryResourceRequestRepo()
     requests.data[request.oid] = request
+    project_members = InMemoryProjectMemberRepo()
+    project_members.data[(request.project_id, request.resource_owner_user_id)] = ProjectMember(
+        oid=uuid4(),
+        project_id=request.project_id,
+        user_id=request.resource_owner_user_id,
+        role=ProjectRole.CAMERA,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=request.requested_by_user_id,
+        created_at=now,
+        updated_at=now,
+    )
     user_service = FakeUserService()
     handler = ProcessReservationOutboxHandler(
         transaction_manager=FakeTx(),
         clock=FakeClock(),
         publisher=FakePublisher(),
         user_service=user_service,
+        project_members=project_members,
         shifts=InMemoryShiftRepo(),
         shift_participants=InMemoryParticipantRepo(),
         resource_requests=requests,

@@ -134,6 +134,17 @@ class FakeUserService:
     async def ensure_user_exists(self, user_id: UUID) -> None:
         self.existing_users.add(user_id)
 
+    async def ensure_user_resource_exists(
+        self,
+        *,
+        user_id: UUID,
+        resource_kind: str,
+        resource_id: UUID,
+    ) -> None:
+        resources = self.resources.get((user_id, resource_kind), [])
+        if not any(resource.resource_id == resource_id for resource in resources):
+            raise EntityNotFoundError("Resource is not found for user.")
+
     async def reserve_user_time(
         self,
         *,
@@ -444,6 +455,7 @@ def build_context(
         clock=clock,
         publisher=publisher,
         user_service=user_service,
+        project_members=members,
         shifts=shifts,
         shift_participants=participants,
         resource_requests=requests,
@@ -464,6 +476,7 @@ def build_context(
         clock=clock,
         publisher=publisher,
         reservation_outbox=reservation_outbox,
+        project_members=members,
         shifts=shifts,
         shift_participants=participants,
         shift_reports=shift_reports,
@@ -657,6 +670,18 @@ def test_invite_shift_participant_still_checks_participant_user_exists() -> None
             updated_at=now,
         )
         await shifts.add(shift)
+        await members.add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project.oid,
+                user_id=participant_user_id,
+                role=ProjectRole.ACTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=owner_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
         handler = InviteShiftParticipantHandler(
             transaction_manager=tx,
             clock=SystemClock(),
@@ -1052,6 +1077,16 @@ def test_confirm_participant_moves_to_reserving_and_leaves_processing_to_outbox(
             project_id=project_id,
             user_id=director_id,
             role=ProjectRole.DIRECTOR,
+            status=ProjectMemberStatus.ACTIVE,
+            invited_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        members.data[(project_id, participant_user_id)] = ProjectMember(
+            oid=uuid4(),
+            project_id=project_id,
+            user_id=participant_user_id,
+            role=ProjectRole.CAMERA,
             status=ProjectMemberStatus.ACTIVE,
             invited_by=director_id,
             created_at=now,
@@ -2295,6 +2330,7 @@ def test_confirm_participant_marks_ready_reports_stale() -> None:
         clock = SystemClock()
         publisher = FakePublisher()
         reservation_outbox = InMemoryReservationOutboxRepo()
+        members = InMemoryProjectMemberRepo()
         shifts = InMemoryShiftRepo()
         participants = InMemoryParticipantRepo()
         reports = InMemoryShiftReportRepo()
@@ -2333,6 +2369,18 @@ def test_confirm_participant_marks_ready_reports_stale() -> None:
                 updated_at=now,
             )
         )
+        await members.add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=user_id,
+                role=ProjectRole.ACTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
         await reports.add(
             ShiftReport(
                 oid=uuid4(),
@@ -2360,6 +2408,7 @@ def test_confirm_participant_marks_ready_reports_stale() -> None:
             clock=clock,
             publisher=publisher,
             reservation_outbox=reservation_outbox,
+            project_members=members,
             shifts=shifts,
             shift_participants=participants,
             shift_reports=reports,
@@ -2420,6 +2469,33 @@ def test_create_resource_request_marks_ready_reports_stale() -> None:
                 updated_at=now,
             )
         )
+        resource_owner_user_id = uuid4()
+        resource_id = uuid4()
+        await project_members.add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=resource_owner_user_id,
+                role=ProjectRole.CAMERA,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        user_service = FakeUserService()
+        user_service.resources[(resource_owner_user_id, "cameras")] = [
+            UserResourceItem(
+                resource_kind="cameras",
+                resource_id=resource_id,
+                title="Sony",
+                description="Camera",
+                resource_type="mirrorless",
+                size=None,
+                created_at=now,
+                windows=(),
+            )
+        ]
         await reports.add(
             ShiftReport(
                 oid=uuid4(),
@@ -2447,6 +2523,7 @@ def test_create_resource_request_marks_ready_reports_stale() -> None:
             clock=clock,
             id_generator=FakeIdGenerator(),
             publisher=publisher,
+            user_service=user_service,
             project_members=project_members,
             shifts=shifts,
             resource_requests=requests,
@@ -2459,8 +2536,8 @@ def test_create_resource_request_marks_ready_reports_stale() -> None:
                 shift_id=shift_id,
                 actor_user_id=director_id,
                 resource_type="camera",
-                resource_id=uuid4(),
-                resource_owner_user_id=uuid4(),
+                resource_id=resource_id,
+                resource_owner_user_id=resource_owner_user_id,
                 time_from=now,
                 time_to=now + timedelta(hours=1),
             )
@@ -2469,5 +2546,242 @@ def test_create_resource_request_marks_ready_reports_stale() -> None:
         report = (await reports.list_by_shift(shift_id))[0]
         assert report.actuality_status == ShiftReportActualityStatus.STALE
         assert report.stale_reason == "Resource request composition changed."
+
+    asyncio.run(scenario())
+
+
+def test_create_resource_request_requires_owner_active_project_member() -> None:
+    async def scenario() -> None:
+        tx = FakeTx()
+        clock = SystemClock()
+        publisher = FakePublisher()
+        user_service = FakeUserService()
+        project_members = InMemoryProjectMemberRepo()
+        shifts = InMemoryShiftRepo()
+        requests = InMemoryResourceRequestRepo()
+        reports = InMemoryShiftReportRepo()
+        now = now_utc()
+        director_id = uuid4()
+        external_owner_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        resource_id = uuid4()
+
+        await shifts.add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.DRAFT,
+                created_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await project_members.add(
+            ProjectMember(
+                oid=uuid4(),
+                project_id=project_id,
+                user_id=director_id,
+                role=ProjectRole.DIRECTOR,
+                status=ProjectMemberStatus.ACTIVE,
+                invited_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        user_service.resources[(external_owner_id, "cameras")] = [
+            UserResourceItem(
+                resource_kind="cameras",
+                resource_id=resource_id,
+                title="External camera",
+                description="Not in project",
+                resource_type="mirrorless",
+                size=None,
+                created_at=now,
+                windows=(),
+            )
+        ]
+        handler = CreateResourceRequestHandler(
+            transaction_manager=tx,
+            clock=clock,
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=project_members,
+            shifts=shifts,
+            resource_requests=requests,
+            shift_reports=reports,
+            resource_request_service=ResourceRequestService(),
+        )
+
+        with pytest.raises(EntityNotFoundError):
+            await handler(
+                CreateResourceRequestCommand(
+                    shift_id=shift_id,
+                    actor_user_id=director_id,
+                    resource_type="camera",
+                    resource_id=resource_id,
+                    resource_owner_user_id=external_owner_id,
+                    time_from=now,
+                    time_to=now + timedelta(hours=1),
+                )
+            )
+
+        assert requests.data == {}
+        assert tx.rollbacks == 1
+
+    asyncio.run(scenario())
+
+
+def test_create_resource_request_requires_resource_owned_by_member() -> None:
+    async def scenario() -> None:
+        tx = FakeTx()
+        clock = SystemClock()
+        publisher = FakePublisher()
+        user_service = FakeUserService()
+        project_members = InMemoryProjectMemberRepo()
+        shifts = InMemoryShiftRepo()
+        requests = InMemoryResourceRequestRepo()
+        reports = InMemoryShiftReportRepo()
+        now = now_utc()
+        director_id = uuid4()
+        owner_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+
+        await shifts.add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.DRAFT,
+                created_by=director_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        for user_id, role in ((director_id, ProjectRole.DIRECTOR), (owner_id, ProjectRole.CAMERA)):
+            await project_members.add(
+                ProjectMember(
+                    oid=uuid4(),
+                    project_id=project_id,
+                    user_id=user_id,
+                    role=role,
+                    status=ProjectMemberStatus.ACTIVE,
+                    invited_by=director_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        handler = CreateResourceRequestHandler(
+            transaction_manager=tx,
+            clock=clock,
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=project_members,
+            shifts=shifts,
+            resource_requests=requests,
+            shift_reports=reports,
+            resource_request_service=ResourceRequestService(),
+        )
+
+        with pytest.raises(EntityNotFoundError):
+            await handler(
+                CreateResourceRequestCommand(
+                    shift_id=shift_id,
+                    actor_user_id=director_id,
+                    resource_type="camera",
+                    resource_id=uuid4(),
+                    resource_owner_user_id=owner_id,
+                    time_from=now,
+                    time_to=now + timedelta(hours=1),
+                )
+            )
+
+        assert requests.data == {}
+        assert tx.rollbacks == 1
+
+    asyncio.run(scenario())
+
+
+def test_create_resource_request_uses_actor_role_resource_kinds() -> None:
+    async def scenario() -> None:
+        tx = FakeTx()
+        clock = SystemClock()
+        publisher = FakePublisher()
+        user_service = FakeUserService()
+        project_members = InMemoryProjectMemberRepo()
+        shifts = InMemoryShiftRepo()
+        requests = InMemoryResourceRequestRepo()
+        reports = InMemoryShiftReportRepo()
+        now = now_utc()
+        actor_id = uuid4()
+        owner_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+
+        await shifts.add(
+            Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Shift",
+                description="Desc",
+                start_time=now,
+                end_time=now + timedelta(hours=2),
+                status=ShiftStatus.DRAFT,
+                created_by=actor_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        for user_id, role in ((actor_id, ProjectRole.CAMERA), (owner_id, ProjectRole.LIGHT)):
+            await project_members.add(
+                ProjectMember(
+                    oid=uuid4(),
+                    project_id=project_id,
+                    user_id=user_id,
+                    role=role,
+                    status=ProjectMemberStatus.ACTIVE,
+                    invited_by=actor_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        handler = CreateResourceRequestHandler(
+            transaction_manager=tx,
+            clock=clock,
+            id_generator=FakeIdGenerator(),
+            publisher=publisher,
+            user_service=user_service,
+            project_members=project_members,
+            shifts=shifts,
+            resource_requests=requests,
+            shift_reports=reports,
+            resource_request_service=ResourceRequestService(),
+        )
+
+        with pytest.raises(AccessDeniedError):
+            await handler(
+                CreateResourceRequestCommand(
+                    shift_id=shift_id,
+                    actor_user_id=actor_id,
+                    resource_type="light",
+                    resource_id=uuid4(),
+                    resource_owner_user_id=owner_id,
+                    time_from=now,
+                    time_to=now + timedelta(hours=1),
+                )
+            )
+
+        assert requests.data == {}
+        assert tx.rollbacks == 1
 
     asyncio.run(scenario())

@@ -23,6 +23,7 @@ from app.application.ports.transaction import TransactionManager
 from app.application.support import (
     get_actor_member,
     publish_best_effort,
+    require_active_project_member,
     require_participant,
     require_shift,
 )
@@ -71,12 +72,18 @@ class InviteShiftParticipantHandler:
         now = self._clock.now()
         try:
             shift = await require_shift(shifts=self._shifts, shift_id=command.shift_id)
-            await self._user_service.ensure_user_exists(command.participant_user_id)
             actor = await get_actor_member(
                 project_members=self._project_members,
                 project_id=shift.project_id,
                 user_id=command.actor_user_id,
             )
+            target = await require_active_project_member(
+                project_members=self._project_members,
+                project_id=shift.project_id,
+                user_id=command.participant_user_id,
+                message="Participant user is not an active project member.",
+            )
+            await self._user_service.ensure_user_exists(target.user_id)
             existing = await self._shift_participants.get_by_shift_and_user(
                 shift_id=command.shift_id,
                 user_id=command.participant_user_id,
@@ -134,6 +141,7 @@ class ConfirmShiftParticipantHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         reservation_outbox: ReservationOutboxRepository,
+        project_members: ProjectMemberRepository,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
         shift_reports: ShiftReportRepository,
@@ -143,6 +151,7 @@ class ConfirmShiftParticipantHandler:
         self._clock = clock
         self._publisher = publisher
         self._reservation_outbox = reservation_outbox
+        self._project_members = project_members
         self._shifts = shifts
         self._shift_participants = shift_participants
         self._shift_reports = shift_reports
@@ -155,6 +164,12 @@ class ConfirmShiftParticipantHandler:
             participant_id=command.participant_id,
         )
         shift = await require_shift(shifts=self._shifts, shift_id=participant.shift_id)
+        await require_active_project_member(
+            project_members=self._project_members,
+            project_id=shift.project_id,
+            user_id=participant.user_id,
+            message="Participant user is not an active project member.",
+        )
         request_id = build_participant_reservation_request_id(participant.oid)
         try:
             self._shift_participant_service.confirm(

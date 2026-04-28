@@ -18,14 +18,20 @@ from app.application.ports.domain import (
     ShiftRepository,
     UserServicePort,
 )
+from app.application.resource_access import (
+    VIEWABLE_RESOURCE_KINDS_BY_ROLE,
+    normalize_resource_kind,
+)
 from app.application.reports_support import mark_shift_reports_stale
 from app.application.ports.transaction import TransactionManager
 from app.application.support import (
     get_actor_member,
     publish_best_effort,
+    require_active_project_member,
     require_resource_request,
     require_shift,
 )
+from app.domain.errors.business import AccessDeniedError, EntityNotFoundError
 from app.domain.entities import ReservationOutboxMessage, ShiftResourceRequest
 from app.domain.services import ResourceRequestService
 
@@ -49,6 +55,7 @@ class CreateResourceRequestHandler:
         clock: ClockPort,
         id_generator: IdGeneratorPort,
         publisher: EventPublisher,
+        user_service: UserServicePort,
         project_members: ProjectMemberRepository,
         shifts: ShiftRepository,
         resource_requests: ResourceRequestRepository,
@@ -59,6 +66,7 @@ class CreateResourceRequestHandler:
         self._clock = clock
         self._id_generator = id_generator
         self._publisher = publisher
+        self._user_service = user_service
         self._project_members = project_members
         self._shifts = shifts
         self._resource_requests = resource_requests
@@ -73,6 +81,23 @@ class CreateResourceRequestHandler:
                 project_members=self._project_members,
                 project_id=shift.project_id,
                 user_id=command.actor_user_id,
+            )
+            owner = await require_active_project_member(
+                project_members=self._project_members,
+                project_id=shift.project_id,
+                user_id=command.resource_owner_user_id,
+                message="Resource owner is not an active project member.",
+            )
+            resource_kind = normalize_resource_kind(command.resource_type)
+            if resource_kind is None:
+                raise EntityNotFoundError("Resource type is not supported.")
+            allowed_kinds = VIEWABLE_RESOURCE_KINDS_BY_ROLE.get(actor.role, ())
+            if resource_kind not in allowed_kinds:
+                raise AccessDeniedError("Actor role cannot request this resource type.")
+            await self._user_service.ensure_user_resource_exists(
+                user_id=owner.user_id,
+                resource_kind=resource_kind,
+                resource_id=command.resource_id,
             )
             request = self._resource_request_service.create(
                 actor=actor,
@@ -124,6 +149,7 @@ class ApproveResourceRequestHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         reservation_outbox: ReservationOutboxRepository,
+        project_members: ProjectMemberRepository,
         resource_requests: ResourceRequestRepository,
         shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
@@ -132,6 +158,7 @@ class ApproveResourceRequestHandler:
         self._clock = clock
         self._publisher = publisher
         self._reservation_outbox = reservation_outbox
+        self._project_members = project_members
         self._resource_requests = resource_requests
         self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
@@ -141,6 +168,12 @@ class ApproveResourceRequestHandler:
         request = await require_resource_request(
             resource_requests=self._resource_requests,
             request_id=command.request_id,
+        )
+        await require_active_project_member(
+            project_members=self._project_members,
+            project_id=request.project_id,
+            user_id=request.resource_owner_user_id,
+            message="Resource owner is not an active project member.",
         )
         request_key = build_resource_reservation_request_id(request.oid)
         try:
@@ -190,6 +223,7 @@ class RejectResourceRequestHandler:
         transaction_manager: TransactionManager,
         clock: ClockPort,
         publisher: EventPublisher,
+        project_members: ProjectMemberRepository,
         resource_requests: ResourceRequestRepository,
         shift_reports: ShiftReportRepository,
         resource_request_service: ResourceRequestService,
@@ -197,6 +231,7 @@ class RejectResourceRequestHandler:
         self._tx = transaction_manager
         self._clock = clock
         self._publisher = publisher
+        self._project_members = project_members
         self._resource_requests = resource_requests
         self._shift_reports = shift_reports
         self._resource_request_service = resource_request_service
@@ -207,6 +242,12 @@ class RejectResourceRequestHandler:
             request = await require_resource_request(
                 resource_requests=self._resource_requests,
                 request_id=command.request_id,
+            )
+            await require_active_project_member(
+                project_members=self._project_members,
+                project_id=request.project_id,
+                user_id=request.resource_owner_user_id,
+                message="Resource owner is not an active project member.",
             )
             self._resource_request_service.reject(
                 request=request,

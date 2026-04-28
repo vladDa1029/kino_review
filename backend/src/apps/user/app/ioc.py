@@ -109,6 +109,7 @@ from app.application.ports.repositories import (
 )
 from app.application.ports.approvals import ConfirmationTokenPort, ProjectApprovalStatePort
 from app.application.ports.broker import EventPublisher
+from app.application.resource_ownership import ResourceOwnershipResolver
 from app.application.ports.storage import FileStorage
 from app.application.ports.transaction import TransactionManager
 from app.config import (
@@ -243,6 +244,7 @@ def services_provider() -> Provider:
     provider.provide(source=EquipmentService)
     provider.provide(source=FreeTimeService)
     provider.provide(source=ImageService)
+    provider.provide(source=ResourceOwnershipResolver)
     return provider
 
 

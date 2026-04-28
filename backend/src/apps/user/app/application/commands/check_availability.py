@@ -14,6 +14,7 @@ from app.application.ports.repositories import (
     SpareTimeRepository,
     UserRepository,
 )
+from app.application.resource_ownership import ResourceOwnershipResolver
 from app.domain.entity.base import BaseId, Spare_time
 from app.domain.service.availability_service import AvailabilityService
 
@@ -39,6 +40,7 @@ class CheckAvailabilityHandler:
         light_tripod_free_time_repository: LightTripodFreeTimeRepository,
         sound_free_time_repository: SoundFreeTimeRepository,
         requisite_free_time_repository: RequisiteFreeTimeRepository,
+        resource_ownership: ResourceOwnershipResolver,
         service: AvailabilityService,
     ) -> None:
         self._user_repository = user_repository
@@ -53,12 +55,17 @@ class CheckAvailabilityHandler:
             sound_free_time_repository,
             requisite_free_time_repository,
         )
+        self._resource_ownership = resource_ownership
         self._service = service
 
     async def __call__(self, command: CheckAvailabilityCommand) -> None:
         user = await self._user_repository.get(command.user_id)
         if user is None:
             raise UserNotFoundError("User not found.")
+        await self._resource_ownership.ensure_owned_by_user(
+            user_id=command.user_id,
+            obj_id=command.obj_id,
+        )
 
         _, windows = await self._resolve_free_time_repository(command.obj_id)
         # Check phase must be side-effect free, so validation runs on a detached list copy.

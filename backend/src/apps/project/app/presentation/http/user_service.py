@@ -172,6 +172,20 @@ class UserServiceHttpClient(UserServicePort):
                 )
         return resources
 
+    async def ensure_user_resource_exists(
+        self,
+        *,
+        user_id: UUID,
+        resource_kind: str,
+        resource_id: UUID,
+    ) -> None:
+        resources = await self.list_user_resources(
+            user_id=user_id,
+            resource_kinds=(resource_kind,),
+        )
+        if not any(resource.resource_id == resource_id for resource in resources):
+            raise EntityNotFoundError("Resource is not found for user.")
+
     async def reserve_user_time(
         self,
         *,

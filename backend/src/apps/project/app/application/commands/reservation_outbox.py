@@ -4,6 +4,7 @@ from uuid import UUID, uuid5
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
     ClockPort,
+    ProjectMemberRepository,
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
@@ -44,6 +45,7 @@ class ProcessReservationOutboxHandler:
         clock: ClockPort,
         publisher: EventPublisher,
         user_service: UserServicePort,
+        project_members: ProjectMemberRepository,
         shifts: ShiftRepository,
         shift_participants: ShiftParticipantRepository,
         resource_requests: ResourceRequestRepository,
@@ -53,6 +55,7 @@ class ProcessReservationOutboxHandler:
         self._clock = clock
         self._publisher = publisher
         self._user_service = user_service
+        self._project_members = project_members
         self._shifts = shifts
         self._shift_participants = shift_participants
         self._resource_requests = resource_requests
@@ -103,6 +106,14 @@ class ProcessReservationOutboxHandler:
         shift = await self._shifts.get_by_id(participant.shift_id)
         if shift is None:
             return await self._complete_missing_message(message, "Shift is not found.")
+        if not await self._is_active_project_member(
+            project_id=shift.project_id,
+            user_id=participant.user_id,
+        ):
+            return await self._complete_missing_message(
+                message,
+                "Participant user is not an active project member.",
+            )
 
         try:
             await self._user_service.reserve_user_time(
@@ -139,6 +150,14 @@ class ProcessReservationOutboxHandler:
                 message,
                 error=f"Resource request is in non-reserving status: {request_status}",
             )
+        if not await self._is_active_project_member(
+            project_id=request.project_id,
+            user_id=request.resource_owner_user_id,
+        ):
+            return await self._complete_missing_message(
+                message,
+                "Resource owner is not an active project member.",
+            )
 
         try:
             await self._user_service.reserve_resource_time(
@@ -160,6 +179,13 @@ class ProcessReservationOutboxHandler:
             return ProcessReservationOutboxResult(status="failed", error=str(exc))
 
         return await self._complete_message(message)
+
+    async def _is_active_project_member(self, *, project_id: UUID, user_id: UUID) -> bool:
+        member = await self._project_members.get_by_project_and_user(
+            project_id=project_id,
+            user_id=user_id,
+        )
+        return member is not None and member.is_active
 
     async def _complete_message(
         self,
