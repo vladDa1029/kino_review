@@ -10,7 +10,6 @@ import {
   createShift,
   declineShiftParticipant,
   confirmShiftParticipant,
-  getUsers,
   inviteProjectMember,
   inviteShiftParticipant,
   listProjectMembers,
@@ -27,7 +26,9 @@ const initialForm = {
 };
 
 const initialMemberForm = {
+  inviteMode: 'userId',
   userId: '',
+  email: '',
   role: 'ACTOR',
 };
 
@@ -95,6 +96,94 @@ const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Стат
 const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
 const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
 
+const SearchIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="11" cy="11" r="6" />
+    <path d="M20 20l-4.2-4.2" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 20l4.5-1 9-9a2 2 0 0 0-4-4l-9 9L4 20Z" />
+    <path d="M13 7l4 4" />
+  </svg>
+);
+
+const ArchiveIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 7h16v4H4z" />
+    <path d="M6 11h12v8H6z" />
+    <path d="M10 15h4" />
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M20 12a8 8 0 1 1-2.3-5.7" />
+    <path d="M20 4v6h-6" />
+  </svg>
+);
+
+const FolderIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+    <path d="M3 7a2 2 0 0 1 2-2h5l2 2" />
+  </svg>
+);
+
+const FilmIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="4" y="5" width="16" height="14" rx="2" />
+    <path d="M8.5 9l6 3-6 3z" />
+    <path d="M8 5v14" />
+    <path d="M16 5v14" />
+  </svg>
+);
+
+const BoxArchiveIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 7h16v4H4z" />
+    <path d="M6 11h12v8H6z" />
+    <path d="M10 15h4" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
+    <path d="M16 10a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z" />
+    <path d="M3.5 19a4.5 4.5 0 0 1 9 0" />
+    <path d="M13 19a4 4 0 0 1 7 0" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 7h16" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M6 7l1 12h10l1-12" />
+    <path d="M9 7V4h6v3" />
+  </svg>
+);
+
+const CalendarSmallIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M7 3v3" />
+    <path d="M17 3v3" />
+    <path d="M4 9h16" />
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+  </svg>
+);
+
 const getCurrentUserId = (userData) =>
   userData?.user_id ||
   userData?.userId ||
@@ -109,19 +198,38 @@ const getCurrentUserId = (userData) =>
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
+const isEmail = (value) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(value);
+
+const getMemberInitials = (member) => {
+  const source = member.displayName || member.user_id || '';
+  const parts = source.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  return source.slice(0, 2).toUpperCase() || 'U';
+};
+
 const ProjectListPage = () => {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const {
     projects,
+    newProjectIds,
     activeProjectId,
     isProjectsLoading,
+    markProjectSeen,
     refreshProjects,
     setActiveProjectId,
   } = useProjectContext();
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectView, setProjectView] = useState('active');
+  const [projectSort, setProjectSort] = useState('updated');
   const [submitting, setSubmitting] = useState(false);
   const [archivingId, setArchivingId] = useState(null);
   const [memberProjectId, setMemberProjectId] = useState('');
@@ -131,8 +239,6 @@ const ProjectListPage = () => {
   const [isMembersLoading, setIsMembersLoading] = useState(false);
   const [isInvitingMember, setIsInvitingMember] = useState(false);
   const [memberInviteError, setMemberInviteError] = useState('');
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [updatingMemberId, setUpdatingMemberId] = useState(null);
   const [removingMemberId, setRemovingMemberId] = useState(null);
   const [shiftForm, setShiftForm] = useState(initialShiftForm);
@@ -151,6 +257,10 @@ const ProjectListPage = () => {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  useEffect(() => {
+    setIncludeArchived(projectView !== 'active');
+  }, [projectView]);
 
   useEffect(() => {
     if (memberProjectId && projects.some((project) => getProjectId(project) === memberProjectId)) {
@@ -184,19 +294,6 @@ const ProjectListPage = () => {
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
-
-  const loadAvailableUsers = useCallback(async () => {
-    setIsUsersLoading(true);
-
-    try {
-      const response = await getUsers(1, 100);
-      setAvailableUsers(Array.isArray(response?.users) ? response.users : []);
-    } catch {
-      setAvailableUsers([]);
-    } finally {
-      setIsUsersLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     setParticipantForm((prev) => {
@@ -273,53 +370,57 @@ const ProjectListPage = () => {
     () => displayedMembers.filter((member) => !member.isOwner || member.user_id),
     [displayedMembers],
   );
-  const inviteableUsers = useMemo(() => {
-    const memberIds = new Set(displayedMembers.map((member) => member.user_id).filter(Boolean));
-
-    return availableUsers.filter((user) => {
-      const userId = user.oid || user.id || '';
-
-      if (!userId || userId === currentUserId) {
-        return false;
-      }
-
-      return !memberIds.has(userId);
-    });
-  }, [availableUsers, currentUserId, displayedMembers]);
-  const userDirectory = useMemo(
-    () =>
-      new Map(
-        availableUsers.map((user) => [
-          user.oid || user.id,
-          {
-            name: user.username || user.description?.username || '',
-            email: user.email || '',
-          },
-        ]),
-      ),
-    [availableUsers],
-  );
   const visibleMembers = useMemo(
     () =>
       displayedMembers.map((member) => {
-        const profile = userDirectory.get(member.user_id) || {};
-
         return {
           ...member,
-          displayName: profile.name || member.user_id,
-          displayEmail: profile.email || '',
+          displayName: member.user_id,
+          displayEmail: '',
+          isPendingAcceptance: !member.isOwner && member.status !== 0,
         };
       }),
-    [displayedMembers, userDirectory],
+    [displayedMembers],
   );
+  const filteredProjects = useMemo(() => {
+    const normalizedSearch = projectSearch.trim().toLowerCase();
 
-  useEffect(() => {
-    if (!memberProjectId) {
-      return;
-    }
+    const nextProjects = projects.filter((project) => {
+      const matchesView =
+        projectView === 'all'
+          ? true
+          : projectView === 'archived'
+            ? project.status !== 0
+            : project.status === 0;
 
-    loadAvailableUsers();
-  }, [loadAvailableUsers, memberProjectId]);
+      if (!matchesView) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = `${project.title || ''} ${project.description || ''}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+
+    nextProjects.sort((left, right) => {
+      if (projectSort === 'title') {
+        return String(left.title || '').localeCompare(String(right.title || ''), 'ru');
+      }
+
+      if (projectSort === 'created') {
+        return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+      }
+
+      return new Date(right.updated_at || 0) - new Date(left.updated_at || 0);
+    });
+
+    return nextProjects;
+  }, [projectSearch, projectSort, projectView, projects]);
+  const featuredProject = filteredProjects[0] || null;
+  const secondaryProjects = filteredProjects.slice(1);
 
   useEffect(() => {
     if (!participantForm.userId) {
@@ -420,6 +521,7 @@ const ProjectListPage = () => {
       return;
     }
 
+    markProjectSeen(projectId);
     setActiveProjectId(projectId);
     navigate('/projects');
   };
@@ -536,17 +638,29 @@ const ProjectListPage = () => {
   const handleInviteMember = async (event) => {
     event.preventDefault();
 
+    const inviteMode = memberForm.inviteMode;
     const userId = memberForm.userId.trim();
+    const email = memberForm.email.trim().toLowerCase();
+    const inviteValue = inviteMode === 'email' ? email : userId;
     setMemberInviteError('');
 
-    if (!memberProjectId || !userId) {
-      const message = 'Выберите проект и пользователя для приглашения';
+    if (!memberProjectId || !inviteValue) {
+      const message = inviteMode === 'email'
+        ? 'Выберите проект и укажите email для приглашения'
+        : 'Выберите проект и укажите ID пользователя для приглашения';
       setMemberInviteError(message);
       toast.error(message);
       return;
     }
 
-    if (!isUuid(userId)) {
+    if (inviteMode === 'email') {
+      if (!isEmail(email)) {
+        const message = 'Введите корректный email для приглашения';
+        setMemberInviteError(message);
+        toast.error(message);
+        return;
+      }
+    } else if (!isUuid(userId)) {
       const message = 'user_id должен быть UUID в формате xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
       setMemberInviteError(message);
       toast.error(message);
@@ -560,7 +674,14 @@ const ProjectListPage = () => {
       return;
     }
 
-    if (displayedMembers.some((member) => member.user_id === userId)) {
+    if (inviteMode === 'email') {
+      if (visibleMembers.some((member) => member.displayEmail && member.displayEmail.toLowerCase() === email)) {
+        const message = 'Пользователь с этим email уже есть в проекте';
+        setMemberInviteError(message);
+        toast.error(message);
+        return;
+      }
+    } else if (displayedMembers.some((member) => member.user_id === userId)) {
       const message = 'Этот пользователь уже добавлен в проект';
       setMemberInviteError(message);
       toast.error(message);
@@ -571,13 +692,23 @@ const ProjectListPage = () => {
 
     try {
       await inviteProjectMember(memberProjectId, {
-        user_id: userId,
         role: memberForm.role,
+        ...(inviteMode === 'email' ? { email } : { user_id: userId }),
       });
-      toast.success('Участник приглашен в проект');
+      if (inviteMode === 'email') {
+        setIncludeInactiveMembers(true);
+      }
+      const response = await listProjectMembers(memberProjectId, {
+        includeInactive: inviteMode === 'email' ? true : includeInactiveMembers,
+      });
+      setMembers(Array.isArray(response?.items) ? response.items : []);
+      toast.success(
+        inviteMode === 'email'
+          ? 'Приглашение отправлено на email. Пользователь должен принять его по ссылке в письме.'
+          : 'Пользователь сразу добавлен в проект.',
+      );
       setMemberForm(initialMemberForm);
       setMemberInviteError('');
-      await loadMembers();
     } catch (error) {
       const message = error?.message || 'Не удалось пригласить участника';
       setMemberInviteError(message);
@@ -760,19 +891,76 @@ const ProjectListPage = () => {
 
         <div className="project-list-stats" aria-label="Сводка проектов">
           <div>
-            <span>Всего</span>
-            <strong>{counters.total}</strong>
+            <span className="project-stat-icon"><FolderIcon /></span>
+            <div className="project-stat-copy">
+              <span>Всего</span>
+              <strong>{counters.total}</strong>
+              <small>проект</small>
+            </div>
           </div>
           <div>
-            <span>Активные</span>
-            <strong>{counters.active}</strong>
+            <span className="project-stat-icon"><FilmIcon /></span>
+            <div className="project-stat-copy">
+              <span>Активные</span>
+              <strong>{counters.active}</strong>
+              <small>проект</small>
+            </div>
           </div>
           <div>
-            <span>Архив</span>
-            <strong>{counters.archived}</strong>
+            <span className="project-stat-icon"><BoxArchiveIcon /></span>
+            <div className="project-stat-copy">
+              <span>Архив</span>
+              <strong>{counters.archived}</strong>
+              <small>проект</small>
+            </div>
           </div>
         </div>
       </div>
+
+      <div className="dashboard-panel project-list-commandbar">
+        <label className="project-search-field">
+          <SearchIcon />
+          <input
+            type="search"
+            value={projectSearch}
+            onChange={(event) => setProjectSearch(event.target.value)}
+            placeholder="Поиск по названию или описанию"
+          />
+        </label>
+
+        <div className="project-view-switcher" role="tablist" aria-label="Фильтр проектов">
+          {[
+            { key: 'all', label: 'Все' },
+            { key: 'active', label: 'Активные' },
+            { key: 'archived', label: 'Архив' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={`project-view-tab ${projectView === option.key ? 'is-active' : ''}`}
+              onClick={() => setProjectView(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="project-toolbar-create-btn"
+          onClick={() => {
+            handleResetForm();
+            document.getElementById('project-create-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        >
+          <PlusIcon />
+          <span>Новый проект</span>
+        </button>
+      </div>
+
+      {newProjectIds.length > 0 ? (
+        <p className="helper-note">У вас есть новое приглашение в проект. Оно отмечено в списке ниже.</p>
+      ) : null}
 
       <div className="project-list-layout">
         <section className="dashboard-panel project-create-panel">
@@ -781,7 +969,7 @@ const ProjectListPage = () => {
             <p>Заполните поля, которые принимает сервис проектов.</p>
           </div>
 
-          <form className="stacked-form" onSubmit={handleSubmit}>
+          <form id="project-create-form" className="stacked-form" onSubmit={handleSubmit}>
             <label className="field-block">
               <span>Название</span>
               <input
@@ -824,18 +1012,27 @@ const ProjectListPage = () => {
         </section>
 
         <section className="project-cards">
-          <div className="dashboard-panel project-list-toolbar">
-            <label className="toggle-inline">
-              <input
-                type="checkbox"
-                checked={includeArchived}
-                onChange={(event) => setIncludeArchived(event.target.checked)}
-              />
-              <span>Показывать архивные</span>
-            </label>
-            <button type="button" className="ghost-action-btn" onClick={loadProjects} disabled={isProjectsLoading}>
-              Обновить
-            </button>
+          <div className="dashboard-panel project-list-toolbar project-list-toolbar-rich">
+            <div className="project-list-toolbar-title">
+              <FilmIcon />
+              <div>
+                <h2>Список проектов</h2>
+              </div>
+            </div>
+            <div className="project-list-toolbar-controls">
+              <label className="project-sort-field">
+                <span>Сортировка:</span>
+                <select value={projectSort} onChange={(event) => setProjectSort(event.target.value)}>
+                  <option value="updated">обновлению</option>
+                  <option value="created">созданию</option>
+                  <option value="title">названию</option>
+                </select>
+              </label>
+              <button type="button" className="ghost-action-btn" onClick={loadProjects} disabled={isProjectsLoading}>
+                <RefreshIcon />
+                <span>Обновить</span>
+              </button>
+            </div>
           </div>
 
           {isProjectsLoading && (
@@ -850,8 +1047,64 @@ const ProjectListPage = () => {
             </div>
           )}
 
+          {!isProjectsLoading && featuredProject && (
+            <article
+              key={getProjectId(featuredProject)}
+              className={`dashboard-panel project-card-item project-card-featured${activeProjectId === getProjectId(featuredProject) ? ' is-active-project' : ''}`}
+            >
+              <div className="project-card-thumb project-card-thumb-featured" aria-hidden="true" />
+              <div className="project-card-main">
+                <div className="project-card-meta">
+                  <span className="project-type-label">{getStatusLabel(featuredProject.status)}</span>
+                  <span className="project-type-label">
+                    {currentUserId && featuredProject.owner_id === currentUserId ? 'Владелец' : 'Участник'}
+                  </span>
+                  {newProjectIds.includes(getProjectId(featuredProject)) ? (
+                    <span className="project-type-label invitation">Новое приглашение</span>
+                  ) : null}
+                  {activeProjectId === getProjectId(featuredProject) ? (
+                    <span className="project-type-label active">Открыт сейчас</span>
+                  ) : null}
+                  <span>Создан: {formatDate(featuredProject.created_at)}</span>
+                </div>
+                <h2>{featuredProject.title}</h2>
+                <p className="project-card-description">
+                  {featuredProject.description || 'Описание не указано'}
+                </p>
+                <p>Обновлен: {formatDate(featuredProject.updated_at)}</p>
+              </div>
+
+              <div className="project-card-actions">
+                <button
+                  type="button"
+                  className="profile-save-btn compact"
+                  onClick={() => handleOpenProject(featuredProject)}
+                >
+                  {activeProjectId === getProjectId(featuredProject) ? 'Открыт' : 'Открыть'}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-action-btn project-inline-action"
+                  onClick={() => handleEditProject(featuredProject)}
+                >
+                  <EditIcon />
+                  <span>Изменить</span>
+                </button>
+                <button
+                  type="button"
+                  className="ghost-action-btn danger project-inline-action"
+                  onClick={() => handleArchiveProject(featuredProject)}
+                  disabled={archivingId === getProjectId(featuredProject)}
+                >
+                  <ArchiveIcon />
+                  <span>{archivingId === getProjectId(featuredProject) ? 'Архивируем...' : 'В архив'}</span>
+                </button>
+              </div>
+            </article>
+          )}
+
           {!isProjectsLoading &&
-            projects.map((project) => {
+            secondaryProjects.map((project) => {
               const projectId = getProjectId(project);
               const isArchiving = archivingId === projectId;
               const isActiveProject = activeProjectId === projectId;
@@ -860,12 +1113,16 @@ const ProjectListPage = () => {
               return (
                 <article
                   key={projectId}
-                  className={`dashboard-panel project-card-item${isActiveProject ? ' is-active-project' : ''}`}
+                  className={`dashboard-panel project-card-item project-card-compact${isActiveProject ? ' is-active-project' : ''}`}
                 >
+                  <div className="project-card-thumb project-card-thumb-compact" aria-hidden="true" />
                   <div className="project-card-main">
                     <div className="project-card-meta">
                       <span className="project-type-label">{getStatusLabel(project.status)}</span>
                       <span className="project-type-label">{isOwner ? 'Владелец' : 'Участник'}</span>
+                      {newProjectIds.includes(projectId) ? (
+                        <span className="project-type-label invitation">Новое приглашение</span>
+                      ) : null}
                       {isActiveProject ? <span className="project-type-label active">Открыт сейчас</span> : null}
                       <span>Создан: {formatDate(project.created_at)}</span>
                     </div>
@@ -886,18 +1143,20 @@ const ProjectListPage = () => {
                     </button>
                     <button
                       type="button"
-                      className="ghost-action-btn"
+                      className="ghost-action-btn project-inline-action"
                       onClick={() => handleEditProject(project)}
                     >
-                      Изменить
+                      <EditIcon />
+                      <span>Изменить</span>
                     </button>
                     <button
                       type="button"
-                      className="ghost-action-btn danger"
+                      className="ghost-action-btn danger project-inline-action"
                       onClick={() => handleArchiveProject(project)}
                       disabled={isArchiving}
                     >
-                      {isArchiving ? 'Архивируем...' : 'В архив'}
+                      <ArchiveIcon />
+                      <span>{isArchiving ? 'Архивируем...' : 'В архив'}</span>
                     </button>
                   </div>
                 </article>
@@ -1145,10 +1404,10 @@ const ProjectListPage = () => {
         <div className="section-heading project-members-heading">
           <div>
             <span className="projects-panel-eyebrow">Участники</span>
-            <h2>{memberProject ? memberProject.title : 'Выберите проект'}</h2>
+            <h2>Участники</h2>
           </div>
           <p>
-            Приглашайте пользователей по `user_id`, меняйте роль и убирайте участников из проекта.
+            Приглашайте пользователей по ID, назначайте роли и управляйте доступом.
           </p>
         </div>
 
@@ -1156,7 +1415,10 @@ const ProjectListPage = () => {
           <p className="helper-note">Управлять участниками может создатель проекта или участник с ролью DIRECTOR.</p>
         ) : null}
 
-        <div className="project-members-toolbar">
+        <div className="project-members-toolbar project-members-toolbar-refined">
+          <div className="project-members-toolbar-icon" aria-hidden="true">
+            <UsersIcon />
+          </div>
           <label className="field-block">
             <span>Проект</span>
             <select
@@ -1179,36 +1441,53 @@ const ProjectListPage = () => {
             </select>
           </label>
 
-          <label className="toggle-inline">
-            <input
-              type="checkbox"
-              checked={includeInactiveMembers}
-              onChange={(event) => setIncludeInactiveMembers(event.target.checked)}
-            />
-            <span>Показывать неактивных</span>
-          </label>
+          <div className="project-members-toolbar-side">
+            <label className="toggle-inline">
+              <input
+                type="checkbox"
+                checked={includeInactiveMembers}
+                onChange={(event) => setIncludeInactiveMembers(event.target.checked)}
+              />
+              <span>Показывать неактивных</span>
+            </label>
 
-          <button
-            type="button"
-            className="ghost-action-btn"
-            onClick={loadMembers}
-            disabled={!memberProjectId || isMembersLoading}
-          >
-            Обновить
-          </button>
+            <button
+              type="button"
+              className="ghost-action-btn"
+              onClick={loadMembers}
+              disabled={!memberProjectId || isMembersLoading}
+            >
+              <RefreshIcon />
+              <span>Обновить</span>
+            </button>
+          </div>
         </div>
 
         {memberInviteError ? <p className="helper-note">{memberInviteError}</p> : null}
 
-                <form className="project-member-invite-form" onSubmit={handleInviteMember}>
+        <form className="project-member-invite-form project-member-invite-form-refined" onSubmit={handleInviteMember}>
           <label className="field-block">
-            <span>ID user</span>
-            <input
-              name="userId"
-              value={memberForm.userId}
+            <span>Пригласить по</span>
+            <select
+              name="inviteMode"
+              value={memberForm.inviteMode}
               onChange={handleMemberFormChange}
               disabled={!canManageMembers}
-              placeholder="UUID ????????????"
+            >
+              <option value="userId">ID user</option>
+              <option value="email">Email</option>
+            </select>
+          </label>
+
+          <label className="field-block">
+            <span>{memberForm.inviteMode === 'email' ? 'Email' : 'ID user'}</span>
+            <input
+              name={memberForm.inviteMode === 'email' ? 'email' : 'userId'}
+              type={memberForm.inviteMode === 'email' ? 'email' : 'text'}
+              value={memberForm.inviteMode === 'email' ? memberForm.email : memberForm.userId}
+              onChange={handleMemberFormChange}
+              disabled={!canManageMembers}
+              placeholder={memberForm.inviteMode === 'email' ? 'Введите email пользователя' : 'Введите ID пользователя'}
             />
           </label>
 
@@ -1237,35 +1516,60 @@ const ProjectListPage = () => {
           </button>
         </form>
 
-        <div className="project-members-list">
+        <p className="helper-note">
+          {memberForm.inviteMode === 'email'
+            ? 'После отправки приглашения участник получит письмо со ссылкой и сможет принять приглашение только после входа в систему.'
+            : 'При приглашении по ID user пользователь добавляется в проект сразу, без ожидания ответа.'}
+        </p>
+
+        <div className="project-members-table-shell">
           {isMembersLoading ? <p className="helper-note">Загружаем участников...</p> : null}
 
           {!isMembersLoading && visibleMembers.length === 0 ? (
             <p className="helper-note">В этом проекте пока нет участников для отображения.</p>
           ) : null}
 
-          {!isMembersLoading &&
-            visibleMembers.map((member) => {
-              const isCurrentUser = member.user_id === currentUserId;
-              const isUpdating = updatingMemberId === member.user_id;
-              const isRemoving = removingMemberId === member.user_id;
+          {!isMembersLoading && visibleMembers.length > 0 ? (
+            <div className="project-members-table">
+              <div className="project-members-table-head">
+                <span>Пользователь</span>
+                <span>ID user</span>
+                <span>Email</span>
+                <span>Роль</span>
+                <span>Добавлен</span>
+                <span>Действия</span>
+              </div>
 
-              return (
-                <article key={member.oid || member.user_id} className="project-member-card">
-                  <div>
-                    <span className="project-type-label">{member.isOwner ? 'Создатель' : getMemberStatusLabel(member.status)}</span>
-                    <h3>{member.displayName}</h3>
-                    <p>
-                      {isCurrentUser ? 'Это вы' : `Пригласил: ${member.invited_by || '-'}`} · Создан:
-                      {' '}
-                      {formatDate(member.created_at)}
-                    </p>
-                    <p>{member.displayEmail || member.user_id}</p>
-                  </div>
+              {visibleMembers.map((member) => {
+                const isCurrentUser = member.user_id === currentUserId;
+                const isUpdating = updatingMemberId === member.user_id;
+                const isRemoving = removingMemberId === member.user_id;
 
-                  <div className="project-member-actions">
-                    <label className="field-block">
-                      <span>Роль</span>
+                return (
+                  <div key={member.oid || member.user_id} className="project-members-table-row">
+                    <div className="project-members-user-cell">
+                      <div className="project-member-avatar" aria-hidden="true">
+                        {getMemberInitials(member)}
+                      </div>
+                      <div className="project-member-copy">
+                        <h3>
+                          {member.displayName}
+                          {isCurrentUser ? <span className="project-member-self-badge">Это вы</span> : null}
+                        </h3>
+                        <p>{member.user_id}</p>
+                      </div>
+                    </div>
+
+                    <div className="project-members-id-cell">{member.user_id}</div>
+
+                    <div className="project-members-status-cell">
+                      <span>{member.displayEmail || 'Почта не указана'}</span>
+                      {member.isPendingAcceptance ? (
+                        <small className="project-members-pending-note">Ожидает принятия приглашения</small>
+                      ) : null}
+                    </div>
+
+                    <div className="project-members-role-cell">
                       <select
                         value={member.role}
                         onChange={(event) => handleChangeMemberRole(member.user_id, event.target.value)}
@@ -1277,21 +1581,33 @@ const ProjectListPage = () => {
                           </option>
                         ))}
                       </select>
-                    </label>
+                    </div>
 
-                    <button
-                      type="button"
-                      className="ghost-action-btn danger"
-                      onClick={() => handleRemoveMember(member)}
-                      disabled={!canManageMembers || member.isOwner || isCurrentUser || isRemoving}
-                      title={getRoleLabel(member.role)}
-                    >
-                      {isRemoving ? 'Удаляем...' : 'Удалить'}
-                    </button>
+                    <div className="project-members-date-cell">
+                      <CalendarSmallIcon />
+                      <span>{formatDate(member.created_at)}</span>
+                    </div>
+
+                    <div className="project-members-actions-cell">
+                      {member.isOwner || isCurrentUser ? (
+                        <span className="project-members-action-placeholder">—</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="project-member-delete-btn"
+                          onClick={() => handleRemoveMember(member)}
+                          disabled={!canManageMembers || isRemoving}
+                          title={getRoleLabel(member.role)}
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </article>
-              );
-            })}
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </section>
     </section>

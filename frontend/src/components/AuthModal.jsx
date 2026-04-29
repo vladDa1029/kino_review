@@ -61,9 +61,11 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
   const { isLogin, setIsLogin, handleLogin, handleRegister } = useAuth();
   const {
     projects,
+    newProjectIds,
     activeProjectId,
     isProjectsLoading,
     refreshProjects,
+    markProjectSeen,
     setActiveProjectId,
   } = useProjectContext();
   const navigate = useNavigate();
@@ -116,6 +118,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
   };
 
   const handleChooseProject = (projectId) => {
+    markProjectSeen(projectId);
     setActiveProjectId(projectId);
     setShowAuth(false);
     setStep('auth');
@@ -149,6 +152,10 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                 </div>
 
                 <div className="project-choice-list">
+                  {newProjectIds.length > 0 ? (
+                    <p className="helper-note">У вас есть новое приглашение в проект. Выберите проект, чтобы открыть его в работе.</p>
+                  ) : null}
+
                   {isProjectsLoading ? <p className="helper-note">Загружаем проекты...</p> : null}
 
                   {!isProjectsLoading && projects.length === 0 ? (
@@ -164,6 +171,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                     projects.map((project) => {
                       const projectId = project.oid || project.id;
                       const isActive = activeProjectId === projectId;
+                      const isNewProject = newProjectIds.includes(projectId);
 
                       return (
                         <button
@@ -172,7 +180,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                           className={`project-choice-card${isActive ? ' is-active' : ''}`}
                           onClick={() => handleChooseProject(projectId)}
                         >
-                          <span>{isActive ? 'Выбран сейчас' : 'Проект'}</span>
+                          <span>{isNewProject ? 'Новое приглашение' : isActive ? 'Выбран сейчас' : 'Проект'}</span>
                           <strong>{project.title}</strong>
                           <small>{project.description || 'Описание не указано'}</small>
                         </button>
