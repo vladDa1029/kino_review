@@ -25,3 +25,21 @@ def test_project_report_paths_are_protected() -> None:
         fnmatch("/project/reports/123", pattern)
         for pattern in settings.patterns["project"]
     )
+
+
+def test_project_invitation_paths_are_protected() -> None:
+    settings = ProtectedPathsSettings()
+
+    assert any(
+        fnmatch("/user/project-invitations/token", pattern)
+        for pattern in settings.patterns["user"]
+    )
+
+
+def test_project_invitation_path_stays_protected_when_patterns_are_overridden() -> None:
+    settings = ProtectedPathsSettings(PROTECTED_PATH_PATTERNS={"user": ["/user/users/*"]})
+
+    assert any(
+        fnmatch("/user/project-invitations/token", pattern)
+        for pattern in settings.patterns["user"]
+    )

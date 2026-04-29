@@ -1,5 +1,3 @@
-from fnmatch import fnmatch
-
 from dishka import FromDishka
 from fastapi import APIRouter, HTTPException, Request, Response
 from dishka.integrations.fastapi import DishkaRoute
@@ -7,7 +5,10 @@ from fastapi.responses import JSONResponse
 import httpx
 
 from app.config import ProtectedPathsSettings, Services
-from app.presentation.api.v1.openapi_utils import strip_header_parameter
+from app.presentation.api.v1.openapi_utils import (
+    mark_protected_endpoints_with_security,
+    strip_header_parameter,
+)
 
 router = APIRouter(
     prefix="/auth",
@@ -112,7 +113,7 @@ async def fetch_and_patch_openapi(
         if "servers" in spec:
             spec["servers"] = [{"url": "/"}]
 
-        _mark_protected_endpoints_with_security(spec, protected_patterns)
+        mark_protected_endpoints_with_security(spec, protected_patterns)
         strip_header_parameter(spec, "x-user-id")
         strip_header_parameter(spec, "x-user-token-type")
         strip_header_parameter(spec, "x-user-is-superuser")
@@ -121,26 +122,3 @@ async def fetch_and_patch_openapi(
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"Auth service unreachable: {e}")
-
-
-def _mark_protected_endpoints_with_security(spec: dict, patterns: list[str]) -> None:
-    if not patterns:
-        return
-
-    components = spec.setdefault("components", {})
-    security_schemes = components.setdefault("securitySchemes", {})
-    security_schemes.setdefault(
-        "bearerAuth",
-        {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
-    )
-
-    for path, operations in spec.get("paths", {}).items():
-        if not _match_path(path, patterns):
-            continue
-        for operation in operations.values():
-            if isinstance(operation, dict):
-                operation.setdefault("security", [{"bearerAuth": []}])
-
-
-def _match_path(path: str, patterns: list[str]) -> bool:
-    return any(fnmatch(path, pattern) for pattern in patterns)

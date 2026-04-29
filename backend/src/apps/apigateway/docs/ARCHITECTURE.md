@@ -79,7 +79,7 @@ These files define:
 | `/admin/user/redoc` | Admin user ReDoc UI |
 | `/user/confirmations/*` | One-click reservation confirmation from email |
 
-Project invitation links use `/user/project-invitations/*` and intentionally remain protected by the normal `/user/*` gateway auth path so `user` receives trusted `X-User-Id`.
+Project invitation links use `/user/project-invitations/*` and are always included in protected gateway paths so `user` receives trusted `X-User-Id`.
 
 ## Outbound Interfaces
 

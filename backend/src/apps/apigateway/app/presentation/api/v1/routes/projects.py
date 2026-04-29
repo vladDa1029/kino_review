@@ -1,5 +1,3 @@
-from fnmatch import fnmatch
-
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -7,6 +5,10 @@ from fastapi.responses import JSONResponse
 import httpx
 
 from app.config import ProtectedPathsSettings, Services
+from app.presentation.api.v1.openapi_utils import (
+    mark_protected_endpoints_with_security,
+    strip_header_parameter,
+)
 
 router = APIRouter(
     prefix="/project",
@@ -110,63 +112,10 @@ async def fetch_and_patch_openapi(
         if "servers" in spec:
             spec["servers"] = [{"url": "/"}]
 
-        _mark_protected_endpoints_with_security(spec, protected_patterns)
-        _strip_header_parameter(spec, "x-user-id")
+        mark_protected_endpoints_with_security(spec, protected_patterns)
+        strip_header_parameter(spec, "x-user-id")
 
         return spec
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"Project service unreachable: {e}")
-
-
-def _mark_protected_endpoints_with_security(spec: dict, patterns: list[str]) -> None:
-    if not patterns:
-        return
-
-    components = spec.setdefault("components", {})
-    security_schemes = components.setdefault("securitySchemes", {})
-    security_schemes.setdefault(
-        "bearerAuth",
-        {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
-    )
-
-    for path, operations in spec.get("paths", {}).items():
-        if not _match_path(path, patterns):
-            continue
-        for operation in operations.values():
-            if isinstance(operation, dict):
-                operation.setdefault("security", [{"bearerAuth": []}])
-
-
-def _match_path(path: str, patterns: list[str]) -> bool:
-    return any(fnmatch(path, pattern) for pattern in patterns)
-
-
-def _strip_header_parameter(spec: dict, header_name: str) -> None:
-    for path_item in spec.get("paths", {}).values():
-        if not isinstance(path_item, dict):
-            continue
-        _strip_parameter_from_container(path_item, header_name)
-        for operation in path_item.values():
-            if isinstance(operation, dict):
-                _strip_parameter_from_container(operation, header_name)
-
-
-def _strip_parameter_from_container(container: dict, header_name: str) -> None:
-    parameters = container.get("parameters")
-    if not parameters:
-        return
-    filtered = []
-    for param in parameters:
-        if not isinstance(param, dict):
-            filtered.append(param)
-            continue
-        param_name = str(param.get("name", "")).lower()
-        param_in = param.get("in")
-        if param_name == header_name.lower() and param_in == "header":
-            continue
-        filtered.append(param)
-    if filtered:
-        container["parameters"] = filtered
-    else:
-        container.pop("parameters", None)

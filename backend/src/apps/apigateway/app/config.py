@@ -1,8 +1,27 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Self
+
 from pydantic import Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
+
+
+DEFAULT_PROTECTED_PATH_PATTERNS = {
+    "auth": ["/auth/users"],
+    "user": ["/user/users/*", "/user/project-invitations/*"],
+    "project": [
+        "/project/projects*",
+        "/project/shifts*",
+        "/project/participants*",
+        "/project/documents*",
+        "/project/resource-requests*",
+        "/project/reports*",
+    ],
+}
+
+REQUIRED_PROTECTED_PATH_PATTERNS = {
+    "user": ["/user/project-invitations/*"],
+}
 
 
 class BaseSettings(BaseSettings):
@@ -22,8 +41,22 @@ class Services(BaseSettings):
 class ProtectedPathsSettings(BaseSettings):
     patterns: dict[str, list[str]] = Field(
         alias="PROTECTED_PATH_PATTERNS",
-        default_factory=dict,
+        default_factory=lambda: {
+            service: list(patterns)
+            for service, patterns in DEFAULT_PROTECTED_PATH_PATTERNS.items()
+        },
     )
+
+    @model_validator(mode="after")
+    def include_required_patterns(self) -> Self:
+        merged = {service: list(patterns) for service, patterns in self.patterns.items()}
+        for service, required_patterns in REQUIRED_PROTECTED_PATH_PATTERNS.items():
+            service_patterns = merged.setdefault(service, [])
+            for pattern in required_patterns:
+                if pattern not in service_patterns:
+                    service_patterns.append(pattern)
+        self.patterns = merged
+        return self
 
 
 class AuthGatewaySettings(BaseSettings):
