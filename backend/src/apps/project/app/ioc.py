@@ -28,6 +28,7 @@ from app.application.commands import (
     CreateShiftHandler,
     DeclineShiftParticipantHandler,
     DeleteProjectHandler,
+    InviteProjectMemberByEmailHandler,
     InviteProjectMemberHandler,
     InviteShiftParticipantHandler,
     RejectResourceRequestHandler,
@@ -244,6 +245,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=UpdateProjectHandler)
     provider.provide(source=DeleteProjectHandler)
     provider.provide(source=InviteProjectMemberHandler)
+    provider.provide(source=InviteProjectMemberByEmailHandler)
     provider.provide(source=ApproveProjectMemberInvitationHandler)
     provider.provide(source=ChangeProjectMemberRoleHandler)
     provider.provide(source=RemoveProjectMemberHandler)

@@ -22,6 +22,7 @@ from app.application.commands.projects import (
     ChangeProjectMemberRoleHandler,
     CreateProjectHandler,
     DeleteProjectHandler,
+    InviteProjectMemberByEmailHandler,
     InviteProjectMemberHandler,
     RemoveProjectMemberHandler,
     UpdateProjectHandler,
@@ -176,6 +177,16 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         director_member_policy=DirectorMemberPolicy(),
     )
     invite_project_member_handler = InviteProjectMemberHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=id_generator,
+        publisher=publisher,
+        user_service=user_service,
+        project_members=members,
+        projects=projects,
+        membership_service=ProjectMembershipService(),
+    )
+    invite_project_member_by_email_handler = InviteProjectMemberByEmailHandler(
         transaction_manager=tx,
         clock=clock,
         id_generator=id_generator,
@@ -345,6 +356,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         (update_project_handler, UpdateProjectHandler),
         (delete_project_handler, DeleteProjectHandler),
         (invite_project_member_handler, InviteProjectMemberHandler),
+        (invite_project_member_by_email_handler, InviteProjectMemberByEmailHandler),
         (list_members_handler, ListProjectMembersHandler),
         (get_member_handler, GetProjectMemberHandler),
         (change_role_handler, ChangeProjectMemberRoleHandler),
@@ -495,6 +507,7 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
     assert payload["paths"]["/health"]["get"]["tags"] == ["system"]
     assert payload["paths"]["/projects"]["post"]["tags"] == ["projects"]
     assert payload["paths"]["/projects/{project_id}/members"]["post"]["tags"] == ["members"]
+    assert payload["paths"]["/projects/{project_id}/members/by-email"]["post"]["tags"] == ["members"]
     assert payload["paths"]["/projects/{project_id}/members/{target_user_id}/resources"]["get"]["tags"] == [
         "member-resources"
     ]
@@ -603,6 +616,7 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
     ctx = build_project_api_crud_context()
     director_id = uuid4()
     invited_member_id = uuid4()
+    email_invited_member_id = uuid4()
     participant_id = uuid4()
     declining_participant_id = uuid4()
     owner_user_id = uuid4()
@@ -630,6 +644,23 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
             assert invite_member_response.status_code == 200
             assert invite_member_response.json()["status"] == int(ProjectMemberStatus.INVITED)
 
+            invite_email_on_user_id_route_response = client.post(
+                f"/projects/{project_id}/members",
+                headers={"X-User-Id": str(director_id)},
+                json={"email": "wrong-route@example.com", "role": "ACTOR"},
+            )
+            assert invite_email_on_user_id_route_response.status_code == 422
+
+            ctx.user_service.users_by_email["invitee@example.com"] = email_invited_member_id
+            invite_by_email_response = client.post(
+                f"/projects/{project_id}/members/by-email",
+                headers={"X-User-Id": str(director_id)},
+                json={"email": "invitee@example.com", "role": "ACTOR"},
+            )
+            assert invite_by_email_response.status_code == 200
+            assert invite_by_email_response.json()["user_id"] == str(email_invited_member_id)
+            assert invite_by_email_response.json()["status"] == int(ProjectMemberStatus.INVITED)
+
             list_members_response = client.get(
                 f"/projects/{project_id}/members",
                 headers={"X-User-Id": str(director_id)},
@@ -637,7 +668,11 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
             )
             assert list_members_response.status_code == 200
             listed_user_ids = {item["user_id"] for item in list_members_response.json()["items"]}
-            assert listed_user_ids == {str(director_id), str(invited_member_id)}
+            assert listed_user_ids == {
+                str(director_id),
+                str(invited_member_id),
+                str(email_invited_member_id),
+            }
 
             get_member_response = client.get(
                 f"/projects/{project_id}/members/{invited_member_id}",

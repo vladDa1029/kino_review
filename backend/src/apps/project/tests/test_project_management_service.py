@@ -26,6 +26,8 @@ from app.application.commands.projects import (
     CreateProjectHandler,
     DeleteProjectCommand,
     DeleteProjectHandler,
+    InviteProjectMemberByEmailCommand,
+    InviteProjectMemberByEmailHandler,
     InviteProjectMemberCommand,
     InviteProjectMemberHandler,
     RemoveProjectMemberCommand,
@@ -669,7 +671,7 @@ def test_invite_project_member_can_resolve_invitee_by_email() -> None:
                 description="Desc",
             )
         )
-        handler = InviteProjectMemberHandler(
+        handler = InviteProjectMemberByEmailHandler(
             transaction_manager=tx,
             clock=SystemClock(),
             id_generator=FakeIdGenerator(),
@@ -681,7 +683,7 @@ def test_invite_project_member_can_resolve_invitee_by_email() -> None:
         )
 
         member = await handler(
-            InviteProjectMemberCommand(
+            InviteProjectMemberByEmailCommand(
                 project_id=project.oid,
                 actor_user_id=owner_id,
                 email=invitee_email,

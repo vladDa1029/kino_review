@@ -28,6 +28,8 @@ from app.application.commands import (
     DeclineShiftParticipantHandler,
     DeleteProjectCommand,
     DeleteProjectHandler,
+    InviteProjectMemberByEmailCommand,
+    InviteProjectMemberByEmailHandler,
     InviteProjectMemberCommand,
     InviteProjectMemberHandler,
     InviteShiftParticipantCommand,
@@ -70,6 +72,7 @@ from app.presentation.schemas import (
     DocumentDownloadUrlResponse,
     DocumentTypeInput,
     DocumentUploadResponse,
+    InviteProjectMemberByEmailRequest,
     InviteProjectMemberRequest,
     InviteShiftParticipantRequest,
     ProjectCreateRequest,
@@ -79,7 +82,6 @@ from app.presentation.schemas import (
     ProjectMemberShortResponse,
     ProjectResourceResponse,
     ProjectResponse,
-    ProjectRoleInput,
     ProjectUpdateRequest,
     ProjectUserResourcesResponse,
     RejectResourceRequestBody,
@@ -255,8 +257,8 @@ async def delete_project(
     "/projects/{project_id}/members",
     response_model=ProjectMemberResponse,
     tags=["members"],
-    summary="Invite member to project",
-    description="Invites a registered user into the project by user id or email. The invitee receives an email link and must accept it while authenticated.",
+    summary="Invite member to project by user id",
+    description="Invites a registered user into the project by user id. The invitee receives an email link and must accept it while authenticated.",
 )
 async def invite_project_member(
     project_id: UUID,
@@ -269,6 +271,29 @@ async def invite_project_member(
             project_id=project_id,
             actor_user_id=x_user_id,
             invited_user_id=payload.user_id,
+            role=payload.role.to_domain(),
+        )
+    )
+    return ProjectMemberResponse.from_entity(member)
+
+
+@router.post(
+    "/projects/{project_id}/members/by-email",
+    response_model=ProjectMemberResponse,
+    tags=["members"],
+    summary="Invite member to project by email",
+    description="Invites a registered user into the project by email. The invitee receives an email link and must accept it while authenticated.",
+)
+async def invite_project_member_by_email(
+    project_id: UUID,
+    payload: InviteProjectMemberByEmailRequest,
+    handler: FromDishka[InviteProjectMemberByEmailHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ProjectMemberResponse:
+    member = await handler(
+        InviteProjectMemberByEmailCommand(
+            project_id=project_id,
+            actor_user_id=x_user_id,
             email=payload.email,
             role=payload.role.to_domain(),
         )

@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from app.domain.entities import (
     Document,
@@ -86,9 +86,14 @@ class ProjectListResponse(BaseModel):
 
 
 class InviteProjectMemberRequest(BaseModel):
-    user_id: UUID | None = None
-    email: str | None = Field(
-        default=None,
+    user_id: UUID
+    role: ProjectRoleInput = Field(
+        description="Role of invited user. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
+    )
+
+
+class InviteProjectMemberByEmailRequest(BaseModel):
+    email: str = Field(
         min_length=3,
         max_length=255,
         pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
@@ -96,12 +101,6 @@ class InviteProjectMemberRequest(BaseModel):
     role: ProjectRoleInput = Field(
         description="Role of invited user. Allowed values: DIRECTOR, PROP_MASTER, CAMERA, SOUND, LIGHT, ACTOR.",
     )
-
-    @model_validator(mode="after")
-    def validate_invitee(self) -> InviteProjectMemberRequest:
-        if (self.user_id is None) == (self.email is None):
-            raise ValueError("Provide exactly one of user_id or email.")
-        return self
 
 
 class ProjectMemberResponse(BaseModel):

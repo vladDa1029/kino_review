@@ -211,9 +211,16 @@ class UpdateProjectHandler:
 class InviteProjectMemberCommand:
     project_id: UUID
     actor_user_id: UUID
+    invited_user_id: UUID
     role: ProjectRole
-    invited_user_id: UUID | None = None
-    email: str | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InviteProjectMemberByEmailCommand:
+    project_id: UUID
+    actor_user_id: UUID
+    email: str
+    role: ProjectRole
 
 
 class InviteProjectMemberHandler:
@@ -238,58 +245,69 @@ class InviteProjectMemberHandler:
         self._projects = projects
         self._membership_service = membership_service
 
-    async def __call__(self, command: InviteProjectMemberCommand) -> ProjectMember:
-        now = self._clock.now()
-        try:
-            project = await self._projects.get_by_id(command.project_id)
-            if project is None:
-                raise EntityNotFoundError("Project is not found.")
-            actor = await get_actor_member(
-                project_members=self._project_members,
-                project_id=command.project_id,
-                user_id=command.actor_user_id,
-            )
-            if (command.invited_user_id is None) == (command.email is None):
-                raise StateTransitionError("Provide exactly one of invited_user_id or email.")
-            if command.invited_user_id is None:
-                assert command.email is not None
-                invited_user = await self._user_service.get_user_by_email(command.email.strip())
-                invited_user_id = invited_user.user_id
-            else:
-                invited_user_id = command.invited_user_id
-                await self._user_service.ensure_user_exists(invited_user_id)
+    async def _get_project_and_actor(
+        self,
+        *,
+        project_id: UUID,
+        actor_user_id: UUID,
+    ) -> tuple[Project, ProjectMember]:
+        project = await self._projects.get_by_id(project_id)
+        if project is None:
+            raise EntityNotFoundError("Project is not found.")
+        actor = await get_actor_member(
+            project_members=self._project_members,
+            project_id=project_id,
+            user_id=actor_user_id,
+        )
+        return project, actor
 
-            existing = await self._project_members.get_by_project_and_user(
-                project_id=command.project_id,
-                user_id=invited_user_id,
-            )
-            member = self._membership_service.invite_member(
-                actor=actor,
-                member_id=self._id_generator(),
-                project_id=command.project_id,
-                invited_user_id=invited_user_id,
-                invited_by=command.actor_user_id,
-                role=command.role,
-                now=now,
-                existing=existing,
-            )
-            if existing is None:
-                await self._project_members.add(member)
-            else:
-                await self._project_members.update(member)
-            await self._tx.commit()
-        except Exception:
-            await self._tx.rollback()
-            raise
+    async def _invite_resolved_member(
+        self,
+        *,
+        project_id: UUID,
+        actor_user_id: UUID,
+        invited_user_id: UUID,
+        role: ProjectRole,
+        now,
+        actor: ProjectMember,
+    ) -> ProjectMember:
+        existing = await self._project_members.get_by_project_and_user(
+            project_id=project_id,
+            user_id=invited_user_id,
+        )
+        member = self._membership_service.invite_member(
+            actor=actor,
+            member_id=self._id_generator(),
+            project_id=project_id,
+            invited_user_id=invited_user_id,
+            invited_by=actor_user_id,
+            role=role,
+            now=now,
+            existing=existing,
+        )
+        if existing is None:
+            await self._project_members.add(member)
+        else:
+            await self._project_members.update(member)
+        await self._tx.commit()
+        return member
 
+    async def _publish_invite_events(
+        self,
+        *,
+        project: Project,
+        actor_user_id: UUID,
+        role: ProjectRole,
+        member: ProjectMember,
+    ) -> None:
         await publish_best_effort(
             publisher=self._publisher,
             topic="project.member_invited",
             payload={
-                "project_id": str(command.project_id),
+                "project_id": str(project.oid),
                 "invited_user_id": str(member.user_id),
-                "role": int(command.role),
-                "invited_by": str(command.actor_user_id),
+                "role": int(role),
+                "invited_by": str(actor_user_id),
             },
         )
         await publish_best_effort(
@@ -297,13 +315,70 @@ class InviteProjectMemberHandler:
             topic="project.member_invitation_requested",
             payload={
                 "request_id": str(member.oid),
-                "project_id": str(command.project_id),
+                "project_id": str(project.oid),
                 "project_title": project.title,
                 "member_id": str(member.oid),
                 "user_id": str(member.user_id),
                 "role": member.role.name,
-                "invited_by_user_id": str(command.actor_user_id),
+                "invited_by_user_id": str(actor_user_id),
             },
+        )
+
+    async def __call__(self, command: InviteProjectMemberCommand) -> ProjectMember:
+        now = self._clock.now()
+        try:
+            project, actor = await self._get_project_and_actor(
+                project_id=command.project_id,
+                actor_user_id=command.actor_user_id,
+            )
+            await self._user_service.ensure_user_exists(command.invited_user_id)
+            member = await self._invite_resolved_member(
+                project_id=command.project_id,
+                actor_user_id=command.actor_user_id,
+                invited_user_id=command.invited_user_id,
+                role=command.role,
+                now=now,
+                actor=actor,
+            )
+        except Exception:
+            await self._tx.rollback()
+            raise
+
+        await self._publish_invite_events(
+            project=project,
+            actor_user_id=command.actor_user_id,
+            role=command.role,
+            member=member,
+        )
+        return member
+
+
+class InviteProjectMemberByEmailHandler(InviteProjectMemberHandler):
+    async def __call__(self, command: InviteProjectMemberByEmailCommand) -> ProjectMember:
+        now = self._clock.now()
+        try:
+            project, actor = await self._get_project_and_actor(
+                project_id=command.project_id,
+                actor_user_id=command.actor_user_id,
+            )
+            invited_user = await self._user_service.get_user_by_email(command.email.strip())
+            member = await self._invite_resolved_member(
+                project_id=command.project_id,
+                actor_user_id=command.actor_user_id,
+                invited_user_id=invited_user.user_id,
+                role=command.role,
+                now=now,
+                actor=actor,
+            )
+        except Exception:
+            await self._tx.rollback()
+            raise
+
+        await self._publish_invite_events(
+            project=project,
+            actor_user_id=command.actor_user_id,
+            role=command.role,
+            member=member,
         )
         return member
 
