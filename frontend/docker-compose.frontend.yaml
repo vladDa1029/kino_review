@@ -8,6 +8,6 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      api-getaway:
+      api-gateway:
         condition: service_started
     restart: unless-stopped

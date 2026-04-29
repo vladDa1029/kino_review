@@ -1,40 +1,45 @@
 <!-- app/presentation/templates/docs/index.html -->
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>API Gateway — Документация</title>
+    <title>API Gateway Documentation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             background: #f4f6f9;
             color: #2c3e50;
             margin: 0;
             padding: 0;
             line-height: 1.6;
         }
+
         .container {
             max-width: 900px;
             margin: 40px auto;
             padding: 20px;
             background: white;
             border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #2980b9;
             text-align: center;
             margin-bottom: 30px;
         }
+
         ul {
             list-style: none;
             padding: 0;
         }
+
         li {
             margin: 15px 0;
         }
+
         a {
             font-size: 1.2em;
             color: #3498db;
@@ -45,18 +50,21 @@
             border-radius: 8px;
             transition: all 0.3s;
         }
+
         a:hover {
             background: #f8f9fa;
             color: #2980b9;
             transform: translateX(5px);
             border-color: #3498db;
         }
+
         .footer {
             text-align: center;
             margin-top: 40px;
             color: #7f8c8d;
             font-size: 0.9em;
         }
+
         .tag {
             font-size: 0.8em;
             padding: 2px 8px;
@@ -69,20 +77,17 @@
 </head>
 <body>
     <div class="container">
-        <h1>🌐 API Gateway</h1>
-        <p>Единая точка входа в систему. Все микросервисы доступны через этот шлюз.</p>
+        <h1>API Gateway</h1>
+        <p>Public entry point for backend services. Use this page to open service API documentation through the gateway.</p>
 
         <ul>
-            <li><a href="/auth/docs">🔐 Авторизация <span class="tag">/auth</span></a></li>
-            <li><a href="/user/docs">👥 Пользователи <span class="tag">/user (в процессе)</span></a></li>
-            <li><a href="/project/docs">Project <span class="tag">/project</span></a></li>
-            <li><a href="/admin/user/docs">Admin User Docs <span class="tag">/admin/user</span></a></li>
-            <li><a href="/movies/docs">🎬 Фильмы <span class="tag">/movies (не готово)</span></a></li>
-
+            <li><a href="/auth/docs">Auth Docs <span class="tag">/auth</span></a></li>
+            <li><a href="/user/docs">User Docs <span class="tag">/user</span></a></li>
+            <li><a href="/project/docs">Project Docs <span class="tag">/project</span></a></li>
         </ul>
 
         <div class="footer">
-            <p><small>API Gateway • 2025</small></p>
+            <p><small>API Gateway</small></p>
         </div>
     </div>
 </body>
