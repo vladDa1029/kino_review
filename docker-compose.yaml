@@ -4,8 +4,49 @@ x-healthcheck-interval: &hc-interval
   retries: 5
   start_period: 10s
 
-# Требуется стандартизировать настройки и ограничить некоторые параметры
+x-deploy-defaults: &deploy-defaults
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 3
+
+x-resources-small: &resources-small
+  limits:
+    cpus: "0.5"
+    memory: 256M
+  reservations:
+    cpus: "0.1"
+    memory: 64M
+
+x-resources-medium: &resources-medium
+  limits:
+    cpus: "1.0"
+    memory: 512M
+  reservations:
+    cpus: "0.25"
+    memory: 128M
+
+x-resources-large: &resources-large
+  limits:
+    cpus: "2.0"
+    memory: 1G
+  reservations:
+    cpus: "0.5"
+    memory: 256M
+
+# ─────────────────────────────────────────────
+# Healthcheck-шаблоны для HTTP-сервисов
+# ─────────────────────────────────────────────
+x-healthcheck-http: &hc-http-template
+  interval: 30s
+  timeout: 10s
+  retries: 5
+  start_period: 15s
+
 services:
+
+  # ─── Infrastructure ───────────────────────
+
   pg:
     image: postgres:18.3-bookworm
     environment:
@@ -13,22 +54,73 @@ services:
       POSTGRES_DB: kino
       POSTGRES_USER: admin
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d kino"]
       interval: 5s
       timeout: 3s
-      retries: 3
-    ports: # Для разработки прокидуется ссылка для подключения в не контейнера
-      - "5433:5432"
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5433:5432" # Dev only: внешний доступ к БД
     volumes:
       - pg_data:/var/lib/postgresql
       - ./docker/pg-init:/docker-entrypoint-initdb.d
-    command: ["postgres", "-c", "listen_addresses=*"] # Для разработки слушает все порты
+    command: ["postgres", "-c", "listen_addresses=*"] # Dev only
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-large
+
+  broker:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      <<: *hc-interval
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI
+    volumes:
+      - broker-data:/var/lib/rabbitmq
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-medium
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 10s
+    ports:
+      - "9000:9000"
+      - "9001:9001" # Console UI
+    volumes:
+      - minio_data:/data
+    command: server /data --address ":9000" --console-address ":9001"
+    restart: unless-stopped
+    deploy:
+      resources: *resources-medium
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    deploy:
+      resources: *resources-small
+
   pgadmin:
     image: dpage/pgadmin4
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.org
       PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
     depends_on:
@@ -38,15 +130,18 @@ services:
         condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-  # Требуется добавить healthcheck
+    deploy:
+      resources: *resources-small
+
+  # ─── Auth Service ─────────────────────────
+
   auth:
     build:
       dockerfile: /Dockerfile
       context: ./backend/src/apps/auth
-    
-    # Порты для доступа если требуется
-    # ports:
-    #   - "8002:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5).read()"]
+      <<: *hc-http-template
     depends_on:
       pg:
         condition: service_healthy
@@ -54,28 +149,54 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/src/apps/auth/app:/app/app
-    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:setup_start_test_app --factory --host 0.0.0.0 --port 8001"]
-  api-getaway:
+    command:
+      - sh
+      - -c
+      - |
+        alembic upgrade head &&
+        poetry run python -m uvicorn main:setup_start_test_app \
+          --factory --host 0.0.0.0 --port 8001
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-medium
+
+  # ─── API Gateway ──────────────────────────
+
+  api-gateway:
     build:
-      context: ./backend/src/apps/apigetaway
+      context: ./backend/src/apps/apigateway
       dockerfile: /Dockerfile
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()"]
+      <<: *hc-http-template
     ports:
-     - "8000:8000"
-    volumes:
-      - ./backend/src/apps/apigetaway/app:/app/app
-    command: ["sh", "-c", "poetry run python -m uvicorn main:start_app_dev --port 8000 --host 0.0.0.0 --factory --reload"]
+      - "8000:8000"
     depends_on:
       broker:
         condition: service_healthy
-  
+      auth:
+        condition: service_healthy
+    volumes:
+      - ./backend/src/apps/apigateway/app:/app/app
+    command:
+      - sh
+      - -c
+      - |
+        poetry run python -m uvicorn main:start_app_dev \
+          --port 8000 --host 0.0.0.0 --factory --reload
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-medium
+
+  # ─── User Service ─────────────────────────
+
   user: # INFO: Сервис не готов
     build:
       dockerfile: /Dockerfile
       context: ./backend/src/apps/user
-    
-    # Порты для доступа если требуется
-    # ports:
-    #   - "8003:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=5).read()"]
+      <<: *hc-http-template
     depends_on:
       pg:
         condition: service_healthy
@@ -91,15 +212,28 @@ services:
     volumes:
       - ./backend/src/apps/user/app:/app/app
       - ./backend/src/apps/user/main.py:/app/main.py
-    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8002"]
+    command:
+      - sh
+      - -c
+      - |
+        alembic upgrade head &&
+        poetry run python -m uvicorn main:start_app_dev \
+          --factory --host 0.0.0.0 --port 8002
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-medium
+
+  # ─── Project Service ──────────────────────
+
   project: # INFO: Сервис не готов
     build:
       dockerfile: /Dockerfile
       context: ./backend/src/apps/project
-    
-    # Порты для доступа если требуется
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=5).read()"]
+      <<: *hc-http-template
     ports:
-      - "8004:8003"
+      - "8004:8003" # Dev only
     depends_on:
       pg:
         condition: service_healthy
@@ -122,7 +256,17 @@ services:
       - ./backend/src/apps/project/app:/app/app
       - ./backend/src/apps/project/main.py:/app/main.py
       - ./backend/src/apps/project/worker.py:/app/worker.py
-    command: ["sh", "-c", "alembic upgrade head  && poetry run python -m uvicorn  main:start_app_dev --factory --host 0.0.0.0 --port 8003"]
+    command:
+      - sh
+      - -c
+      - |
+        alembic upgrade head &&
+        poetry run python -m uvicorn main:start_app_dev \
+          --factory --host 0.0.0.0 --port 8003
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-medium
+
   project-worker:
     build:
       dockerfile: /Dockerfile
@@ -148,11 +292,25 @@ services:
     volumes:
       - ./backend/src/apps/project/app:/app/app
       - ./backend/src/apps/project/worker.py:/app/worker.py
-    command: ["sh", "-c", "alembic upgrade head && poetry run taskiq worker worker:create_worker_taskiq_app"]
+    command:
+      - sh
+      - -c
+      - |
+        alembic upgrade head &&
+        poetry run taskiq worker worker:create_worker_taskiq_app
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-small
+
+  # ─── Notification Service ─────────────────
+
   notificate:
     build:
       dockerfile: /Dockerfile
       context: ./backend/src/apps/notificate
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health', timeout=5).read()"]
+      <<: *hc-http-template
     ports:
       - "8005:8005"
     depends_on:
@@ -167,7 +325,16 @@ services:
       SMTP_FROM_NAME: Kino
     volumes:
       - ./backend/src/apps/notificate/app:/app/app
-    command: ["sh", "-c", "poetry run python -m uvicorn main:start_app_dev --factory --host 0.0.0.0 --port 8005"]
+    command:
+      - sh
+      - -c
+      - |
+        poetry run python -m uvicorn main:start_app_dev \
+          --factory --host 0.0.0.0 --port 8005
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-small
+
   notificate-worker:
     build:
       dockerfile: /Dockerfile
@@ -184,45 +351,16 @@ services:
       SMTP_FROM_NAME: Kino
     volumes:
       - ./backend/src/apps/notificate/app:/app/app
-    command: ["sh", "-c", "poetry run taskiq worker worker:create_worker_taskiq_app"]
-  broker:
-    image: rabbitmq:3-management-alpine
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: "guest"
-      RABBITMQ_DEFAULT_PASS: "guest"
-    volumes:
-      - broker-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      <<: *hc-interval
-  mailhog:
-    image: mailhog/mailhog:latest
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-  
+    command:
+      - sh
+      - -c
+      - poetry run taskiq worker worker:create_worker_taskiq_app
+    deploy:
+      <<: *deploy-defaults
+      resources: *resources-small
 
-  minio:
-    image: minio/minio:latest
-    ports:
-      - "9000:9000"    
-      - "9001:9001"    
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    command: server /data --address ":9000" --console-address ":9001"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    
+# ─────────────────────────────────────────────
+
 networks:
   default:
     driver: bridge
@@ -232,5 +370,3 @@ volumes:
   pgadmin_data:
   broker-data:
   minio_data:
-
-

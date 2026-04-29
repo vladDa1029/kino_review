@@ -15,6 +15,7 @@ from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.security.jwt import JWTServices
 from app.infrastructure.security.password_hasher import PasswordHasher
 from app.infrastructure.transactions import TransactionManagerAlchemy
+from app.application.queries.health import HealthHandler
 
 
 def settings_provider() -> Provider:
@@ -52,6 +53,7 @@ def auth_services_provider() -> Provider:
 
     # Регистрируем основной сервис
     provider.provide(source=JWTAuthServices)
+    provider.provide(source=HealthHandler)
 
     return provider
 

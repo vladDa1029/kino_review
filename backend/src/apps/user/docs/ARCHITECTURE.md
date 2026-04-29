@@ -64,6 +64,7 @@ Key adapters:
 
 | Interface group | Paths | Authentication | Purpose |
 | --- | --- | --- | --- |
+| Health | `/health` | public | Process health check for Docker readiness |
 | User existence | `/users/{user_id}` | `X-User-Id` must match path | Legacy public read-side existence endpoint; V1 interservice validation now uses AMQP |
 | Profile | `/users/{user_id}/description` | `X-User-Id` | Create, update, and read description |
 | User availability | `/users/{user_id}/spare-times` | `X-User-Id` | Manage user free windows |

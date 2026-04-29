@@ -28,6 +28,7 @@ package-mode = false
 ipython = "^9.4.0"
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 markers = [
     "e2e: live cross-service end-to-end tests",
 ]

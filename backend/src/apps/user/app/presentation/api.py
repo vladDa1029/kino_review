@@ -187,6 +187,11 @@ from app.presentation.schemas import (
 router = APIRouter(route_class=DishkaRoute)
 
 
+@router.get("/health", tags=["system"], summary="Health check")
+async def healthcheck() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 def user_id_from_header(
     user_id: UUID,
     x_user_id: UUID | None = Header(default=None, alias="x-user-id"),

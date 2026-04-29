@@ -21,6 +21,7 @@ from app.presentations.schemas import (
     ListUsersGetResponse,
 )
 from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
+from app.application.queries.health import HealthHandler, HealthQuery
 
 router = APIRouter(tags=["auth"], route_class=DishkaRoute)
 
@@ -28,9 +29,21 @@ router = APIRouter(tags=["auth"], route_class=DishkaRoute)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
+@router.get(
+    "/health",
+    tags=["system"],
+    summary="Health check",
+    description="Returns a lightweight health payload for liveness and readiness probes.",
+)
+async def healthcheck(handler: FromDishka[HealthHandler]) -> dict:
+    return await handler(HealthQuery())
+
+
 def require_admin_access(
     x_user_token_type: Annotated[str | None, Header(alias="X-User-Token-Type")] = None,
-    x_user_is_superuser: Annotated[str | None, Header(alias="X-User-Is-Superuser")] = None,
+    x_user_is_superuser: Annotated[
+        str | None, Header(alias="X-User-Is-Superuser")
+    ] = None,
 ) -> None:
     ensure_admin_headers(
         x_user_token_type=x_user_token_type,

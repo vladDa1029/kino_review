@@ -63,6 +63,7 @@ These files define:
 
 | Surface | Purpose | Backing module |
 | --- | --- | --- |
+| `/health` | Process health check for Docker readiness | [main.py](../main.py) |
 | `/auth/*` | Proxy to auth service | [auth.py](../app/presentation/api/v1/routes/auth.py) |
 | `/user/*` | Proxy to user service | [users.py](../app/presentation/api/v1/routes/users.py) |
 | `/admin/user/*` | Admin-only proxy to user service | [users.py](../app/presentation/api/v1/routes/users.py) |
