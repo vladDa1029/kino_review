@@ -1,12 +1,13 @@
+from collections.abc import Callable
 from fnmatch import fnmatch
-from typing import Callable
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.config import AuthGatewaySettings
-from app.infrastructure.security.jwt_validator import JWTValidator, JWTValidationError
+from app.infrastructure.security.jwt_validator import JWTValidationError, JWTValidator
 from app.presentation.middleware.user_headers import build_user_headers
 
 
@@ -26,14 +27,18 @@ class AuthGatewayMiddleware(BaseHTTPMiddleware):
         self._public_paths = public_paths or []
 
     async def dispatch(self, request: Request, call_next: Callable):
-        if request.method == "OPTIONS" or self._is_public_path(
-            request.url.path
-        ) or not self._is_protected_path(request.url.path):
+        if (
+            request.method == "OPTIONS"
+            or self._is_public_path(request.url.path)
+            or not self._is_protected_path(request.url.path)
+        ):
             return await call_next(request)
 
         token = _extract_bearer_token(request)
         if not token:
-            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+            return JSONResponse(
+                status_code=401, content={"detail": "Not authenticated"}
+            )
 
         try:
             payload = self._validator.decode(token)
@@ -42,7 +47,9 @@ class AuthGatewayMiddleware(BaseHTTPMiddleware):
 
         token_type = payload.get(self._settings.token_type_claim)
         if token_type and token_type != "access":
-            return JSONResponse(status_code=401, content={"detail": "Invalid token type"})
+            return JSONResponse(
+                status_code=401, content={"detail": "Invalid token type"}
+            )
 
         user_id = payload.get(self._settings.user_id_claim)
         if not user_id:

@@ -1,8 +1,8 @@
-from dishka import FromDishka
-from fastapi import APIRouter, HTTPException, Request, Response
-from dishka.integrations.fastapi import DishkaRoute
-from fastapi.responses import JSONResponse
 import httpx
+from dishka import FromDishka
+from dishka.integrations.fastapi import DishkaRoute
+from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.config import ProtectedPathsSettings, Services
 from app.presentation.api.v1.openapi_utils import (

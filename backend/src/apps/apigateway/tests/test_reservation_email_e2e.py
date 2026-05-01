@@ -11,7 +11,6 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 
-
 pytestmark = [
     pytest.mark.e2e,
     pytest.mark.skipif(
@@ -21,7 +20,9 @@ pytestmark = [
 ]
 
 GATEWAY_URL = os.getenv("KINO_E2E_GATEWAY_URL", "http://127.0.0.1:8000")
-MAILHOG_API_URL = os.getenv("KINO_E2E_MAILHOG_API_URL", "http://127.0.0.1:8025/api/v2/messages")
+MAILHOG_API_URL = os.getenv(
+    "KINO_E2E_MAILHOG_API_URL", "http://127.0.0.1:8025/api/v2/messages"
+)
 HTTP_TIMEOUT = float(os.getenv("KINO_E2E_HTTP_TIMEOUT_SECONDS", "10"))
 POLL_TIMEOUT = float(os.getenv("KINO_E2E_POLL_TIMEOUT_SECONDS", "40"))
 POLL_INTERVAL = float(os.getenv("KINO_E2E_POLL_INTERVAL_SECONDS", "1"))
@@ -39,7 +40,9 @@ class UserSession:
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(base_url=GATEWAY_URL, timeout=HTTP_TIMEOUT, follow_redirects=True)
+    return httpx.Client(
+        base_url=GATEWAY_URL, timeout=HTTP_TIMEOUT, follow_redirects=True
+    )
 
 
 def _require_live_stack() -> None:
@@ -52,7 +55,9 @@ def _require_live_stack() -> None:
         pytest.skip(f"Live stack is unavailable: {exc}")
 
 
-def _register_and_login(client: httpx.Client, *, email: str, password: str) -> UserSession:
+def _register_and_login(
+    client: httpx.Client, *, email: str, password: str
+) -> UserSession:
     register_response = client.post(
         "/auth/register",
         json={"email": email, "password": password},
@@ -81,7 +86,7 @@ def _decode_token_subject(access_token: str) -> UUID:
 
 def _wait_for_user_projection(client: httpx.Client, session: UserSession) -> None:
     def load_projection() -> dict:
-        response = client.get(f"/user/users/me", headers=session.headers)
+        response = client.get("/user/users/me", headers=session.headers)
         assert response.status_code == 200, response.text
         payload = response.json()
         assert payload["exists"] is True
@@ -152,7 +157,9 @@ def _list_cameras(client: httpx.Client, session: UserSession) -> list[dict]:
     return response.json()["items"]
 
 
-def _list_camera_windows(client: httpx.Client, session: UserSession, camera_id: UUID) -> list[dict]:
+def _list_camera_windows(
+    client: httpx.Client, session: UserSession, camera_id: UUID
+) -> list[dict]:
     response = client.get(
         f"/user/users/me/cameras/{camera_id}/free-times",
         headers=session.headers,
@@ -161,7 +168,9 @@ def _list_camera_windows(client: httpx.Client, session: UserSession, camera_id: 
     return response.json()["items"]
 
 
-def _assert_reserved_window_present(items: list[dict], *, time_from: datetime, time_to: datetime) -> None:
+def _assert_reserved_window_present(
+    items: list[dict], *, time_from: datetime, time_to: datetime
+) -> None:
     for item in items:
         if (
             item["status"] == "reserved"
@@ -190,7 +199,9 @@ def _future_interval() -> tuple[datetime, datetime]:
     return start, end
 
 
-def _wait_for_report_ready(client: httpx.Client, session: UserSession, report_id: UUID) -> dict:
+def _wait_for_report_ready(
+    client: httpx.Client, session: UserSession, report_id: UUID
+) -> dict:
     def load_report() -> dict:
         response = client.get(f"/project/reports/{report_id}", headers=session.headers)
         assert response.status_code == 200, response.text
@@ -219,7 +230,10 @@ def test_member_invite_validates_user_existence_via_broker_request_reply() -> No
         project_response = client.post(
             "/project/projects",
             headers=director.headers,
-            json={"title": f"V1 validation {suffix}", "description": "broker existence check"},
+            json={
+                "title": f"V1 validation {suffix}",
+                "description": "broker existence check",
+            },
         )
         assert project_response.status_code == 200, project_response.text
         project_id = UUID(project_response.json()["oid"])
@@ -456,7 +470,10 @@ def test_generated_shift_report_flow_end_to_end() -> None:
         project_response = client.post(
             "/project/projects",
             headers=director.headers,
-            json={"title": f"Report flow {suffix}", "description": "generated report e2e"},
+            json={
+                "title": f"Report flow {suffix}",
+                "description": "generated report e2e",
+            },
         )
         assert project_response.status_code == 200, project_response.text
         project_id = UUID(project_response.json()["oid"])
@@ -498,7 +515,9 @@ def test_generated_shift_report_flow_end_to_end() -> None:
             headers=director.headers,
         )
         assert list_response.status_code == 200, list_response.text
-        assert [item["oid"] for item in list_response.json()["items"]] == [str(report_id)]
+        assert [item["oid"] for item in list_response.json()["items"]] == [
+            str(report_id)
+        ]
 
         download_url_response = client.get(
             f"/project/reports/{report_id}/download-url",

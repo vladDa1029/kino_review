@@ -1,16 +1,15 @@
+import httpx
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
-import httpx
 
-from app.application.errors import AccessDeniedError
 from app.config import ProtectedPathsSettings, Services
+from app.presentation.access import ensure_admin_payload
 from app.presentation.api.v1.openapi_utils import (
     mark_protected_endpoints_with_security,
     strip_header_parameter,
 )
-from app.presentation.access import ensure_admin_payload
 
 router = APIRouter(
     prefix="/user",
@@ -167,6 +166,7 @@ async def proxy_request_admin(
 def _apply_user_headers(headers: dict[str, str], request: Request) -> None:
     headers.pop("x-user-id", None)
     headers.pop("x-user-token-type", None)
+    headers.pop("x-user-is-superuser", None)
     user_headers = getattr(request.state, "user_headers", None)
     if user_headers:
         headers.update(user_headers)
@@ -175,6 +175,7 @@ def _apply_user_headers(headers: dict[str, str], request: Request) -> None:
 def _apply_admin_headers(headers: dict[str, str], request: Request, path: str) -> None:
     headers.pop("x-user-id", None)
     headers.pop("x-user-token-type", None)
+    headers.pop("x-user-is-superuser", None)
     user_headers = getattr(request.state, "user_headers", None)
     if not user_headers:
         return
@@ -269,6 +270,7 @@ async def fetch_and_patch_openapi(
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"User service unreachable: {e}")
+
 
 def _replace_user_id_paths(spec: dict) -> None:
     paths = spec.get("paths")

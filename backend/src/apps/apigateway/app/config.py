@@ -1,10 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 DEFAULT_PROTECTED_PATH_PATTERNS = {
     "auth": ["/auth/users"],
@@ -32,6 +31,17 @@ class BaseSettings(BaseSettings):
     )
 
 
+class Log(BaseSettings):
+    level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"] = Field(
+        alias="LOG_LEVEL",
+        default="WARNING",
+    )
+    format: str = Field(
+        alias="LOG_FORMAT",
+        default="%(levelname)-10s%(asctime)-25s %(name)s - %(funcName)-15s: %(lineno)-5d - %(message)3s",
+    )
+
+
 class Services(BaseSettings):
     auth: str = Field(alias="AUTH_URL", default="auth:8001")
     user: str = Field(alias="USER_URL", default="user:8002")
@@ -49,7 +59,9 @@ class ProtectedPathsSettings(BaseSettings):
 
     @model_validator(mode="after")
     def include_required_patterns(self) -> Self:
-        merged = {service: list(patterns) for service, patterns in self.patterns.items()}
+        merged = {
+            service: list(patterns) for service, patterns in self.patterns.items()
+        }
         for service, required_patterns in REQUIRED_PROTECTED_PATH_PATTERNS.items():
             service_patterns = merged.setdefault(service, [])
             for pattern in required_patterns:
@@ -86,6 +98,7 @@ class Config(BaseSettings):
     services: Services = Services()
     auth_gateway: AuthGatewaySettings = AuthGatewaySettings()
     protected_paths: ProtectedPathsSettings = ProtectedPathsSettings()
+    log: Log = Log()
 
 
 @lru_cache(1)

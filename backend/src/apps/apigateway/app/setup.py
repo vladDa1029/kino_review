@@ -1,9 +1,9 @@
 # Функции для настройки main фабрик.
 from typing import AsyncIterator
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 import httpx
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import AuthGatewaySettings, ProtectedPathsSettings
 from app.infrastructure.security.jwt_validator import JWTValidator

@@ -37,7 +37,9 @@ def test_project_invitation_paths_are_protected() -> None:
 
 
 def test_project_invitation_path_stays_protected_when_patterns_are_overridden() -> None:
-    settings = ProtectedPathsSettings(PROTECTED_PATH_PATTERNS={"user": ["/user/users/*"]})
+    settings = ProtectedPathsSettings(
+        PROTECTED_PATH_PATTERNS={"user": ["/user/users/*"]}
+    )
 
     assert any(
         fnmatch("/user/project-invitations/token", pattern)
