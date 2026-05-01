@@ -23,10 +23,6 @@ class UserAbstractRepository(Protocol, Generic[T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def list(self) -> Sequence[T]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     async def get_by_email(self, email) -> T | None:
         raise NotImplementedError
 
@@ -41,6 +37,14 @@ class UserAbstractRepository(Protocol, Generic[T]):
         sorting: Sorting | None = None,
         pagination: Pagination | None = None,
     ) -> Sequence[T]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def delete(self, entity: T) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def count(self, filters: Filter | None = None) -> int:
         raise NotImplementedError
 
 
@@ -83,6 +87,9 @@ class UserSqlAlchemyRepository(UserAbstractRepository[entities.User]):
     async def add(self, entity: entities.User):
         self.session.add(entity)
 
+    async def delete(self, entity: entities.User) -> None:
+        await self.session.delete(entity)
+
     async def get(self, oid) -> entities.User | None:
         result = await self.session.execute(
             select(entities.User).where(entities.User.oid == oid)
@@ -115,7 +122,8 @@ class UserSqlAlchemyRepository(UserAbstractRepository[entities.User]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def count(self) -> int:
+    async def count(self, filters: Filter | None = None) -> int:
         count_stmt = select(func.count(entities.User.oid)).select_from(entities.User)
+        count_stmt = _apply_equipment_filters(count_stmt, entities.User, filters)
         count_res = await self.session.execute(count_stmt)
         return count_res.scalar_one()

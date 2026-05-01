@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Literal
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field
+
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.application.common.pagination import MAX_PAGE_SIZE
 
@@ -27,6 +28,51 @@ class UserCreateRequest(BaseModel):
     ]
 
 
+class AdminUserCreateRequest(UserCreateRequest):
+    is_active: bool = True
+    is_superuser: bool = False
+    is_verified: bool = False
+
+
+class AdminUserUpdateRequest(BaseModel):
+    email: Annotated[
+        EmailStr | None,
+        Field(
+            default=None,
+            title="User Email",
+            description="New unique email for the user.",
+        ),
+    ] = None
+    password: Annotated[
+        str | None,
+        Field(
+            default=None,
+            min_length=4,
+            max_length=24,
+            title="User password",
+            description="New password for the user.",
+        ),
+    ] = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+    is_verified: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_non_empty(self) -> "AdminUserUpdateRequest":
+        if all(
+            value is None
+            for value in (
+                self.email,
+                self.password,
+                self.is_active,
+                self.is_superuser,
+                self.is_verified,
+            )
+        ):
+            raise ValueError("At least one field must be provided.")
+        return self
+
+
 class UserGetResponse(BaseModel):
     email: str
     is_active: bool
@@ -43,7 +89,7 @@ class UserGetForAdminResponse(BaseModel):
 
 
 class ListUsersGetResponse(BaseModel):
-    users: List[UserGetForAdminResponse]
+    users: list[UserGetForAdminResponse]
     total_count: int
     pages: int
 
@@ -63,7 +109,6 @@ class TokenResponse(BaseModel):
     token_type: str = "Bearer"
 
 
-# no must be here
 class BrokerUserRegistered(BaseModel):
     user_id: str
     email: str
@@ -74,7 +119,7 @@ class BrokerUserRegistered(BaseModel):
 
 
 class ListRequest(BaseModel):
-    base_id: Optional[UUID] = None
+    base_id: UUID | None = None
     page: Annotated[int, Field(1, ge=1)]
     page_size: Annotated[int, Field(20, ge=1, le=MAX_PAGE_SIZE)]
     sort_by: Literal["create_at", "is_active", "is_superuser", "is_verified"] | None = (
@@ -84,6 +129,3 @@ class ListRequest(BaseModel):
     search: str | None = None
     created_from: datetime | None = None
     created_to: datetime | None = None
-
-
-# WARN: Здесь остановился нужно дописать схему, handler и endpoint

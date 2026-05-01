@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faststream.rabbit import RabbitBroker
 
 from app.application.use_case.authenticate_uc import JWTAuthServices
+from app.application.use_case.user_uc import AdminUserService
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings
 from app.application.ports.transaction import TransactionManager
 from app.infrastructure.adapters.repository import (
@@ -53,6 +54,7 @@ def auth_services_provider() -> Provider:
 
     # Регистрируем основной сервис
     provider.provide(source=JWTAuthServices)
+    provider.provide(source=AdminUserService)
     provider.provide(source=HealthHandler)
 
     return provider

@@ -9,7 +9,7 @@ It owns:
 - auth-user persistence;
 - password hashing and verification;
 - access and refresh token issuance;
-- admin-facing auth-user listing;
+- admin-facing auth-user CRUD;
 - publication of `user.registered`.
 
 It does not own:
@@ -74,7 +74,11 @@ These files assemble:
 | `POST /login` | Verify credentials and issue tokens |
 | `POST /refresh` | Rotate access and refresh tokens |
 | `GET /logout` | Remove refresh cookie client-side |
-| `GET /users` | Admin-only auth-user listing |
+| `POST /admin/users` | Admin-only auth-user creation and `user.registered` publication |
+| `GET /admin/users` | Admin-only auth-user listing |
+| `GET /admin/users/{user_id}` | Admin-only auth-user read by identifier |
+| `PATCH /admin/users/{user_id}` | Admin-only auth-user updates including `is_active` |
+| `DELETE /admin/users/{user_id}` | Admin-only auth-user deletion |
 
 ## Outbound Interfaces
 
@@ -120,6 +124,14 @@ flowchart LR
     API --> PUB["Publish user.registered"]
     PUB --> MQ["RabbitMQ"]
 ```
+
+### Admin user management
+
+1. Gateway forwards trusted admin headers.
+2. `require_admin_access` verifies access-token type and `is_superuser=true`.
+3. `AdminUserService` performs CRUD against the auth-user repository.
+4. Admin endpoints never allow a resulting state with `is_superuser=true` and `is_active=false`.
+5. Admin user creation also publishes `user.registered`.
 
 ### Login
 

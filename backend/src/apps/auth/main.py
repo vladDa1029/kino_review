@@ -8,9 +8,11 @@ import structlog
 from faststream.rabbit import RabbitBroker
 
 from app.application.errors.errors import (
+    AdminBlockedError,
     AccessDeniedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
+    UserNotFoundError,
     UserAlreadyError,
 )
 from app.config import (
@@ -86,6 +88,14 @@ def setup_start_test_app():
     app.add_exception_handler(
         AccessDeniedError,
         handlers.access_denied_error_handler,
+    )
+    app.add_exception_handler(
+        UserNotFoundError,
+        handlers.user_not_found_error_handler,
+    )
+    app.add_exception_handler(
+        AdminBlockedError,
+        handlers.admin_blocked_error_handler,
     )
 
     start_mappers()

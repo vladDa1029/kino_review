@@ -15,3 +15,11 @@ class PasswordOrLogInincorrectError(ApplicationError):
 
 class AccessDeniedError(ApplicationError):
     """Raised when the caller does not have enough permissions."""
+
+
+class UserNotFoundError(ApplicationError):
+    """Raised when the requested user does not exist."""
+
+
+class AdminBlockedError(ApplicationError):
+    """Raised when someone attempts to block an admin user."""

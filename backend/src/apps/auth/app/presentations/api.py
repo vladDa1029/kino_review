@@ -1,32 +1,63 @@
 import math
 from typing import Annotated
+from uuid import UUID
+
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Cookie, Depends, Header, Response
+from fastapi import APIRouter, Cookie, Depends, Header, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from faststream.rabbit import RabbitBroker
+
 from app.application.common.filters import Filter
 from app.application.common.pagination import Pagination
 from app.application.common.sorting import Sorting
+from app.application.queries.health import HealthHandler, HealthQuery
 from app.application.use_case.authenticate_uc import JWTAuthServices
-from app.infrastructure.adapters.repository import UserAbstractRepository
+from app.application.use_case.user_uc import AdminUserService
+from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 from app.presentations.access import ensure_admin_headers
 from app.presentations.schemas import (
+    AdminUserCreateRequest,
+    AdminUserUpdateRequest,
     BrokerUserRegistered,
     ListRequest,
+    ListUsersGetResponse,
+    TokenResponse,
     UserCreateRequest,
     UserGetForAdminResponse,
     UserGetResponse,
-    TokenResponse,
-    ListUsersGetResponse,
 )
-from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
-from app.application.queries.health import HealthHandler, HealthQuery
 
-router = APIRouter(tags=["auth"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+
+def _serialize_admin_user(user) -> UserGetForAdminResponse:
+    return UserGetForAdminResponse(
+        oid=str(user.oid),
+        email=user.email.value,
+        is_active=user.is_active,
+        is_superuser=user.is_superuser,
+        is_verified=user.is_verified,
+    )
+
+
+async def _publish_user_registered(user, broker: RabbitBroker) -> None:
+    event = BrokerUserRegistered(
+        user_id=str(user.oid),
+        email=str(user.email),
+        is_active=user.is_active,
+        is_superuser=user.is_superuser,
+        is_verified=user.is_verified,
+        create_at=user.create_at,
+    )
+    await broker.publish(
+        event,
+        exchange=USER_REGISTERED_EXCHANGE,
+        routing_key="user.registered",
+    )
 
 
 @router.get(
@@ -52,7 +83,10 @@ def require_admin_access(
 
 
 @router.post(
-    "/register", summary="Регистрация пользователя.", response_model=UserGetResponse
+    "/register",
+    tags=["user"],
+    summary="Register user",
+    response_model=UserGetResponse,
 )
 async def register_user(
     user_form: UserCreateRequest,
@@ -63,17 +97,7 @@ async def register_user(
         user_form.email,
         user_form.password,
     )
-    event = BrokerUserRegistered(
-        user_id=str(data.oid),
-        email=str(data.email),
-        is_active=data.is_active,
-        is_superuser=data.is_superuser,
-        is_verified=data.is_verified,
-        create_at=data.create_at,
-    )
-    await broker.publish(
-        event, exchange=USER_REGISTERED_EXCHANGE, routing_key="user.registered"
-    )
+    await _publish_user_registered(data, broker)
     return UserGetResponse(
         email=str(data.email),
         is_active=data.is_active,
@@ -84,9 +108,10 @@ async def register_user(
 
 @router.post(
     "/login",
-    summary="Пользователь логинится",
+    tags=["user"],
+    summary="Login user",
     status_code=200,
-    description="Получение токенов авторизации",
+    description="Verify credentials and issue tokens.",
     response_model=TokenResponse,
 )
 async def login(
@@ -104,13 +129,13 @@ async def login(
         samesite="strict",
         max_age=60 * 60 * 24 * 7,
     )
-    token_resp = TokenResponse(access_token=tokens.get("access_token"))
-    return token_resp
+    return TokenResponse(access_token=tokens.get("access_token"))
 
 
 @router.post(
     "/refresh",
-    summary="Обновление токенов.",
+    tags=["user"],
+    summary="Refresh tokens",
     status_code=200,
     response_model=TokenResponse,
 )
@@ -125,21 +150,22 @@ async def refresh(
         secure=False,
         samesite="strict",
     )
-    response.set_cookie(  # может потребоваться вынисение в отдельную логику в будущем
+    response.set_cookie(
         key="refresh",
         value=tokens.get("refresh_token"),
         httponly=True,
-        secure=False,  # только HTTPS пока что не требуется, но стоит не забыть для продакшена (в теории)
-        samesite="strict",  # или "lax", в зависимости от фронтенда надо будет узнать
-        max_age=60 * 60 * 24 * 7,  # 7 дней
+        secure=False,
+        samesite="strict",
+        max_age=60 * 60 * 24 * 7,
     )
     return TokenResponse(access_token=tokens.get("access_token"))
 
 
 @router.get(
     "/logout",
-    summary="Разлогинится пользователю.",
-    description="Обнуление токенов. пока что только refresh.",
+    tags=["user"],
+    summary="Logout user",
+    description="Remove refresh token cookie on the client side.",
     status_code=200,
 )
 async def logout(response: Response, authser: FromDishka[JWTAuthServices]) -> str:
@@ -148,18 +174,42 @@ async def logout(response: Response, authser: FromDishka[JWTAuthServices]) -> st
         secure=False,
         samesite="strict",
     )
-    # await authser.logout()# вроде надо вызвать чтобы на будущее не забыть, но это черезмерно
     return "succesfull"
 
 
+@router.post(
+    "/admin/users",
+    tags=["admin"],
+    summary="Create user as admin",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserGetForAdminResponse,
+)
+async def create_admin_user(
+    user_form: AdminUserCreateRequest,
+    admin_service: FromDishka[AdminUserService],
+    broker: FromDishka[RabbitBroker],
+    _: None = Depends(require_admin_access),
+) -> UserGetForAdminResponse:
+    user = await admin_service.create_user(
+        email=str(user_form.email),
+        password=user_form.password,
+        is_active=user_form.is_active,
+        is_superuser=user_form.is_superuser,
+        is_verified=user_form.is_verified,
+    )
+    await _publish_user_registered(user, broker)
+    return _serialize_admin_user(user)
+
+
 @router.get(
-    path="/users",
-    summary="Получение всех пользователей.",
-    description="Получение пользователей админом с пагинацией.",
+    "/admin/users",
+    tags=["admin"],
+    summary="List users for admin",
     status_code=200,
+    response_model=ListUsersGetResponse,
 )
 async def get_users(
-    user_repo: FromDishka[UserAbstractRepository],
+    admin_service: FromDishka[AdminUserService],
     param: ListRequest = Depends(),
     _: None = Depends(require_admin_access),
 ) -> ListUsersGetResponse:
@@ -167,34 +217,83 @@ async def get_users(
         page=param.page,
         page_size=param.page_size,
     )
-    if param.sort_by is None:
-        sorting = None
-    else:
-        sorting = Sorting(
+    sorting = (
+        None
+        if param.sort_by is None
+        else Sorting(
             field=param.sort_by,
             direction=param.sort_dir,
         )
-    filter = Filter(
+    )
+    filters = Filter(
         base_id=param.base_id,
+        search=param.search,
         created_from=param.created_from,
         created_to=param.created_to,
     )
 
-    users = await user_repo.list(filters=filter, pagination=pagination, sorting=sorting)
-    total_count = await user_repo.count()
+    users = await admin_service.list_users(
+        filters=filters,
+        pagination=pagination,
+        sorting=sorting,
+    )
+    total_count = await admin_service.count_users(filters=filters)
     total_page = math.ceil(total_count / pagination.page_size)
-    response = ListUsersGetResponse(
-        users=[
-            UserGetForAdminResponse(
-                oid=str(user.oid),
-                email=user.email.value,
-                is_active=user.is_active,
-                is_superuser=user.is_superuser,
-                is_verified=user.is_verified,
-            )
-            for user in users
-        ],
+    return ListUsersGetResponse(
+        users=[_serialize_admin_user(user) for user in users],
         total_count=total_count,
         pages=total_page,
     )
-    return response
+
+
+@router.get(
+    "/admin/users/{user_id}",
+    tags=["admin"],
+    summary="Get user for admin",
+    response_model=UserGetForAdminResponse,
+)
+async def get_user_by_id(
+    user_id: UUID,
+    admin_service: FromDishka[AdminUserService],
+    _: None = Depends(require_admin_access),
+) -> UserGetForAdminResponse:
+    user = await admin_service.get_user(user_id)
+    return _serialize_admin_user(user)
+
+
+@router.patch(
+    "/admin/users/{user_id}",
+    tags=["admin"],
+    summary="Update user for admin",
+    response_model=UserGetForAdminResponse,
+)
+async def update_user_by_id(
+    user_id: UUID,
+    payload: AdminUserUpdateRequest,
+    admin_service: FromDishka[AdminUserService],
+    _: None = Depends(require_admin_access),
+) -> UserGetForAdminResponse:
+    user = await admin_service.update_user(
+        user_id,
+        email=str(payload.email) if payload.email is not None else None,
+        password=payload.password,
+        is_active=payload.is_active,
+        is_superuser=payload.is_superuser,
+        is_verified=payload.is_verified,
+    )
+    return _serialize_admin_user(user)
+
+
+@router.delete(
+    "/admin/users/{user_id}",
+    tags=["admin"],
+    summary="Delete user for admin",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_user_by_id(
+    user_id: UUID,
+    admin_service: FromDishka[AdminUserService],
+    _: None = Depends(require_admin_access),
+) -> Response:
+    await admin_service.delete_user(user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

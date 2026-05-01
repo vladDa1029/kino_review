@@ -4,16 +4,20 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.application.errors.errors import (
+    AdminBlockedError,
     AccessDeniedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
+    UserNotFoundError,
     UserAlreadyError,
 )
 from app.infrastructure.constants import (
+    ADMIN_BLOCKED_FORBIDDEN,
     PASSWORD_OR_LOGIN_INCORRECT,
     TOKEN_PERMISSION_DENIED,
     TOKEN_INVALID,
     TOKEN_SIGNATURE_INVALID,
+    USER_NOT_FOUND,
     USER_ALREADY_EXISTS,
 )
 from app.infrastructure.errors.coder import NoValidTokenError
@@ -55,4 +59,18 @@ async def access_denied_error_handler(request: Request, exc: AccessDeniedError):
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
         content={"message": TOKEN_PERMISSION_DENIED},
+    )
+
+
+async def user_not_found_error_handler(request: Request, exc: UserNotFoundError):
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"message": USER_NOT_FOUND},
+    )
+
+
+async def admin_blocked_error_handler(request: Request, exc: AdminBlockedError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"message": ADMIN_BLOCKED_FORBIDDEN},
     )
