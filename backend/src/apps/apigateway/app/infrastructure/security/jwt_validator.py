@@ -1,9 +1,9 @@
 from typing import Any
 
 import jwt
+import structlog
 
 from .token_claims import AccessTokenClaims
-import structlog
 
 log =structlog.get_logger(__file__)
 

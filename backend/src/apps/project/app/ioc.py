@@ -7,8 +7,17 @@ from taskiq import AsyncBroker
 
 from app.application.commands import (
     ApproveProjectMemberInvitationHandler,
+    ApproveResourceRequestHandler,
+    ApproveShiftHandler,
     ArchiveShiftReportHandler,
-    ProcessReservationOutboxHandler,
+    ChangeProjectMemberRoleHandler,
+    ConfirmShiftParticipantHandler,
+    CreateProjectHandler,
+    CreateResourceRequestHandler,
+    CreateShiftHandler,
+    DeclineShiftParticipantHandler,
+    DeleteProjectHandler,
+    GenerateShiftReportHandler,
     HandleParticipantReservationCheckFailedHandler,
     HandleParticipantReservationCheckSucceededHandler,
     HandleParticipantReservationFailedHandler,
@@ -17,20 +26,11 @@ from app.application.commands import (
     HandleResourceReservationCheckSucceededHandler,
     HandleResourceReservationFailedHandler,
     HandleResourceReservationSucceededHandler,
-    ApproveResourceRequestHandler,
-    ApproveShiftHandler,
-    ChangeProjectMemberRoleHandler,
-    ConfirmShiftParticipantHandler,
-    CreateProjectHandler,
-    GenerateShiftReportHandler,
-    ProcessShiftReportGenerationHandler,
-    CreateResourceRequestHandler,
-    CreateShiftHandler,
-    DeclineShiftParticipantHandler,
-    DeleteProjectHandler,
     InviteProjectMemberByEmailHandler,
     InviteProjectMemberHandler,
     InviteShiftParticipantHandler,
+    ProcessReservationOutboxHandler,
+    ProcessShiftReportGenerationHandler,
     RejectResourceRequestHandler,
     RemoveProjectMemberHandler,
     UpdateProjectHandler,
@@ -67,20 +67,20 @@ from app.application.queries.admin import (
     ListAdminProjectsHandler,
     ListAdminShiftReportsHandler,
 )
-from app.application.queries.documents import GetDocumentDownloadUrlHandler
-from app.application.queries.reports import (
-    GetReportDownloadUrlHandler,
-    GetReportHandler,
-    ListShiftReportsHandler,
+from app.application.queries.approvals import (
+    GetParticipantApprovalStateHandler,
+    GetResourceApprovalStateHandler,
 )
+from app.application.queries.documents import GetDocumentDownloadUrlHandler
 from app.application.queries.health import HealthHandler
 from app.application.queries.projects import (
     GetProjectHandler,
     ListActorProjectsHandler,
 )
-from app.application.queries.approvals import (
-    GetParticipantApprovalStateHandler,
-    GetResourceApprovalStateHandler,
+from app.application.queries.reports import (
+    GetReportDownloadUrlHandler,
+    GetReportHandler,
+    ListShiftReportsHandler,
 )
 from app.application.queries.resources import (
     GetProjectMemberHandler,
@@ -129,8 +129,8 @@ from app.infrastructure.reporting.xlsx import OpenpyxlShiftReportRenderer
 from app.infrastructure.storage.minio import MinioDocumentStorage
 from app.infrastructure.taskiq.dispatcher import TaskiqShiftReportTaskDispatcher
 from app.infrastructure.transactions import TransactionManagerAlchemy
-from app.presentation.report_snapshot import ShiftReportSnapshotBrokerClient
 from app.presentation.http.user_service import UserServiceHttpClient
+from app.presentation.report_snapshot import ShiftReportSnapshotBrokerClient
 
 
 def make_user_service_http_client(

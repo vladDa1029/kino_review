@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-
 from typing import ClassVar, Literal
 
 from app.application.errors.query_param import SortingError

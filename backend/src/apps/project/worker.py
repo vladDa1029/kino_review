@@ -1,6 +1,6 @@
+import structlog
 from dishka import AsyncContainer
 from dishka.integrations.taskiq import setup_dishka
-import structlog
 from taskiq import AsyncBroker, TaskiqEvents, TaskiqState
 
 from app.bootstrap import (

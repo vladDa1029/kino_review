@@ -1,5 +1,5 @@
 # Функции для настройки main фабрик.
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
 from fastapi import FastAPI

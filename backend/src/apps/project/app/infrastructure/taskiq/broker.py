@@ -1,5 +1,6 @@
-from app.config import TaskIQ
 from taskiq_aio_pika import AioPikaBroker
+
+from app.config import TaskIQ
 
 
 def create_taskiq_broker(url: str, *, taskiq: TaskIQ) -> AioPikaBroker:

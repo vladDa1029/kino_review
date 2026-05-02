@@ -10,10 +10,10 @@ from app.presentation.http.project_service import (
     PARTICIPANT_APPROVAL_STATE_FAILED,
     PARTICIPANT_APPROVAL_STATE_PROVIDED,
     PARTICIPANT_APPROVAL_STATE_REQUESTED_TOPIC,
-    ProjectApprovalStateBrokerClient,
-    ProjectApprovalStateError,
     RESOURCE_APPROVAL_STATE_PROVIDED,
     RESOURCE_APPROVAL_STATE_REQUESTED_TOPIC,
+    ProjectApprovalStateBrokerClient,
+    ProjectApprovalStateError,
 )
 
 

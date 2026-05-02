@@ -6,7 +6,6 @@ from uuid import UUID
 
 from app.domain.values import Email
 
-
 BaseUserId = NewType("BaseUserId", UUID)
 
 

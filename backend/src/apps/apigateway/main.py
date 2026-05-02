@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import cast
 
+import structlog
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
@@ -27,7 +28,7 @@ from app.presentation.api.v1.routes.users import (
 )
 from app.set_log import configure_logging
 from app.setup import AuthGateway_Middleware, CORS_Middleware
-import structlog
+
 log = structlog.get_logger(__file__)
 settings = get_settings()
 
@@ -48,14 +49,14 @@ def start_app_dev():
         description="Сервис предаставляющий прокси всех микросервисов в виде API а также обрабатывает работу с токенами.",
     )
 
-    
+
     context ={
             Services: settings.services,
             AuthGatewaySettings: settings.auth_gateway,
             ProtectedPathsSettings: settings.protected_paths,
             Log: settings.log,
         }
-    
+
     container = make_async_container(*setup_providers(), context=context)
     configure_logging(context[Log])
     setup_dishka(container=container, app=app)

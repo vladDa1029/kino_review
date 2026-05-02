@@ -4,11 +4,9 @@ from datetime import datetime
 from typing import NewType
 from uuid import UUID
 
-
 from app.domain.value.email import Email
 from app.domain.value.phone import Phone
 from app.domain.value.status import AvailabilityStatus
-
 
 BaseId = NewType("BaseId", UUID)
 

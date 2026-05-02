@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from structlog import getLogger
+
 from app.application.ports.repositories import UserRepository
 from app.application.ports.transaction import TransactionManager
 from app.domain.entity.base import BaseId, User
 from app.domain.value.email import Email
 from app.infrastructure.generation import AbstractGenerationID
-from structlog import getLogger
 
 log = getLogger(__name__)
 

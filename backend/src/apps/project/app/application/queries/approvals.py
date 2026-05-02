@@ -13,8 +13,8 @@ from app.application.ports.domain import (
     ShiftRepository,
 )
 from app.application.support import require_participant, require_resource_request, require_shift
-from app.domain.errors.business import EntityNotFoundError
 from app.domain.enums import ProjectRole, ResourceRequestStatus, ShiftParticipantStatus
+from app.domain.errors.business import EntityNotFoundError
 
 
 @dataclass(frozen=True, slots=True)

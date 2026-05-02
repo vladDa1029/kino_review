@@ -1,11 +1,11 @@
-from sqlalchemy import Table, MetaData, Column, String, Boolean, DateTime
 from datetime import datetime
-from sqlalchemy.orm import registry, composite
+
+from sqlalchemy import Boolean, Column, DateTime, MetaData, String, Table
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import composite, registry
 
 from app.domain import entities
 from app.domain.values import Email
-
 
 metadata = MetaData()
 mapper_registry = registry(metadata=metadata)

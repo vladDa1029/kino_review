@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.config import UserService
 from app.application.ports.domain import UserResourceItem
+from app.config import UserService
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.presentation.http.user_service import UserServiceHttpClient

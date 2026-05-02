@@ -10,16 +10,22 @@
 
 ## Local Run
 
+Install dependencies:
+
+```bash
+uv sync
+```
+
 Run the API and broker process:
 
 ```bash
-poetry run uvicorn main:start_app_dev --factory --reload --host 0.0.0.0 --port 8005
+uv run uvicorn main:start_app_dev --factory --reload --host 0.0.0.0 --port 8005
 ```
 
 Run the worker:
 
 ```bash
-poetry run taskiq worker worker:create_worker_taskiq_app
+uv run taskiq worker worker:create_worker_taskiq_app
 ```
 
 For local delivery tests, point SMTP settings to MailHog or another local SMTP server.
@@ -29,5 +35,12 @@ For local delivery tests, point SMTP settings to MailHog or another local SMTP s
 Run the service test suite:
 
 ```bash
-poetry run pytest -q
+uv run pytest -q
+```
+
+Run lint and type checks:
+
+```bash
+uv run ruff check .
+uv run mypy
 ```

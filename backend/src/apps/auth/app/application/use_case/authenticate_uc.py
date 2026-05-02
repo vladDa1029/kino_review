@@ -1,4 +1,5 @@
 from typing import Literal, Optional
+
 import structlog
 
 from app.application.errors.errors import (
@@ -6,8 +7,8 @@ from app.application.errors.errors import (
     PasswordOrLogInincorrectError,
     UserAlreadyError,
 )
-from app.domain.entities import User
 from app.application.ports.transaction import TransactionManager
+from app.domain.entities import User
 from app.domain.values import Email
 from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.infrastructure.generation import AbstractGenerationID

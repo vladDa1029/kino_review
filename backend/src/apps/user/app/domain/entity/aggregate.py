@@ -1,6 +1,6 @@
+import warnings
 from dataclasses import dataclass
 from typing import List
-import warnings
 
 from app.domain.entity.base import Description, Spare_time, User
 from app.domain.service.description_service import DescriptionService

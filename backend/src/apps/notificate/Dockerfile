@@ -1,16 +1,17 @@
 FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_CACHE_DIR=/tmp/uv-cache
+ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-RUN pip install --upgrade pip wheel "poetry==2.1.2"
-RUN poetry config virtualenvs.create false
+COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /bin/
 
-COPY pyproject.toml ./
-RUN poetry install --no-root
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-cache
 
-COPY ./.env ./
 COPY ./app ./app
 COPY ./main.py ./main.py
 COPY ./worker.py ./worker.py

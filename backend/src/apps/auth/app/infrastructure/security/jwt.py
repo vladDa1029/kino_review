@@ -1,12 +1,13 @@
-from dataclasses import dataclass, field
 import datetime
+import uuid
+from dataclasses import dataclass, field
 from typing import Any, Dict, Literal, Optional, Set
 from uuid import uuid4
-import uuid
-from app.config import Auth
-import structlog
-import jwt
 
+import jwt
+import structlog
+
+from app.config import Auth
 from app.infrastructure.errors.coder import NoValidTokenError
 
 log = structlog.get_logger(__file__)

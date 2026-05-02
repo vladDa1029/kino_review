@@ -20,26 +20,26 @@ from app.config import (
     get_settings,
 )
 from app.domain.errors.base import ApplicationError
-from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
     PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
-    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
-    USER_EVENTS_EXCHANGE,
     USER_EMAIL_LOOKUP_REQUESTED_QUEUE,
-    USER_REGISTERED_EXCHANGE,
+    USER_EVENTS_EXCHANGE,
     USER_EXISTENCE_REQUESTED_QUEUE,
+    USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
 )
+from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
 from app.infrastructure.adapters.storage import prepare_file_storage
-from app.infrastructure.adapters.orm import start_mappers
+from app.ioc import setup_providers
 from app.presentation import handlers
 from app.presentation.api import router as web_router
 from app.presentation.broker import create_broker_router

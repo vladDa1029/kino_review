@@ -18,12 +18,12 @@ from app.application.ports.domain import (
     ShiftRepository,
     UserServicePort,
 )
+from app.application.ports.transaction import TransactionManager
+from app.application.reports_support import mark_shift_reports_stale
 from app.application.resource_access import (
     VIEWABLE_RESOURCE_KINDS_BY_ROLE,
     normalize_resource_kind,
 )
-from app.application.reports_support import mark_shift_reports_stale
-from app.application.ports.transaction import TransactionManager
 from app.application.support import (
     get_actor_member,
     publish_best_effort,
@@ -31,8 +31,8 @@ from app.application.support import (
     require_resource_request,
     require_shift,
 )
-from app.domain.errors.business import AccessDeniedError, EntityNotFoundError
 from app.domain.entities import ReservationOutboxMessage, ShiftResourceRequest
+from app.domain.errors.business import AccessDeniedError, EntityNotFoundError
 from app.domain.services import ResourceRequestService
 
 

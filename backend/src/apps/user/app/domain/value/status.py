@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from app.domain.errors.value import AvailabilityStatusError
 from app.domain.value.base import BaseValueObject
 
-
 ALLOWED_STATUSES = {"free", "reserved", "blocked"}  # WARN:Может стоит ввести Еnum.
 
 

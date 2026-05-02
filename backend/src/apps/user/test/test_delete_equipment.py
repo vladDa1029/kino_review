@@ -38,7 +38,6 @@ from test.helpers import (
     make_user,
 )
 
-
 DELETE_CASES = [
     (
         DeleteMicrofonHandler,

@@ -1,19 +1,20 @@
 from contextlib import asynccontextmanager
 from typing import cast
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+
+import structlog
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import setup_dishka
-import structlog
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
 
 from app.application.errors.errors import (
-    AdminBlockedError,
     AccessDeniedError,
+    AdminBlockedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
-    UserNotFoundError,
     UserAlreadyError,
+    UserNotFoundError,
 )
 from app.config import (
     Auth,
@@ -22,12 +23,12 @@ from app.config import (
     SQLAlchemySettings,
     get_settings,
 )
-from app.ioc import setup_providers
 from app.infrastructure.adapters.broker import USER_REGISTERED_EXCHANGE
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.errors.coder import NoValidTokenError
-from app.presentations.api import router as auth_router
+from app.ioc import setup_providers
 from app.presentations import handlers
+from app.presentations.api import router as auth_router
 from app.set_log import configure_logging
 
 log = structlog.get_logger(__file__)

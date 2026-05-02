@@ -1,21 +1,18 @@
 FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_CACHE_DIR=/tmp/uv-cache
+ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-RUN pip install --upgrade pip wheel "poetry==2.1.2"
+COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /bin/
 
-RUN poetry config virtualenvs.create false
-
-COPY pyproject.toml poetry.lock ./
-
-RUN poetry install
-
-COPY ./.env .
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-cache
 
 COPY ./app ./app
 COPY alembic.ini .
 COPY ./migrations ./migrations
 COPY main.py .
-# CMD ["poetry","run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

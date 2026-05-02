@@ -22,7 +22,8 @@ Monorepo for project scheduling, team coordination, resources, availability, res
 - Docker and Docker Compose
 - Node.js 20 and npm
 - Python 3.11
-- Poetry
+- uv
+- pre-commit
 - just
 
 ## Quickstart
@@ -108,6 +109,25 @@ Run tests for all backend services:
 just test-all
 ```
 
+Sync all backend environments:
+
+```powershell
+just sync-all
+```
+
+Run lint, type checks, and tests for one backend service:
+
+```powershell
+just check auth
+```
+
+Run Ruff or mypy for one backend service:
+
+```powershell
+just lint auth
+just typecheck auth
+```
+
 Run tests for one backend service:
 
 ```powershell
@@ -121,6 +141,14 @@ Available backend services for `just test <service>`:
 - `notificate`
 - `project`
 - `user`
+
+## Pre-commit
+
+Install the repository hooks once:
+
+```powershell
+pre-commit install
+```
 
 ___
 

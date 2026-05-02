@@ -40,7 +40,11 @@ from app.domain.enums import (
     ShiftReportGenerationStatus,
     ShiftStatus,
 )
-from app.domain.errors.business import EntityNotFoundError, ExternalServiceError, StateTransitionError
+from app.domain.errors.business import (
+    EntityNotFoundError,
+    ExternalServiceError,
+    StateTransitionError,
+)
 from app.domain.policy import DirectorMemberPolicy
 
 

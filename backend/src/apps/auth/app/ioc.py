@@ -1,12 +1,14 @@
 from typing import Iterable
-from dishka import Provider, Scope
-from sqlalchemy.ext.asyncio import AsyncSession
-from faststream.rabbit import RabbitBroker
 
+from dishka import Provider, Scope
+from faststream.rabbit import RabbitBroker
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.application.ports.transaction import TransactionManager
+from app.application.queries.health import HealthHandler
 from app.application.use_case.authenticate_uc import JWTAuthServices
 from app.application.use_case.user_uc import AdminUserService
 from app.config import Auth, DatabaseSettings, Log, SQLAlchemySettings
-from app.application.ports.transaction import TransactionManager
 from app.infrastructure.adapters.repository import (
     UserAbstractRepository,
     UserSqlAlchemyRepository,
@@ -16,7 +18,6 @@ from app.infrastructure.generation import AbstractGenerationID, GenerationUUID
 from app.infrastructure.security.jwt import JWTServices
 from app.infrastructure.security.password_hasher import PasswordHasher
 from app.infrastructure.transactions import TransactionManagerAlchemy
-from app.application.queries.health import HealthHandler
 
 
 def settings_provider() -> Provider:

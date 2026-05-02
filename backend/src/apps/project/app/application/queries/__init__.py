@@ -33,14 +33,6 @@ from app.application.queries.projects import (
     ListActorProjectsHandler,
     ListActorProjectsQuery,
 )
-from app.application.queries.resources import (
-    GetProjectMemberHandler,
-    GetProjectMemberQuery,
-    GetProjectUserResourcesHandler,
-    GetProjectUserResourcesQuery,
-    ListProjectMembersHandler,
-    ListProjectMembersQuery,
-)
 from app.application.queries.reports import (
     GetReportDownloadUrlHandler,
     GetReportDownloadUrlQuery,
@@ -48,6 +40,14 @@ from app.application.queries.reports import (
     GetReportQuery,
     ListShiftReportsHandler,
     ListShiftReportsQuery,
+)
+from app.application.queries.resources import (
+    GetProjectMemberHandler,
+    GetProjectMemberQuery,
+    GetProjectUserResourcesHandler,
+    GetProjectUserResourcesQuery,
+    ListProjectMembersHandler,
+    ListProjectMembersQuery,
 )
 
 __all__ = [

@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 import re
-from app.domain.value.base import BaseValueObject
+from dataclasses import dataclass
+
 from app.domain.errors.value import PhoneError
+from app.domain.value.base import BaseValueObject
 
 
 @dataclass(frozen=True, eq=False, unsafe_hash=True)

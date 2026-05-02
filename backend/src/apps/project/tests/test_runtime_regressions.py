@@ -4,17 +4,17 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from app.application.commands.reports import _report_actuality_status
-from app.application.commands.reservation_outbox import (
-    OUTBOX_STATUS_PENDING,
-    PARTICIPANT_RESERVE_OPERATION,
-    RESOURCE_RESERVE_OPERATION,
-    ProcessReservationOutboxHandler,
-)
 from app.application.commands.reservation_events import (
     HandleParticipantReservationCheckSucceededCommand,
     HandleParticipantReservationCheckSucceededHandler,
     HandleResourceReservationCheckSucceededCommand,
     HandleResourceReservationCheckSucceededHandler,
+)
+from app.application.commands.reservation_outbox import (
+    OUTBOX_STATUS_PENDING,
+    PARTICIPANT_RESERVE_OPERATION,
+    RESOURCE_RESERVE_OPERATION,
+    ProcessReservationOutboxHandler,
 )
 from app.domain.entities import (
     Project,
@@ -24,8 +24,13 @@ from app.domain.entities import (
     ShiftParticipant,
     ShiftResourceRequest,
 )
-from app.domain.enums import ProjectMemberStatus, ProjectRole, ProjectStatus, ShiftStatus
-from app.domain.enums import ShiftReportActualityStatus
+from app.domain.enums import (
+    ProjectMemberStatus,
+    ProjectRole,
+    ProjectStatus,
+    ShiftReportActualityStatus,
+    ShiftStatus,
+)
 from app.presentation.schemas import to_project_role_input
 
 

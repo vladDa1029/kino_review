@@ -3,6 +3,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from app.application.commands.reservation_events import (
+    PARTICIPANT_APPROVAL_REQUESTED_TOPIC,
+    RESOURCE_APPROVAL_REQUESTED_TOPIC,
     HandleParticipantReservationCheckFailedCommand,
     HandleParticipantReservationCheckFailedHandler,
     HandleParticipantReservationCheckSucceededCommand,
@@ -11,8 +13,6 @@ from app.application.commands.reservation_events import (
     HandleResourceReservationCheckSucceededHandler,
     HandleResourceReservationSucceededCommand,
     HandleResourceReservationSucceededHandler,
-    PARTICIPANT_APPROVAL_REQUESTED_TOPIC,
-    RESOURCE_APPROVAL_REQUESTED_TOPIC,
 )
 from app.application.commands.reservation_outbox import (
     OUTBOX_STATUS_PENDING,

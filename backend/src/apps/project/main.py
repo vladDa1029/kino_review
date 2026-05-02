@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
 from taskiq import AsyncBroker
 
+from app.application.commands import ProcessReservationOutboxHandler
 from app.bootstrap import (
     create_container,
     create_message_broker,
@@ -19,11 +20,10 @@ from app.bootstrap import (
     declare_api_message_topology,
 )
 from app.config import (
+    Minio,
     ReservationOutbox,
     get_settings,
 )
-from app.application.commands import ProcessReservationOutboxHandler
-from app.config import Minio
 from app.domain.errors.base import ApplicationError
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
@@ -32,6 +32,8 @@ from app.presentation import handlers
 from app.presentation.api import (
     PROJECT_API_DESCRIPTION,
     PROJECT_OPENAPI_TAGS,
+)
+from app.presentation.api import (
     router as api_router,
 )
 from app.presentation.broker import create_broker_router

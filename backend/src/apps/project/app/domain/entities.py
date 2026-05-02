@@ -9,9 +9,9 @@ from app.domain.enums import (
     ProjectRole,
     ProjectStatus,
     ResourceRequestStatus,
+    ShiftParticipantStatus,
     ShiftReportActualityStatus,
     ShiftReportGenerationStatus,
-    ShiftParticipantStatus,
     ShiftStatus,
 )
 from app.domain.value_objects import TimeInterval

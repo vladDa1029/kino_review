@@ -49,10 +49,40 @@ all-dev:
 all-build:
     docker compose {{all_compose}} up --build -d
 
+# Sync dependencies for one backend service. Usage: just sync auth
+sync service:
+    uv sync --directory backend/src/apps/{{service}}
+
+# Sync dependencies for all backend services.
+sync-all:
+    @$ErrorActionPreference = "Stop"; $services = "{{services}}".Split(" "); foreach ($service in $services) { Write-Host ""; Write-Host "==> $service"; uv sync --directory "backend/src/apps/$service" }
+
+# Check the lockfile for one backend service. Usage: just lock-check auth
+lock-check service:
+    uv lock --check --directory backend/src/apps/{{service}}
+
+# Run Ruff for one backend service. Usage: just lint auth
+lint service:
+    uv run --directory backend/src/apps/{{service}} ruff check .
+
+# Run mypy for one backend service. Usage: just typecheck auth
+typecheck service:
+    uv run --directory backend/src/apps/{{service}} mypy
+
 # Run tests for one backend service. Usage: just test auth
 test service:
-    @Push-Location "backend/src/apps/{{service}}"; try { poetry run pytest } finally { Pop-Location }
+    uv run --directory backend/src/apps/{{service}} pytest
 
 # Run tests for all backend services.
 test-all:
-    @$ErrorActionPreference = "Stop"; $services = "{{services}}".Split(" "); foreach ($service in $services) { Write-Host ""; Write-Host "==> $service"; Push-Location "backend/src/apps/$service"; try { poetry run pytest } finally { Pop-Location } }
+    @$ErrorActionPreference = "Stop"; $services = "{{services}}".Split(" "); foreach ($service in $services) { Write-Host ""; Write-Host "==> $service"; uv run --directory "backend/src/apps/$service" pytest }
+
+# Run Ruff, mypy, and tests for one backend service. Usage: just check auth
+check service:
+    uv run --directory backend/src/apps/{{service}} ruff check .
+    uv run --directory backend/src/apps/{{service}} mypy
+    uv run --directory backend/src/apps/{{service}} pytest
+
+# Run Ruff, mypy, and tests for all backend services.
+check-all:
+    @$ErrorActionPreference = "Stop"; $services = "{{services}}".Split(" "); foreach ($service in $services) { Write-Host ""; Write-Host "==> $service"; uv run --directory "backend/src/apps/$service" ruff check .; uv run --directory "backend/src/apps/$service" mypy; uv run --directory "backend/src/apps/$service" pytest }

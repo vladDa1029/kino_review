@@ -8,7 +8,6 @@ from app.application.ports.repositories import UserRepository
 from app.config import ConfirmationSettings
 from app.domain.entity.base import BaseId
 
-
 EMAIL_REQUESTED_TOPIC = "notification.email_requested"
 
 

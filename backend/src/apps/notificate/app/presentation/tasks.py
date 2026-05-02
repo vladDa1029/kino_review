@@ -6,7 +6,6 @@ from app.application.commands.send_email import (
     SendNotificationEmailHandler,
 )
 
-
 SEND_NOTIFICATION_EMAIL_TASK_NAME = "notificate.send_notification_email"
 
 

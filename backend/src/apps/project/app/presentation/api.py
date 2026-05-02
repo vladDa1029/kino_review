@@ -6,12 +6,12 @@ from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Depends, File, Form, Header, Response, UploadFile, status
 
 from app.application.commands import (
-    ArchiveShiftReportCommand,
-    ArchiveShiftReportHandler,
     ApproveResourceRequestCommand,
     ApproveResourceRequestHandler,
     ApproveShiftCommand,
     ApproveShiftHandler,
+    ArchiveShiftReportCommand,
+    ArchiveShiftReportHandler,
     ChangeProjectMemberRoleCommand,
     ChangeProjectMemberRoleHandler,
     ConfirmShiftParticipantCommand,
@@ -20,14 +20,14 @@ from app.application.commands import (
     CreateProjectHandler,
     CreateResourceRequestCommand,
     CreateResourceRequestHandler,
-    GenerateShiftReportCommand,
-    GenerateShiftReportHandler,
     CreateShiftCommand,
     CreateShiftHandler,
     DeclineShiftParticipantCommand,
     DeclineShiftParticipantHandler,
     DeleteProjectCommand,
     DeleteProjectHandler,
+    GenerateShiftReportCommand,
+    GenerateShiftReportHandler,
     InviteProjectMemberByEmailCommand,
     InviteProjectMemberByEmailHandler,
     InviteProjectMemberCommand,
@@ -68,19 +68,20 @@ from app.application.queries import (
     GetReportQuery,
     HealthHandler,
     HealthQuery,
+    ListActorProjectsHandler,
+    ListActorProjectsQuery,
     ListAdminProjectMembersHandler,
     ListAdminProjectMembersQuery,
     ListAdminProjectsHandler,
     ListAdminProjectsQuery,
     ListAdminShiftReportsHandler,
     ListAdminShiftReportsQuery,
-    ListShiftReportsHandler,
-    ListShiftReportsQuery,
-    ListActorProjectsHandler,
-    ListActorProjectsQuery,
     ListProjectMembersHandler,
     ListProjectMembersQuery,
+    ListShiftReportsHandler,
+    ListShiftReportsQuery,
 )
+from app.domain.errors.business import AccessDeniedError
 from app.presentation.schemas import (
     ChangeProjectMemberRoleRequest,
     CreateResourceRequestBody,
@@ -109,7 +110,6 @@ from app.presentation.schemas import (
     ShiftResponse,
     to_project_role_input,
 )
-from app.domain.errors.business import AccessDeniedError
 
 PROJECT_API_DESCRIPTION = """
 Project service owns project planning, membership, shifts, participants, resource requests,

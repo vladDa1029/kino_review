@@ -22,16 +22,65 @@ dependencies = [
     "python-multipart (>=0.0.22,<0.0.23)",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1,<9.0.0",
+    "ruff>=0.15.12,<0.16.0",
+    "mypy>=1.19.1,<2.0.0",
+]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv]
+package = false
 
-[tool.poetry]
-package-mode = false
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "migrations",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.4.1"
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501", "F401", "F841"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app", "main.py"]
+exclude = "^(\\.venv|migrations|tests|test)/"
+explicit_package_bases = true
+pretty = true
+show_error_codes = true
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = false
+no_implicit_optional = true
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "func-returns-value",
+    "misc",
+    "no-redef",
+    "override",
+    "return-value",
+    "type-arg",
+    "union-attr",
+]
 
 [tool.pytest.ini_options] 
 pythonpath = ["."]

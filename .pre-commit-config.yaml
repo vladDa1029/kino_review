@@ -1,0 +1,107 @@
+repos:
+  - repo: local
+    hooks:
+      - id: apigateway-lock
+        name: apigateway uv lock check
+        entry: uv lock --check --directory backend/src/apps/apigateway
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/apigateway/(pyproject\.toml|uv\.lock)$
+
+      - id: auth-lock
+        name: auth uv lock check
+        entry: uv lock --check --directory backend/src/apps/auth
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/auth/(pyproject\.toml|uv\.lock)$
+
+      - id: notificate-lock
+        name: notificate uv lock check
+        entry: uv lock --check --directory backend/src/apps/notificate
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/notificate/(pyproject\.toml|uv\.lock)$
+
+      - id: project-lock
+        name: project uv lock check
+        entry: uv lock --check --directory backend/src/apps/project
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/project/(pyproject\.toml|uv\.lock)$
+
+      - id: user-lock
+        name: user uv lock check
+        entry: uv lock --check --directory backend/src/apps/user
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/user/(pyproject\.toml|uv\.lock)$
+
+      - id: apigateway-ruff
+        name: apigateway ruff
+        entry: uv run --directory backend/src/apps/apigateway ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/apigateway/.*\.py$
+
+      - id: auth-ruff
+        name: auth ruff
+        entry: uv run --directory backend/src/apps/auth ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/auth/.*\.py$
+
+      - id: notificate-ruff
+        name: notificate ruff
+        entry: uv run --directory backend/src/apps/notificate ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/notificate/.*\.py$
+
+      - id: project-ruff
+        name: project ruff
+        entry: uv run --directory backend/src/apps/project ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/project/.*\.py$
+
+      - id: user-ruff
+        name: user ruff
+        entry: uv run --directory backend/src/apps/user ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/user/.*\.py$
+
+      - id: apigateway-mypy
+        name: apigateway mypy
+        entry: uv run --directory backend/src/apps/apigateway mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/apigateway/.*\.py$
+
+      - id: auth-mypy
+        name: auth mypy
+        entry: uv run --directory backend/src/apps/auth mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/auth/.*\.py$
+
+      - id: notificate-mypy
+        name: notificate mypy
+        entry: uv run --directory backend/src/apps/notificate mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/notificate/.*\.py$
+
+      - id: project-mypy
+        name: project mypy
+        entry: uv run --directory backend/src/apps/project mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/project/.*\.py$
+
+      - id: user-mypy
+        name: user mypy
+        entry: uv run --directory backend/src/apps/user mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/src/apps/user/.*\.py$

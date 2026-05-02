@@ -1,8 +1,8 @@
 from app.application.ports.repositories import (
     CameraFreeTimeRepository,
     CameraRepository,
-    CameraTripodRepository,
     CameraTripodFreeTimeRepository,
+    CameraTripodRepository,
     DescriptionRepository,
     EquipmentRepository,
     ImageRepository,

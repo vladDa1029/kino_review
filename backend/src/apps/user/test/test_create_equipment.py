@@ -35,7 +35,6 @@ from test.helpers import (
     make_user,
 )
 
-
 CREATE_CASES = [
     (
         CreateCameraHandler,

@@ -2,6 +2,32 @@ from app.application.commands.documents import (
     UploadShiftDocumentCommand,
     UploadShiftDocumentHandler,
 )
+from app.application.commands.participants import (
+    ConfirmShiftParticipantCommand,
+    ConfirmShiftParticipantHandler,
+    DeclineShiftParticipantCommand,
+    DeclineShiftParticipantHandler,
+    InviteShiftParticipantCommand,
+    InviteShiftParticipantHandler,
+)
+from app.application.commands.projects import (
+    ApproveProjectMemberInvitationCommand,
+    ApproveProjectMemberInvitationHandler,
+    ChangeProjectMemberRoleCommand,
+    ChangeProjectMemberRoleHandler,
+    CreateProjectCommand,
+    CreateProjectHandler,
+    DeleteProjectCommand,
+    DeleteProjectHandler,
+    InviteProjectMemberByEmailCommand,
+    InviteProjectMemberByEmailHandler,
+    InviteProjectMemberCommand,
+    InviteProjectMemberHandler,
+    RemoveProjectMemberCommand,
+    RemoveProjectMemberHandler,
+    UpdateProjectCommand,
+    UpdateProjectHandler,
+)
 from app.application.commands.reports import (
     ArchiveShiftReportCommand,
     ArchiveShiftReportHandler,
@@ -29,32 +55,6 @@ from app.application.commands.reservation_events import (
     HandleResourceReservationSucceededHandler,
 )
 from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
-from app.application.commands.participants import (
-    ConfirmShiftParticipantCommand,
-    ConfirmShiftParticipantHandler,
-    DeclineShiftParticipantCommand,
-    DeclineShiftParticipantHandler,
-    InviteShiftParticipantCommand,
-    InviteShiftParticipantHandler,
-)
-from app.application.commands.projects import (
-    ApproveProjectMemberInvitationCommand,
-    ApproveProjectMemberInvitationHandler,
-    ChangeProjectMemberRoleCommand,
-    ChangeProjectMemberRoleHandler,
-    CreateProjectCommand,
-    CreateProjectHandler,
-    DeleteProjectCommand,
-    DeleteProjectHandler,
-    InviteProjectMemberByEmailCommand,
-    InviteProjectMemberByEmailHandler,
-    InviteProjectMemberCommand,
-    InviteProjectMemberHandler,
-    RemoveProjectMemberCommand,
-    RemoveProjectMemberHandler,
-    UpdateProjectCommand,
-    UpdateProjectHandler,
-)
 from app.application.commands.resources import (
     ApproveResourceRequestCommand,
     ApproveResourceRequestHandler,

@@ -1,12 +1,11 @@
 from typing import Callable, Iterable
 
+import structlog
 from dishka import Provider, Scope
 from faststream.rabbit import RabbitBroker
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 from structlog.stdlib import BoundLogger
 
-from app.application.commands.add_image import AddImageHandler
 from app.application.commands.add_equipment_free_time import (
     AddCameraFreeTimeHandler,
     AddCameraTripodFreeTimeHandler,
@@ -16,10 +15,11 @@ from app.application.commands.add_equipment_free_time import (
     AddRequisiteFreeTimeHandler,
     AddSoundFreeTimeHandler,
 )
+from app.application.commands.add_image import AddImageHandler
 from app.application.commands.add_spare_time import AddSpareTimeHandler
 from app.application.commands.approval_notifications import (
-    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedHandler,
+    HandleProjectMemberInvitationRequestedHandler,
     HandleResourceApprovalRequestedHandler,
 )
 from app.application.commands.check_availability import CheckAvailabilityHandler
@@ -27,7 +27,6 @@ from app.application.commands.confirm_project_invitation import (
     ConfirmProjectInvitationByTokenHandler,
 )
 from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
-from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.create_description import CreateDescriptionHandler
 from app.application.commands.create_equipment import (
     CreateCameraHandler,
@@ -47,11 +46,10 @@ from app.application.commands.delete_equipment import (
     DeleteRequisiteHandler,
     DeleteSoundHandler,
 )
+from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.remove_image import RemoveImageHandler
 from app.application.commands.reserve_availability import ReserveAvailabilityHandler
-from app.application.commands.user_registered import UserRegisteredHandler
 from app.application.commands.update_description import UpdateDescriptionHandler
-from app.application.commands.update_spare_time import UpdateSpareTimeHandler
 from app.application.commands.update_equipment import (
     UpdateCameraHandler,
     UpdateCameraTripodHandler,
@@ -61,41 +59,16 @@ from app.application.commands.update_equipment import (
     UpdateRequisiteHandler,
     UpdateSoundHandler,
 )
-from app.application.queries.list_equipment import (
-    ListCamerasHandler,
-    ListCameraTripodsHandler,
-    ListLightsHandler,
-    ListLightTripodsHandler,
-    ListMicrofonsHandler,
-    ListRequisitesHandler,
-    ListSoundsHandler,
-)
-from app.application.queries.images import (
-    GetRequisiteImageHandler,
-    ListRequisiteImagesHandler,
-)
-from app.application.queries.description import GetDescriptionHandler
-from app.application.queries.equipment_free_times import (
-    ListCameraFreeTimesHandler,
-    ListCameraTripodFreeTimesHandler,
-    ListLightFreeTimesHandler,
-    ListLightTripodFreeTimesHandler,
-    ListMicrofonFreeTimesHandler,
-    ListRequisiteFreeTimesHandler,
-    ListSoundFreeTimesHandler,
-)
-from app.application.queries.users import GetUserByEmailHandler, GetUserExistsHandler
-from app.application.queries.report_snapshot import ProvideShiftReportSnapshotHandler
-from app.application.queries.spare_times import (
-    GetUserSpareTimeHandler,
-    ListUserSpareTimesHandler,
-)
+from app.application.commands.update_spare_time import UpdateSpareTimeHandler
+from app.application.commands.user_registered import UserRegisteredHandler
+from app.application.ports.approvals import ConfirmationTokenPort, ProjectApprovalStatePort
+from app.application.ports.broker import EventPublisher
 from app.application.ports.repositories import (
     AvailabilityReservationRepository,
     CameraFreeTimeRepository,
     CameraRepository,
-    CameraTripodRepository,
     CameraTripodFreeTimeRepository,
+    CameraTripodRepository,
     DescriptionRepository,
     ImageRepository,
     LightFreeTimeRepository,
@@ -111,11 +84,38 @@ from app.application.ports.repositories import (
     SpareTimeRepository,
     UserRepository,
 )
-from app.application.ports.approvals import ConfirmationTokenPort, ProjectApprovalStatePort
-from app.application.ports.broker import EventPublisher
-from app.application.resource_ownership import ResourceOwnershipResolver
 from app.application.ports.storage import FileStorage
 from app.application.ports.transaction import TransactionManager
+from app.application.queries.description import GetDescriptionHandler
+from app.application.queries.equipment_free_times import (
+    ListCameraFreeTimesHandler,
+    ListCameraTripodFreeTimesHandler,
+    ListLightFreeTimesHandler,
+    ListLightTripodFreeTimesHandler,
+    ListMicrofonFreeTimesHandler,
+    ListRequisiteFreeTimesHandler,
+    ListSoundFreeTimesHandler,
+)
+from app.application.queries.images import (
+    GetRequisiteImageHandler,
+    ListRequisiteImagesHandler,
+)
+from app.application.queries.list_equipment import (
+    ListCamerasHandler,
+    ListCameraTripodsHandler,
+    ListLightsHandler,
+    ListLightTripodsHandler,
+    ListMicrofonsHandler,
+    ListRequisitesHandler,
+    ListSoundsHandler,
+)
+from app.application.queries.report_snapshot import ProvideShiftReportSnapshotHandler
+from app.application.queries.spare_times import (
+    GetUserSpareTimeHandler,
+    ListUserSpareTimesHandler,
+)
+from app.application.queries.users import GetUserByEmailHandler, GetUserExistsHandler
+from app.application.resource_ownership import ResourceOwnershipResolver
 from app.config import (
     ConfirmationSettings,
     DatabaseSettings,
@@ -126,6 +126,7 @@ from app.config import (
     SQLAlchemySettings,
     StorageSettings,
 )
+from app.domain.entity.base import BaseId
 from app.domain.policy.active_user import ActiveUserPolicy
 from app.domain.policy.description import DescriptionOwnershipPolicy
 from app.domain.policy.image_ownership import ImageOwnershipPolicy
@@ -141,13 +142,13 @@ from app.domain.service.image_service import ImageService
 from app.domain.specification.description_identity import DescriptionIdentitySpec
 from app.domain.specification.time_overlap import NonOverlappingTimeSpec
 from app.domain.specification.time_within import TimeWithinWindowSpec
-from app.domain.entity.base import BaseId
+from app.infrastructure.adapters.broker import RabbitPublisher
 from app.infrastructure.adapters.repository import (
     AvailabilityReservationSqlAlchemyRepository,
     CameraFreeTimeSqlAlchemyRepository,
     CameraSqlAlchemyRepository,
-    CameraTripodSqlAlchemyRepository,
     CameraTripodFreeTimeSqlAlchemyRepository,
+    CameraTripodSqlAlchemyRepository,
     DescriptionSqlAlchemyRepository,
     ImageSqlAlchemyRepository,
     LightFreeTimeSqlAlchemyRepository,
@@ -163,7 +164,6 @@ from app.infrastructure.adapters.repository import (
     SpareTimeSqlAlchemyRepository,
     UserSqlAlchemyRepository,
 )
-from app.infrastructure.adapters.broker import RabbitPublisher
 from app.infrastructure.adapters.request_reply import BrokerReplyInbox
 from app.infrastructure.adapters.storage import create_file_storage
 from app.infrastructure.database import get_engine, get_session, get_sessionmaker

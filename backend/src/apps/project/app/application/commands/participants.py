@@ -18,8 +18,8 @@ from app.application.ports.domain import (
     ShiftRepository,
     UserServicePort,
 )
-from app.application.reports_support import mark_shift_reports_stale
 from app.application.ports.transaction import TransactionManager
+from app.application.reports_support import mark_shift_reports_stale
 from app.application.support import (
     get_actor_member,
     publish_best_effort,

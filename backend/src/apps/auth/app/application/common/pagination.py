@@ -3,7 +3,6 @@ from typing import Dict, Final, Literal
 
 from app.application.errors.query_param import PaginationError
 
-
 MAX_PAGE_SIZE: Final[int] = 100
 
 

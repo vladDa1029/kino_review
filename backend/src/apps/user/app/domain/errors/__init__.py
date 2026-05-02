@@ -1,10 +1,10 @@
-from app.domain.errors.base import ApplicationError
 from app.domain.errors.aggregate import CrossingTimingError, NoBaseIdeqError
 from app.domain.errors.availability import (
     AvailabilityNotFoundError,
     ReservationOverlapError,
     WindowStatusError,
 )
+from app.domain.errors.base import ApplicationError
 from app.domain.errors.policy import (
     DescriptionAlreadyExistsError,
     DescriptionIdentityError,

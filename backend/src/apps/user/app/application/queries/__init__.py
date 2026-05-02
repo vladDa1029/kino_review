@@ -1,16 +1,4 @@
 from app.application.queries.base import Query, QueryHandler
-from app.application.queries.list_equipment import (
-    EquipmentListResult,
-    ListCamerasHandler,
-    ListCameraTripodsHandler,
-    ListEquipmentHandler,
-    ListEquipmentQuery,
-    ListLightsHandler,
-    ListLightTripodsHandler,
-    ListMicrofonsHandler,
-    ListRequisitesHandler,
-    ListSoundsHandler,
-)
 from app.application.queries.description import (
     GetDescriptionHandler,
     GetDescriptionQuery,
@@ -31,7 +19,24 @@ from app.application.queries.equipment_free_times import (
     ListSoundFreeTimesHandler,
     ListSoundFreeTimesQuery,
 )
-from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
+from app.application.queries.images import (
+    GetRequisiteImageHandler,
+    GetRequisiteImageQuery,
+    ListRequisiteImagesHandler,
+    ListRequisiteImagesQuery,
+)
+from app.application.queries.list_equipment import (
+    EquipmentListResult,
+    ListCamerasHandler,
+    ListCameraTripodsHandler,
+    ListEquipmentHandler,
+    ListEquipmentQuery,
+    ListLightsHandler,
+    ListLightTripodsHandler,
+    ListMicrofonsHandler,
+    ListRequisitesHandler,
+    ListSoundsHandler,
+)
 from app.application.queries.report_snapshot import (
     ProvideShiftReportSnapshotHandler,
     ProvideShiftReportSnapshotQuery,
@@ -42,12 +47,7 @@ from app.application.queries.spare_times import (
     ListUserSpareTimesHandler,
     ListUserSpareTimesQuery,
 )
-from app.application.queries.images import (
-    GetRequisiteImageHandler,
-    GetRequisiteImageQuery,
-    ListRequisiteImagesHandler,
-    ListRequisiteImagesQuery,
-)
+from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
 
 __all__ = [
     "EquipmentListResult",

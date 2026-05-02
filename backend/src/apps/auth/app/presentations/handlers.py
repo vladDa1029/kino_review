@@ -4,21 +4,21 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.application.errors.errors import (
-    AdminBlockedError,
     AccessDeniedError,
+    AdminBlockedError,
     InvalidCredentialsError,
     PasswordOrLogInincorrectError,
-    UserNotFoundError,
     UserAlreadyError,
+    UserNotFoundError,
 )
 from app.infrastructure.constants import (
     ADMIN_BLOCKED_FORBIDDEN,
     PASSWORD_OR_LOGIN_INCORRECT,
-    TOKEN_PERMISSION_DENIED,
     TOKEN_INVALID,
+    TOKEN_PERMISSION_DENIED,
     TOKEN_SIGNATURE_INVALID,
-    USER_NOT_FOUND,
     USER_ALREADY_EXISTS,
+    USER_NOT_FOUND,
 )
 from app.infrastructure.errors.coder import NoValidTokenError
 

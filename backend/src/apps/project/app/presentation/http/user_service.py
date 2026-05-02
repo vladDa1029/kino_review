@@ -12,8 +12,8 @@ from app.application.ports.domain import (
     UserServicePort,
 )
 from app.config import UserService
-from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.domain.errors.business import EntityNotFoundError, ExternalServiceError
+from app.infrastructure.broker.request_reply import BrokerReplyInbox
 from app.presentation.schemas import BrokerUserEmailLookupReply, BrokerUserExistenceReply
 
 USER_EXISTENCE_REQUESTED_TOPIC = "user.existence_requested"

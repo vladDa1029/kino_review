@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from app.domain.errors.value import EmailError
 from app.domain.value.base import BaseValueObject

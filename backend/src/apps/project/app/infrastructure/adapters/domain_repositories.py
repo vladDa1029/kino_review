@@ -27,7 +27,11 @@ from app.domain.entities import (
 from app.domain.enums import ProjectMemberStatus, ProjectStatus
 from app.infrastructure.adapters.orm import documents as documents_table
 from app.infrastructure.adapters.orm import projects as projects_table
-from app.infrastructure.adapters.orm import reservation_outbox, shift_participants, users_project_role
+from app.infrastructure.adapters.orm import (
+    reservation_outbox,
+    shift_participants,
+    users_project_role,
+)
 from app.infrastructure.adapters.orm import shift_reports as shift_reports_table
 
 T = TypeVar("T")

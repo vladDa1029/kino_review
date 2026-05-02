@@ -1,10 +1,9 @@
 import logging
 
-from app.config import Log
-
-
 import structlog
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder
+
+from app.config import Log
 
 
 def configure_logging(settings: Log) -> None:

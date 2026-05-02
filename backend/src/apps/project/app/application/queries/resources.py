@@ -3,12 +3,13 @@ from datetime import datetime
 from uuid import UUID
 
 from app.application.ports.domain import ProjectMemberRepository, UserServicePort
+from app.application.resource_access import VIEWABLE_RESOURCE_KINDS_BY_ROLE
 from app.application.support import get_actor_member
 from app.domain.entities import ProjectMember
-from app.application.resource_access import VIEWABLE_RESOURCE_KINDS_BY_ROLE
 from app.domain.enums import ProjectRole
 from app.domain.errors.business import AccessDeniedError, EntityNotFoundError
 from app.domain.policy.member_access import ActiveMemberPolicy
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GetProjectUserResourcesQuery:

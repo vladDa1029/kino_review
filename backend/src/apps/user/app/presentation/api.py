@@ -15,7 +15,6 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse
 
-from app.application.commands.add_image import AddImageCommand, AddImageHandler
 from app.application.commands.add_equipment_free_time import (
     AddCameraFreeTimeCommand,
     AddCameraFreeTimeHandler,
@@ -32,18 +31,15 @@ from app.application.commands.add_equipment_free_time import (
     AddSoundFreeTimeCommand,
     AddSoundFreeTimeHandler,
 )
+from app.application.commands.add_image import AddImageCommand, AddImageHandler
 from app.application.commands.add_spare_time import (
     AddSpareTimeCommand,
     AddSpareTimeHandler,
 )
-from app.application.commands.delete_spare_time import (
-    DeleteSpareTimeCommand,
-    DeleteSpareTimeHandler,
-)
-from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
 from app.application.commands.confirm_project_invitation import (
     ConfirmProjectInvitationByTokenHandler,
 )
+from app.application.commands.confirm_reservation import ConfirmReservationByTokenHandler
 from app.application.commands.create_description import (
     CreateDescriptionCommand,
     CreateDescriptionHandler,
@@ -82,6 +78,10 @@ from app.application.commands.delete_equipment import (
     DeleteSoundCommand,
     DeleteSoundHandler,
 )
+from app.application.commands.delete_spare_time import (
+    DeleteSpareTimeCommand,
+    DeleteSpareTimeHandler,
+)
 from app.application.commands.remove_image import (
     RemoveImageCommand,
     RemoveImageHandler,
@@ -93,10 +93,6 @@ from app.application.commands.reserve_availability import (
 from app.application.commands.update_description import (
     UpdateDescriptionCommand,
     UpdateDescriptionHandler,
-)
-from app.application.commands.update_spare_time import (
-    UpdateSpareTimeCommand,
-    UpdateSpareTimeHandler,
 )
 from app.application.commands.update_equipment import (
     UpdateCameraCommand,
@@ -114,12 +110,15 @@ from app.application.commands.update_equipment import (
     UpdateSoundCommand,
     UpdateSoundHandler,
 )
+from app.application.commands.update_spare_time import (
+    UpdateSpareTimeCommand,
+    UpdateSpareTimeHandler,
+)
 from app.application.common import EquipmentFilters, EquipmentSorting, Pagination
-from app.application.queries.images import (
-    GetRequisiteImageHandler,
-    GetRequisiteImageQuery,
-    ListRequisiteImagesHandler,
-    ListRequisiteImagesQuery,
+from app.application.ports.storage import FileStorage
+from app.application.queries.description import (
+    GetDescriptionHandler,
+    GetDescriptionQuery,
 )
 from app.application.queries.equipment_free_times import (
     ListCameraFreeTimesHandler,
@@ -137,17 +136,12 @@ from app.application.queries.equipment_free_times import (
     ListSoundFreeTimesHandler,
     ListSoundFreeTimesQuery,
 )
-from app.application.queries.spare_times import (
-    GetUserSpareTimeHandler,
-    GetUserSpareTimeQuery,
-    ListUserSpareTimesHandler,
-    ListUserSpareTimesQuery,
+from app.application.queries.images import (
+    GetRequisiteImageHandler,
+    GetRequisiteImageQuery,
+    ListRequisiteImagesHandler,
+    ListRequisiteImagesQuery,
 )
-from app.application.queries.description import (
-    GetDescriptionHandler,
-    GetDescriptionQuery,
-)
-from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
 from app.application.queries.list_equipment import (
     ListCamerasHandler,
     ListCameraTripodsHandler,
@@ -158,24 +152,30 @@ from app.application.queries.list_equipment import (
     ListRequisitesHandler,
     ListSoundsHandler,
 )
-from app.domain.entity.base import BaseId
-from app.application.ports.storage import FileStorage
+from app.application.queries.spare_times import (
+    GetUserSpareTimeHandler,
+    GetUserSpareTimeQuery,
+    ListUserSpareTimesHandler,
+    ListUserSpareTimesQuery,
+)
+from app.application.queries.users import GetUserExistsHandler, GetUserExistsQuery
 from app.config import ImageSettings
+from app.domain.entity.base import BaseId
 from app.presentation.schemas import (
     DescriptionCreateRequest,
     DescriptionResponse,
     DescriptionUpdateRequest,
+    EquipmentCreateRequest,
     EquipmentItemResponse,
     EquipmentListQuery,
     EquipmentListResponse,
-    EquipmentCreateRequest,
     EquipmentUpdateRequest,
     ImageListResponse,
     ImageResponse,
+    RequisiteCreateRequest,
     RequisiteItemResponse,
     RequisiteListQuery,
     RequisiteListResponse,
-    RequisiteCreateRequest,
     RequisiteUpdateRequest,
     ReserveAvailabilityRequest,
     ReserveAvailabilityResponse,

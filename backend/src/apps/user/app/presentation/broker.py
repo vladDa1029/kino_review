@@ -2,10 +2,10 @@ from dishka import AsyncContainer
 from faststream.rabbit import RabbitRouter
 
 from app.application.commands.approval_notifications import (
-    HandleProjectMemberInvitationRequestedCommand,
-    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedCommand,
     HandleParticipantApprovalRequestedHandler,
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
     HandleResourceApprovalRequestedCommand,
     HandleResourceApprovalRequestedHandler,
 )
@@ -21,49 +21,49 @@ from app.application.commands.user_registered import (
     UserRegisteredCommand,
     UserRegisteredHandler,
 )
-from app.application.queries.users import (
-    GetUserByEmailHandler,
-    GetUserByEmailQuery,
-    GetUserExistsHandler,
-    GetUserExistsQuery,
-)
+from app.application.ports.broker import EventPublisher
 from app.application.queries.report_snapshot import (
     ProvideShiftReportSnapshotHandler,
     ProvideShiftReportSnapshotQuery,
     ShiftReportParticipantContext,
     ShiftReportResourceContext,
 )
-from app.application.ports.broker import EventPublisher
+from app.application.queries.users import (
+    GetUserByEmailHandler,
+    GetUserByEmailQuery,
+    GetUserExistsHandler,
+    GetUserExistsQuery,
+)
 from app.domain.entity.base import BaseId
 from app.infrastructure.adapters.broker import (
     PROJECT_EVENTS_EXCHANGE,
     PROJECT_MEMBER_INVITATION_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
-    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+    SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_REQUESTED_QUEUE,
-    USER_EVENTS_EXCHANGE,
     USER_EMAIL_LOOKUP_REQUESTED_QUEUE,
+    USER_EVENTS_EXCHANGE,
     USER_EXISTENCE_REQUESTED_QUEUE,
     USER_REGISTERED_EXCHANGE,
     USER_REGISTERED_QUEUE,
 )
 from app.infrastructure.adapters.request_reply import BrokerReplyInbox, build_reply_queue
 from app.presentation.schemas import (
-    BrokerUserExistenceRequested,
     BrokerProjectMemberInvitationRequested,
     BrokerShiftParticipantApprovalRequested,
-    BrokerShiftReportSnapshotRequested,
     BrokerShiftParticipantReservationCheckRequested,
     BrokerShiftParticipantReservationRequested,
+    BrokerShiftReportSnapshotRequested,
     BrokerShiftResourceRequestApprovalRequested,
     BrokerShiftResourceRequestReservationCheckRequested,
     BrokerShiftResourceRequestReservationRequested,
-    BrokerUserRegistered,
     BrokerUserEmailLookupRequested,
+    BrokerUserExistenceRequested,
+    BrokerUserRegistered,
 )
 
 

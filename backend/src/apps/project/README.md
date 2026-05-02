@@ -14,7 +14,7 @@
 1. Install dependencies:
 
 ```bash
-poetry install
+uv sync
 ```
 
 2. Create `.env` from `.env.example`.
@@ -22,19 +22,19 @@ poetry install
 3. Apply migrations:
 
 ```bash
-poetry run alembic upgrade head
+uv run alembic upgrade head
 ```
 
 4. Start the API service:
 
 ```bash
-poetry run uvicorn main:start_app_dev --factory --reload
+uv run uvicorn main:start_app_dev --factory --reload
 ```
 
 5. Start the Taskiq worker for generated shift reports:
 
 ```bash
-poetry run taskiq worker worker:create_worker_taskiq_app
+uv run taskiq worker worker:create_worker_taskiq_app
 ```
 
 By default the OpenAPI UI is available at `http://localhost:8000/docs`.
@@ -44,13 +44,13 @@ By default the OpenAPI UI is available at `http://localhost:8000/docs`.
 Create a migration:
 
 ```bash
-poetry run alembic revision --autogenerate -m "message"
+uv run alembic revision --autogenerate -m "message"
 ```
 
 Apply migrations:
 
 ```bash
-poetry run alembic upgrade head
+uv run alembic upgrade head
 ```
 
 ## Tests
@@ -58,5 +58,12 @@ poetry run alembic upgrade head
 Run the service test suite:
 
 ```bash
-poetry run pytest
+uv run pytest
+```
+
+Run lint and type checks:
+
+```bash
+uv run ruff check .
+uv run mypy
 ```

@@ -5,8 +5,8 @@ import types
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import pytest
 import fastapi
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request

@@ -1,6 +1,6 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
-import re
 
 from app.domain.errors.values import DomainFieldError, EmailError
 

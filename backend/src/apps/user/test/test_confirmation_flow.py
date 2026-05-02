@@ -5,10 +5,10 @@ from uuid import uuid4
 import jwt
 
 from app.application.commands.approval_notifications import (
-    HandleProjectMemberInvitationRequestedCommand,
-    HandleProjectMemberInvitationRequestedHandler,
     HandleParticipantApprovalRequestedCommand,
     HandleParticipantApprovalRequestedHandler,
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
 )
 from app.application.commands.confirm_project_invitation import (
     ConfirmProjectInvitationByTokenHandler,

@@ -15,6 +15,7 @@ from app.domain.entities import Document, Project, ShiftReport
 from app.domain.enums import ShiftReportGenerationStatus
 from app.domain.errors.business import EntityNotFoundError, StateTransitionError
 
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ListAdminProjectsQuery:
     include_archived: bool = False

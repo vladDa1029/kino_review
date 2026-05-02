@@ -11,7 +11,6 @@ from app.domain.errors.confirmation import (
     ConfirmationTokenInvalidError,
 )
 
-
 PROJECT_MEMBER_APPROVED_TOPIC = "project.member.approved"
 
 

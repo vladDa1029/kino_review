@@ -5,16 +5,16 @@ from dishka import Provider, Scope
 from structlog.stdlib import BoundLogger
 from taskiq import AsyncBroker
 
-from app.application.commands.send_email import (
-    SendNotificationEmailHandler,
-)
 from app.application.commands.schedule_notifications import (
     ScheduleNotificationEmailHandler,
+)
+from app.application.commands.send_email import (
+    SendNotificationEmailHandler,
 )
 from app.application.ports.email import EmailSender
 from app.application.ports.tasks import NotificationTaskDispatcher
 from app.application.queries.health import GetHealthHandler
-from app.config import Log, Rabbitmq, SMTP, TaskIQ
+from app.config import SMTP, Log, Rabbitmq, TaskIQ
 from app.infrastructure.email.smtp import SMTPEmailSender
 from app.infrastructure.taskiq.dispatcher import TaskiqNotificationTaskDispatcher
 

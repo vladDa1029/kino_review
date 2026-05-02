@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
-from app.domain.entities import BaseUserId
+
 from app.application.errors.query_param import FilterError
+from app.domain.entities import BaseUserId
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

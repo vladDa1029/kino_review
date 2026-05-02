@@ -1,13 +1,14 @@
 import abc
 from typing import Generic, Protocol, Sequence, TypeVar
-from app.application.common.pagination import Pagination
-from app.application.common.sorting import Sorting
-from app.application.common.filters import Filter
-from app.application.errors.query_param import SortingError
-from app.domain import entities
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.common.filters import Filter
+from app.application.common.pagination import Pagination
+from app.application.common.sorting import Sorting
+from app.application.errors.query_param import SortingError
+from app.domain import entities
 from app.domain.values import Email
 
 T = TypeVar("T", bound=entities.Base)

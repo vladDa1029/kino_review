@@ -18,7 +18,6 @@ from app.infrastructure.adapters.repository import UserAbstractRepository
 from app.infrastructure.generation import AbstractGenerationID
 from app.infrastructure.security.password_hasher import PasswordHasher
 
-
 log = structlog.get_logger(__file__)
 
 

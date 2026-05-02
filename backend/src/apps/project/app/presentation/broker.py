@@ -21,25 +21,25 @@ from app.application.commands import (
     HandleResourceReservationSucceededCommand,
     HandleResourceReservationSucceededHandler,
 )
+from app.application.ports.broker import EventPublisher
 from app.application.queries import (
     GetParticipantApprovalStateHandler,
     GetParticipantApprovalStateQuery,
     GetResourceApprovalStateHandler,
     GetResourceApprovalStateQuery,
 )
-from app.application.ports.broker import EventPublisher
 from app.infrastructure.broker.consumer import (
     PROJECT_MEMBER_APPROVED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE,
-    SHIFT_PARTICIPANT_RESERVED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_FAILED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_SUCCEEDED_QUEUE,
     SHIFT_PARTICIPANT_RESERVE_FAILED_QUEUE,
+    SHIFT_PARTICIPANT_RESERVED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_STATE_REQUESTED_QUEUE,
-    SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_FAILED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_SUCCEEDED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVE_FAILED_QUEUE,
+    SHIFT_RESOURCE_REQUEST_RESERVED_QUEUE,
     USER_EVENTS_EXCHANGE,
 )
 from app.infrastructure.broker.request_reply import BrokerReplyInbox, build_reply_queue
@@ -48,13 +48,13 @@ from app.presentation.schemas import (
     BrokerShiftParticipantApprovalStateRequested,
     BrokerShiftParticipantReservationCheckFailed,
     BrokerShiftParticipantReservationCheckSucceeded,
-    BrokerShiftParticipantReserveFailed,
     BrokerShiftParticipantReserved,
+    BrokerShiftParticipantReserveFailed,
     BrokerShiftResourceRequestApprovalStateRequested,
     BrokerShiftResourceRequestReservationCheckFailed,
     BrokerShiftResourceRequestReservationCheckSucceeded,
-    BrokerShiftResourceRequestReserveFailed,
     BrokerShiftResourceRequestReserved,
+    BrokerShiftResourceRequestReserveFailed,
 )
 
 

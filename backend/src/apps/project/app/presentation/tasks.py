@@ -8,7 +8,6 @@ from app.application.commands.reports import (
     ProcessShiftReportGenerationHandler,
 )
 
-
 PROCESS_SHIFT_REPORT_TASK_NAME = "project.process_shift_report_generation"
 
 

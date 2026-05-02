@@ -10,15 +10,6 @@ from app.application.commands.participants import (
     InviteShiftParticipantCommand,
     InviteShiftParticipantHandler,
 )
-from app.application.commands.reports import (
-    ArchiveShiftReportCommand,
-    ArchiveShiftReportHandler,
-    GenerateShiftReportCommand,
-    GenerateShiftReportHandler,
-    ProcessShiftReportGenerationCommand,
-    ProcessShiftReportGenerationHandler,
-)
-from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
 from app.application.commands.projects import (
     ApproveProjectMemberInvitationCommand,
     ApproveProjectMemberInvitationHandler,
@@ -35,6 +26,15 @@ from app.application.commands.projects import (
     UpdateProjectCommand,
     UpdateProjectHandler,
 )
+from app.application.commands.reports import (
+    ArchiveShiftReportCommand,
+    ArchiveShiftReportHandler,
+    GenerateShiftReportCommand,
+    GenerateShiftReportHandler,
+    ProcessShiftReportGenerationCommand,
+    ProcessShiftReportGenerationHandler,
+)
+from app.application.commands.reservation_outbox import ProcessReservationOutboxHandler
 from app.application.commands.resources import (
     ApproveResourceRequestCommand,
     ApproveResourceRequestHandler,
@@ -48,8 +48,8 @@ from app.application.ports.domain import (
     UserResourceTimeWindow,
 )
 from app.application.ports.reporting import (
-    ShiftReportSnapshot,
     ShiftReportResourceDetails,
+    ShiftReportSnapshot,
     ShiftReportUserDetails,
 )
 from app.application.ports.tasks import ScheduleShiftReportGenerationCommand

@@ -2,7 +2,8 @@ from abc import ABC
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Optional, Self
-from pydantic import Field, PrivateAttr, model_validator, AmqpDsn
+
+from pydantic import AmqpDsn, Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

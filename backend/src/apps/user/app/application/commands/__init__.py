@@ -1,28 +1,3 @@
-from app.application.commands.base import Command, CommandHandler
-from app.application.commands.create_microfon import (
-    CreateMicrofonCommand,
-    CreateMicrofonHandler,
-)
-from app.application.commands.create_description import (
-    CreateDescriptionCommand,
-    CreateDescriptionHandler,
-)
-from app.application.commands.update_description import (
-    UpdateDescriptionCommand,
-    UpdateDescriptionHandler,
-)
-from app.application.commands.add_spare_time import (
-    AddSpareTimeCommand,
-    AddSpareTimeHandler,
-)
-from app.application.commands.delete_spare_time import (
-    DeleteSpareTimeCommand,
-    DeleteSpareTimeHandler,
-)
-from app.application.commands.update_spare_time import (
-    UpdateSpareTimeCommand,
-    UpdateSpareTimeHandler,
-)
 from app.application.commands.add_equipment_free_time import (
     AddCameraFreeTimeCommand,
     AddCameraFreeTimeHandler,
@@ -39,32 +14,36 @@ from app.application.commands.add_equipment_free_time import (
     AddSoundFreeTimeCommand,
     AddSoundFreeTimeHandler,
 )
+from app.application.commands.add_image import AddImageCommand, AddImageHandler
+from app.application.commands.add_spare_time import (
+    AddSpareTimeCommand,
+    AddSpareTimeHandler,
+)
+from app.application.commands.approval_notifications import (
+    HandleParticipantApprovalRequestedCommand,
+    HandleParticipantApprovalRequestedHandler,
+    HandleProjectMemberInvitationRequestedCommand,
+    HandleProjectMemberInvitationRequestedHandler,
+    HandleResourceApprovalRequestedCommand,
+    HandleResourceApprovalRequestedHandler,
+)
+from app.application.commands.base import Command, CommandHandler
 from app.application.commands.check_availability import (
     CheckAvailabilityCommand,
     CheckAvailabilityHandler,
-)
-from app.application.commands.confirm_reservation import (
-    ConfirmReservationByTokenHandler,
-    ReservationConfirmationResult,
 )
 from app.application.commands.confirm_project_invitation import (
     ConfirmProjectInvitationByTokenHandler,
     ProjectInvitationConfirmationResult,
 )
-from app.application.commands.approval_notifications import (
-    HandleProjectMemberInvitationRequestedCommand,
-    HandleProjectMemberInvitationRequestedHandler,
-    HandleParticipantApprovalRequestedCommand,
-    HandleParticipantApprovalRequestedHandler,
-    HandleResourceApprovalRequestedCommand,
-    HandleResourceApprovalRequestedHandler,
+from app.application.commands.confirm_reservation import (
+    ConfirmReservationByTokenHandler,
+    ReservationConfirmationResult,
 )
-from app.application.commands.reserve_availability import (
-    ReserveAvailabilityCommand,
-    ReserveAvailabilityHandler,
+from app.application.commands.create_description import (
+    CreateDescriptionCommand,
+    CreateDescriptionHandler,
 )
-from app.application.commands.add_image import AddImageCommand, AddImageHandler
-from app.application.commands.remove_image import RemoveImageCommand, RemoveImageHandler
 from app.application.commands.create_equipment import (
     CreateCameraCommand,
     CreateCameraHandler,
@@ -74,30 +53,16 @@ from app.application.commands.create_equipment import (
     CreateLightHandler,
     CreateLightTripodCommand,
     CreateLightTripodHandler,
-    CreateSoundCommand,
-    CreateSoundHandler,
     CreateRequisiteCommand,
     CreateRequisiteHandler,
+    CreateSoundCommand,
+    CreateSoundHandler,
 )
-from app.application.commands.update_equipment import (
-    UpdateMicrofonCommand,
-    UpdateMicrofonHandler,
-    UpdateCameraCommand,
-    UpdateCameraHandler,
-    UpdateCameraTripodCommand,
-    UpdateCameraTripodHandler,
-    UpdateLightCommand,
-    UpdateLightHandler,
-    UpdateLightTripodCommand,
-    UpdateLightTripodHandler,
-    UpdateSoundCommand,
-    UpdateSoundHandler,
-    UpdateRequisiteCommand,
-    UpdateRequisiteHandler,
+from app.application.commands.create_microfon import (
+    CreateMicrofonCommand,
+    CreateMicrofonHandler,
 )
 from app.application.commands.delete_equipment import (
-    DeleteMicrofonCommand,
-    DeleteMicrofonHandler,
     DeleteCameraCommand,
     DeleteCameraHandler,
     DeleteCameraTripodCommand,
@@ -106,10 +71,45 @@ from app.application.commands.delete_equipment import (
     DeleteLightHandler,
     DeleteLightTripodCommand,
     DeleteLightTripodHandler,
-    DeleteSoundCommand,
-    DeleteSoundHandler,
+    DeleteMicrofonCommand,
+    DeleteMicrofonHandler,
     DeleteRequisiteCommand,
     DeleteRequisiteHandler,
+    DeleteSoundCommand,
+    DeleteSoundHandler,
+)
+from app.application.commands.delete_spare_time import (
+    DeleteSpareTimeCommand,
+    DeleteSpareTimeHandler,
+)
+from app.application.commands.remove_image import RemoveImageCommand, RemoveImageHandler
+from app.application.commands.reserve_availability import (
+    ReserveAvailabilityCommand,
+    ReserveAvailabilityHandler,
+)
+from app.application.commands.update_description import (
+    UpdateDescriptionCommand,
+    UpdateDescriptionHandler,
+)
+from app.application.commands.update_equipment import (
+    UpdateCameraCommand,
+    UpdateCameraHandler,
+    UpdateCameraTripodCommand,
+    UpdateCameraTripodHandler,
+    UpdateLightCommand,
+    UpdateLightHandler,
+    UpdateLightTripodCommand,
+    UpdateLightTripodHandler,
+    UpdateMicrofonCommand,
+    UpdateMicrofonHandler,
+    UpdateRequisiteCommand,
+    UpdateRequisiteHandler,
+    UpdateSoundCommand,
+    UpdateSoundHandler,
+)
+from app.application.commands.update_spare_time import (
+    UpdateSpareTimeCommand,
+    UpdateSpareTimeHandler,
 )
 
 __all__ = [

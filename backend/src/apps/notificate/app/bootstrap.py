@@ -3,7 +3,7 @@ from faststream.rabbit import RabbitBroker
 from taskiq import AsyncBroker
 from taskiq.middlewares import SmartRetryMiddleware
 
-from app.config import Log, Rabbitmq, SMTP, Settings, TaskIQ
+from app.config import SMTP, Log, Rabbitmq, Settings, TaskIQ
 from app.infrastructure.taskiq.broker import create_taskiq_broker
 from app.ioc import setup_providers
 from app.presentation.tasks import (

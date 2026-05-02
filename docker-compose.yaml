@@ -149,12 +149,13 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/src/apps/auth/app:/app/app
+      - ./backend/src/apps/auth/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
         alembic upgrade head &&
-        poetry run python -m uvicorn main:setup_start_test_app \
+        python -m uvicorn main:setup_start_test_app \
           --factory --host 0.0.0.0 --port 8001
     deploy:
       <<: *deploy-defaults
@@ -178,11 +179,12 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/src/apps/apigateway/app:/app/app
+      - ./backend/src/apps/apigateway/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
-        poetry run python -m uvicorn main:start_app_dev \
+        python -m uvicorn main:start_app_dev \
           --port 8000 --host 0.0.0.0 --factory --reload
     deploy:
       <<: *deploy-defaults
@@ -212,12 +214,13 @@ services:
     volumes:
       - ./backend/src/apps/user/app:/app/app
       - ./backend/src/apps/user/main.py:/app/main.py
+      - ./backend/src/apps/user/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
         alembic upgrade head &&
-        poetry run python -m uvicorn main:start_app_dev \
+        python -m uvicorn main:start_app_dev \
           --factory --host 0.0.0.0 --port 8002
     deploy:
       <<: *deploy-defaults
@@ -256,12 +259,13 @@ services:
       - ./backend/src/apps/project/app:/app/app
       - ./backend/src/apps/project/main.py:/app/main.py
       - ./backend/src/apps/project/worker.py:/app/worker.py
+      - ./backend/src/apps/project/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
         alembic upgrade head &&
-        poetry run python -m uvicorn main:start_app_dev \
+        python -m uvicorn main:start_app_dev \
           --factory --host 0.0.0.0 --port 8003
     deploy:
       <<: *deploy-defaults
@@ -292,12 +296,13 @@ services:
     volumes:
       - ./backend/src/apps/project/app:/app/app
       - ./backend/src/apps/project/worker.py:/app/worker.py
+      - ./backend/src/apps/project/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
         alembic upgrade head &&
-        poetry run taskiq worker worker:create_worker_taskiq_app
+        taskiq worker worker:create_worker_taskiq_app
     deploy:
       <<: *deploy-defaults
       resources: *resources-small
@@ -325,11 +330,12 @@ services:
       SMTP_FROM_NAME: Kino
     volumes:
       - ./backend/src/apps/notificate/app:/app/app
+      - ./backend/src/apps/notificate/.env:/app/.env:ro
     command:
       - sh
       - -c
       - |
-        poetry run python -m uvicorn main:start_app_dev \
+        python -m uvicorn main:start_app_dev \
           --factory --host 0.0.0.0 --port 8005
     deploy:
       <<: *deploy-defaults
@@ -351,10 +357,11 @@ services:
       SMTP_FROM_NAME: Kino
     volumes:
       - ./backend/src/apps/notificate/app:/app/app
+      - ./backend/src/apps/notificate/.env:/app/.env:ro
     command:
       - sh
       - -c
-      - poetry run taskiq worker worker:create_worker_taskiq_app
+      - taskiq worker worker:create_worker_taskiq_app
     deploy:
       <<: *deploy-defaults
       resources: *resources-small

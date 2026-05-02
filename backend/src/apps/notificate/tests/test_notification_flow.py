@@ -9,8 +9,8 @@ from app.application.commands.send_email import (
     SendNotificationEmailHandler,
 )
 from app.config import TaskIQ
-from app.infrastructure.taskiq.dispatcher import TaskiqNotificationTaskDispatcher
 from app.infrastructure.taskiq.broker import create_taskiq_broker
+from app.infrastructure.taskiq.dispatcher import TaskiqNotificationTaskDispatcher
 
 
 class FakeDispatcher:

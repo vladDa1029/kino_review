@@ -8,16 +8,12 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.application.commands.documents import UploadShiftDocumentHandler
 from app.application.commands.participants import (
     ConfirmShiftParticipantHandler,
     DeclineShiftParticipantHandler,
     InviteShiftParticipantHandler,
 )
-from app.application.commands.reports import (
-    ArchiveShiftReportHandler,
-    GenerateShiftReportHandler,
-)
-from app.application.commands.documents import UploadShiftDocumentHandler
 from app.application.commands.projects import (
     ChangeProjectMemberRoleHandler,
     CreateProjectHandler,
@@ -26,6 +22,10 @@ from app.application.commands.projects import (
     InviteProjectMemberHandler,
     RemoveProjectMemberHandler,
     UpdateProjectHandler,
+)
+from app.application.commands.reports import (
+    ArchiveShiftReportHandler,
+    GenerateShiftReportHandler,
 )
 from app.application.commands.resources import (
     ApproveResourceRequestHandler,
@@ -44,10 +44,6 @@ from app.application.ports.domain import (
     UserResourceItem,
 )
 from app.application.ports.transaction import TransactionManager
-from app.application.queries.projects import (
-    GetProjectHandler,
-    ListActorProjectsHandler,
-)
 from app.application.queries.admin import (
     GetAdminDocumentDownloadUrlHandler,
     GetAdminProjectHandler,
@@ -58,12 +54,21 @@ from app.application.queries.admin import (
     ListAdminProjectsHandler,
     ListAdminShiftReportsHandler,
 )
-from app.application.queries.reports import GetReportDownloadUrlHandler, GetReportHandler, ListShiftReportsHandler
+from app.application.queries.projects import (
+    GetProjectHandler,
+    ListActorProjectsHandler,
+)
+from app.application.queries.reports import (
+    GetReportDownloadUrlHandler,
+    GetReportHandler,
+    ListShiftReportsHandler,
+)
 from app.application.queries.resources import (
     GetProjectMemberHandler,
     ListProjectMembersHandler,
 )
 from app.application.support import SystemClock
+from app.domain.entities import Document, ProjectMember, Shift, ShiftReport
 from app.domain.enums import (
     DocumentStatus,
     DocumentType,
@@ -75,7 +80,6 @@ from app.domain.enums import (
     ShiftReportGenerationStatus,
     ShiftStatus,
 )
-from app.domain.entities import Document, ProjectMember, Shift, ShiftReport
 from app.domain.errors.base import ApplicationError
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
@@ -89,6 +93,8 @@ from app.presentation import handlers
 from app.presentation.api import (
     PROJECT_API_DESCRIPTION,
     PROJECT_OPENAPI_TAGS,
+)
+from app.presentation.api import (
     router as project_router,
 )
 from tests.test_project_management_service import (
@@ -97,15 +103,15 @@ from tests.test_project_management_service import (
     FakeShiftReportTaskDispatcher,
     FakeStorage,
     FakeTx,
-    InMemoryDocumentRepo,
     FakeUserService,
+    InMemoryDocumentRepo,
+    InMemoryParticipantRepo,
     InMemoryProjectMemberRepo,
     InMemoryProjectRepo,
     InMemoryReservationOutboxRepo,
     InMemoryResourceRequestRepo,
     InMemoryShiftRepo,
     InMemoryShiftReportRepo,
-    InMemoryParticipantRepo,
 )
 
 
