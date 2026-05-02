@@ -52,6 +52,13 @@ class SqlAlchemyProjectRepository(SqlAlchemyRepository[Project], ProjectReposito
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Project)
 
+    async def list_all(self, *, include_archived: bool = False) -> list[Project]:
+        stmt = select(Project)
+        if not include_archived:
+            stmt = stmt.where(projects_table.c.status != int(ProjectStatus.ARCHIVED))
+        stmt = stmt.order_by(projects_table.c.created_at.desc())
+        return list((await self._session.execute(stmt)).scalars().all())
+
     async def list_by_user(self, user_id: UUID, *, include_archived: bool = False) -> list[Project]:
         stmt = (
             select(Project)

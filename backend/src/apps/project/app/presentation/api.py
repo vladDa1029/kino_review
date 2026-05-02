@@ -3,7 +3,7 @@ from uuid import UUID
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, File, Form, Header, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, Response, UploadFile, status
 
 from app.application.commands import (
     ArchiveShiftReportCommand,
@@ -44,6 +44,16 @@ from app.application.commands import (
     UploadShiftDocumentHandler,
 )
 from app.application.queries import (
+    GetAdminDocumentDownloadUrlHandler,
+    GetAdminDocumentDownloadUrlQuery,
+    GetAdminProjectHandler,
+    GetAdminProjectMemberHandler,
+    GetAdminProjectMemberQuery,
+    GetAdminProjectQuery,
+    GetAdminReportDownloadUrlHandler,
+    GetAdminReportDownloadUrlQuery,
+    GetAdminReportHandler,
+    GetAdminReportQuery,
     GetDocumentDownloadUrlHandler,
     GetDocumentDownloadUrlQuery,
     GetProjectHandler,
@@ -58,6 +68,12 @@ from app.application.queries import (
     GetReportQuery,
     HealthHandler,
     HealthQuery,
+    ListAdminProjectMembersHandler,
+    ListAdminProjectMembersQuery,
+    ListAdminProjectsHandler,
+    ListAdminProjectsQuery,
+    ListAdminShiftReportsHandler,
+    ListAdminShiftReportsQuery,
     ListShiftReportsHandler,
     ListShiftReportsQuery,
     ListActorProjectsHandler,
@@ -93,6 +109,7 @@ from app.presentation.schemas import (
     ShiftResponse,
     to_project_role_input,
 )
+from app.domain.errors.business import AccessDeniedError
 
 PROJECT_API_DESCRIPTION = """
 Project service owns project planning, membership, shifts, participants, resource requests,
@@ -102,10 +119,15 @@ Notes:
 - Final availability and reserve facts are owned by `user`.
 - Confirmation email delivery is owned by `notificate`.
 - Member resource discovery remains the legacy V2 HTTP-backed read path.
+- Admin read endpoints are available under `/admin/*` and require `X-User-Is-Superuser: true`.
 """.strip()
 
 PROJECT_OPENAPI_TAGS = [
     {"name": "system", "description": "Health and service-level endpoints."},
+    {
+        "name": "admin",
+        "description": "Administrative read-only endpoints guarded by X-User-Is-Superuser.",
+    },
     {"name": "projects", "description": "Project aggregate management endpoints."},
     {
         "name": "members",
@@ -134,6 +156,24 @@ PROJECT_OPENAPI_TAGS = [
 router = APIRouter(route_class=DishkaRoute)
 
 
+def _require_superuser_access(x_user_is_superuser: bool | None) -> None:
+    if x_user_is_superuser is not True:
+        raise AccessDeniedError("Admin access required.")
+
+
+def require_superuser_access(
+    x_user_is_superuser: Annotated[bool | None, Header(alias="X-User-Is-Superuser")] = None,
+) -> None:
+    _require_superuser_access(x_user_is_superuser)
+
+
+admin_router = APIRouter(
+    prefix="/admin",
+    route_class=DishkaRoute,
+    dependencies=[Depends(require_superuser_access)],
+)
+
+
 @router.get(
     "/health",
     tags=["system"],
@@ -142,6 +182,164 @@ router = APIRouter(route_class=DishkaRoute)
 )
 async def healthcheck(handler: FromDishka[HealthHandler]) -> dict:
     return await handler(HealthQuery())
+
+
+@admin_router.get(
+    "/projects",
+    response_model=ProjectListResponse,
+    tags=["admin"],
+    summary="List all projects for admins",
+    description="Returns all projects visible to service administrators. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_list_projects(
+    handler: FromDishka[ListAdminProjectsHandler],
+    include_archived: bool = False,
+) -> ProjectListResponse:
+    projects = await handler(ListAdminProjectsQuery(include_archived=include_archived))
+    return ProjectListResponse(items=[ProjectResponse.from_entity(project) for project in projects])
+
+
+@admin_router.get(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    tags=["admin"],
+    summary="Get project for admins",
+    description="Returns a project by id for service administrators. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_get_project(
+    project_id: UUID,
+    handler: FromDishka[GetAdminProjectHandler],
+) -> ProjectResponse:
+    project = await handler(GetAdminProjectQuery(project_id=project_id))
+    return ProjectResponse.from_entity(project)
+
+
+@admin_router.get(
+    "/projects/{project_id}/members",
+    response_model=ProjectMemberListResponse,
+    tags=["admin"],
+    summary="List project members for admins",
+    description="Returns project members without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_list_project_members(
+    project_id: UUID,
+    handler: FromDishka[ListAdminProjectMembersHandler],
+    user_id: UUID | None = None,
+    include_inactive: bool = False,
+) -> ProjectMemberListResponse:
+    members = await handler(
+        ListAdminProjectMembersQuery(
+            project_id=project_id,
+            user_id=user_id,
+            include_inactive=include_inactive,
+        )
+    )
+    return ProjectMemberListResponse(
+        items=[
+            ProjectMemberShortResponse(
+                oid=member.oid,
+                user_id=member.user_id,
+                role=to_project_role_input(member.role),
+                status=member.status,
+                invited_by=member.invited_by,
+                created_at=member.created_at,
+                updated_at=member.updated_at,
+            )
+            for member in members
+        ]
+    )
+
+
+@admin_router.get(
+    "/projects/{project_id}/members/{target_user_id}",
+    response_model=ProjectMemberResponse,
+    tags=["admin"],
+    summary="Get project member for admins",
+    description="Returns a project member by user id without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_get_project_member(
+    project_id: UUID,
+    target_user_id: UUID,
+    handler: FromDishka[GetAdminProjectMemberHandler],
+    include_inactive: bool = False,
+) -> ProjectMemberResponse:
+    member = await handler(
+        GetAdminProjectMemberQuery(
+            project_id=project_id,
+            target_user_id=target_user_id,
+            include_inactive=include_inactive,
+        )
+    )
+    return ProjectMemberResponse(
+        oid=member.oid,
+        project_id=project_id,
+        user_id=member.user_id,
+        role=to_project_role_input(member.role),
+        status=member.status,
+        invited_by=member.invited_by,
+        created_at=member.created_at,
+        updated_at=member.updated_at,
+    )
+
+
+@admin_router.get(
+    "/shifts/{shift_id}/reports",
+    response_model=ReportListResponse,
+    tags=["admin"],
+    summary="List shift reports for admins",
+    description="Returns report versions for a shift without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_list_shift_reports(
+    shift_id: UUID,
+    handler: FromDishka[ListAdminShiftReportsHandler],
+) -> ReportListResponse:
+    reports = await handler(ListAdminShiftReportsQuery(shift_id=shift_id))
+    return ReportListResponse(items=[ReportResponse.from_entity(report) for report in reports])
+
+
+@admin_router.get(
+    "/reports/{report_id}",
+    response_model=ReportResponse,
+    tags=["admin"],
+    summary="Get report metadata for admins",
+    description="Returns report metadata without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_get_report(
+    report_id: UUID,
+    handler: FromDishka[GetAdminReportHandler],
+) -> ReportResponse:
+    report = await handler(GetAdminReportQuery(report_id=report_id))
+    return ReportResponse.from_entity(report)
+
+
+@admin_router.get(
+    "/reports/{report_id}/download-url",
+    response_model=DocumentDownloadUrlResponse,
+    tags=["admin"],
+    summary="Get report download url for admins",
+    description="Returns a temporary download URL for a READY report without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_get_report_download_url(
+    report_id: UUID,
+    handler: FromDishka[GetAdminReportDownloadUrlHandler],
+) -> DocumentDownloadUrlResponse:
+    url = await handler(GetAdminReportDownloadUrlQuery(report_id=report_id))
+    return DocumentDownloadUrlResponse(download_url=url)
+
+
+@admin_router.get(
+    "/documents/{document_id}/download-url",
+    response_model=DocumentDownloadUrlResponse,
+    tags=["admin"],
+    summary="Get document download url for admins",
+    description="Returns a temporary download URL for a shift document without project-level RBAC checks. Access requires X-User-Is-Superuser=true.",
+)
+async def admin_get_document_download_url(
+    document_id: UUID,
+    handler: FromDishka[GetAdminDocumentDownloadUrlHandler],
+) -> DocumentDownloadUrlResponse:
+    url = await handler(GetAdminDocumentDownloadUrlQuery(document_id=document_id))
+    return DocumentDownloadUrlResponse(download_url=url)
 
 
 @router.post(
@@ -813,3 +1011,6 @@ async def reject_resource_request(
         )
     )
     return ShiftResourceRequestResponse.from_entity(request)
+
+
+router.include_router(admin_router)

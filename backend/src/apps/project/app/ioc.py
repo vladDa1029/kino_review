@@ -57,6 +57,16 @@ from app.application.ports.reporting import (
 )
 from app.application.ports.tasks import ShiftReportTaskDispatcher
 from app.application.ports.transaction import TransactionManager
+from app.application.queries.admin import (
+    GetAdminDocumentDownloadUrlHandler,
+    GetAdminProjectHandler,
+    GetAdminProjectMemberHandler,
+    GetAdminReportDownloadUrlHandler,
+    GetAdminReportHandler,
+    ListAdminProjectMembersHandler,
+    ListAdminProjectsHandler,
+    ListAdminShiftReportsHandler,
+)
 from app.application.queries.documents import GetDocumentDownloadUrlHandler
 from app.application.queries.reports import (
     GetReportDownloadUrlHandler,
@@ -230,6 +240,14 @@ def domain_services_provider() -> Provider:
 def use_case_provider() -> Provider:
     provider = Provider(scope=Scope.REQUEST)
     provider.provide(source=HealthHandler)
+    provider.provide(source=ListAdminProjectsHandler)
+    provider.provide(source=GetAdminProjectHandler)
+    provider.provide(source=ListAdminProjectMembersHandler)
+    provider.provide(source=GetAdminProjectMemberHandler)
+    provider.provide(source=ListAdminShiftReportsHandler)
+    provider.provide(source=GetAdminReportHandler)
+    provider.provide(source=GetAdminReportDownloadUrlHandler)
+    provider.provide(source=GetAdminDocumentDownloadUrlHandler)
     provider.provide(source=GetParticipantApprovalStateHandler)
     provider.provide(source=GetResourceApprovalStateHandler)
     provider.provide(source=GetProjectHandler)

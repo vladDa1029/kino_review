@@ -246,6 +246,15 @@ class InMemoryProjectRepo:
     async def get_by_id(self, project_id: UUID) -> Project | None:
         return self.data.get(project_id)
 
+    async def list_all(self, *, include_archived: bool = False) -> list[Project]:
+        projects = [
+            project
+            for project in self.data.values()
+            if include_archived or project.status != ProjectStatus.ARCHIVED
+        ]
+        projects.sort(key=lambda item: item.created_at, reverse=True)
+        return projects
+
     async def list_by_user(self, user_id: UUID, *, include_archived: bool = False) -> list[Project]:
         return [
             project

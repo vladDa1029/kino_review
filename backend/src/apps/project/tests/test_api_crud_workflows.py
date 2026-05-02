@@ -48,6 +48,16 @@ from app.application.queries.projects import (
     GetProjectHandler,
     ListActorProjectsHandler,
 )
+from app.application.queries.admin import (
+    GetAdminDocumentDownloadUrlHandler,
+    GetAdminProjectHandler,
+    GetAdminProjectMemberHandler,
+    GetAdminReportDownloadUrlHandler,
+    GetAdminReportHandler,
+    ListAdminProjectMembersHandler,
+    ListAdminProjectsHandler,
+    ListAdminShiftReportsHandler,
+)
 from app.application.queries.reports import GetReportDownloadUrlHandler, GetReportHandler, ListShiftReportsHandler
 from app.application.queries.resources import (
     GetProjectMemberHandler,
@@ -55,13 +65,17 @@ from app.application.queries.resources import (
 )
 from app.application.support import SystemClock
 from app.domain.enums import (
+    DocumentStatus,
+    DocumentType,
     ProjectMemberStatus,
     ProjectRole,
     ResourceRequestStatus,
     ShiftParticipantStatus,
+    ShiftReportActualityStatus,
+    ShiftReportGenerationStatus,
     ShiftStatus,
 )
-from app.domain.entities import ProjectMember
+from app.domain.entities import Document, ProjectMember, Shift, ShiftReport
 from app.domain.errors.base import ApplicationError
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
@@ -153,6 +167,16 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         projects=projects,
         project_members=members,
         membership_service=ProjectMembershipService(),
+    )
+    admin_list_projects_handler = ListAdminProjectsHandler(projects=projects)
+    admin_get_project_handler = GetAdminProjectHandler(projects=projects)
+    admin_list_members_handler = ListAdminProjectMembersHandler(
+        projects=projects,
+        project_members=members,
+    )
+    admin_get_member_handler = GetAdminProjectMemberHandler(
+        projects=projects,
+        project_members=members,
     )
     list_projects_handler = ListActorProjectsHandler(projects=projects)
     get_project_handler = GetProjectHandler(
@@ -316,6 +340,19 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         director_member_policy=DirectorMemberPolicy(),
         document_storage=storage,
     )
+    admin_list_shift_reports_handler = ListAdminShiftReportsHandler(
+        shift_reports=reports,
+        shifts=shifts,
+    )
+    admin_get_report_handler = GetAdminReportHandler(shift_reports=reports)
+    admin_get_report_download_url_handler = GetAdminReportDownloadUrlHandler(
+        shift_reports=reports,
+        document_storage=storage,
+    )
+    admin_get_document_download_url_handler = GetAdminDocumentDownloadUrlHandler(
+        documents=documents,
+        document_storage=storage,
+    )
     create_resource_request_handler = CreateResourceRequestHandler(
         transaction_manager=tx,
         clock=clock,
@@ -351,6 +388,10 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
     provider = Provider(scope=Scope.REQUEST)
     for instance, provides in (
         (create_project_handler, CreateProjectHandler),
+        (admin_list_projects_handler, ListAdminProjectsHandler),
+        (admin_get_project_handler, GetAdminProjectHandler),
+        (admin_list_members_handler, ListAdminProjectMembersHandler),
+        (admin_get_member_handler, GetAdminProjectMemberHandler),
         (list_projects_handler, ListActorProjectsHandler),
         (get_project_handler, GetProjectHandler),
         (update_project_handler, UpdateProjectHandler),
@@ -372,6 +413,10 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         (list_shift_reports_handler, ListShiftReportsHandler),
         (get_report_handler, GetReportHandler),
         (get_report_download_url_handler, GetReportDownloadUrlHandler),
+        (admin_list_shift_reports_handler, ListAdminShiftReportsHandler),
+        (admin_get_report_handler, GetAdminReportHandler),
+        (admin_get_report_download_url_handler, GetAdminReportDownloadUrlHandler),
+        (admin_get_document_download_url_handler, GetAdminDocumentDownloadUrlHandler),
         (create_resource_request_handler, CreateResourceRequestHandler),
         (approve_resource_request_handler, ApproveResourceRequestHandler),
         (reject_resource_request_handler, RejectResourceRequestHandler),
@@ -476,6 +521,153 @@ def test_project_http_crud_lifecycle() -> None:
     assert archived_list.json()["items"][0]["oid"] == project_id
 
 
+def test_admin_project_routes_require_superuser_header_and_bypass_project_rbac() -> None:
+    ctx = build_project_api_crud_context()
+    owner_id = uuid4()
+    invited_member_id = uuid4()
+    shift_id = uuid4()
+    report_id = uuid4()
+    document_id = uuid4()
+    start_time = now_utc() + timedelta(hours=1)
+    end_time = start_time + timedelta(hours=2)
+
+    try:
+        with TestClient(ctx.app) as client:
+            create_response = client.post(
+                "/projects",
+                headers={"X-User-Id": str(owner_id)},
+                json={"title": "Admin visible project", "description": "admin api"},
+            )
+            assert create_response.status_code == 200
+            project_id = UUID(create_response.json()["oid"])
+
+            invite_response = client.post(
+                f"/projects/{project_id}/members",
+                headers={"X-User-Id": str(owner_id)},
+                json={"user_id": str(invited_member_id), "role": "ACTOR"},
+            )
+            assert invite_response.status_code == 200
+
+            awaitable_shift = Shift(
+                oid=shift_id,
+                project_id=project_id,
+                title="Admin report shift",
+                description="admin",
+                start_time=start_time,
+                end_time=end_time,
+                status=ShiftStatus.APPROVED,
+                created_by=owner_id,
+                approved_by=owner_id,
+                approved_at=start_time,
+                created_at=start_time,
+                updated_at=start_time,
+            )
+            ctx.shifts.data[shift_id] = awaitable_shift
+            ctx.documents.data[document_id] = Document(
+                oid=document_id,
+                shift_id=shift_id,
+                doc_type=DocumentType.PLAN,
+                filename="plan.pdf",
+                title="Plan",
+                storage_key="documents/plan.pdf",
+                bucket="bucket",
+                mime_type="application/pdf",
+                size=128,
+                owner_id=owner_id,
+                description="admin visible",
+                version=1,
+                status=DocumentStatus.ACTIVE,
+                created_at=start_time,
+            )
+            ctx.reports.data[report_id] = ShiftReport(
+                oid=report_id,
+                project_id=project_id,
+                shift_id=shift_id,
+                version=1,
+                generation_status=ShiftReportGenerationStatus.READY,
+                actuality_status=ShiftReportActualityStatus.ACTUAL,
+                requested_by_user_id=owner_id,
+                file_name="admin-report.xlsx",
+                bucket="bucket",
+                storage_key="reports/admin-report.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                generated_at=start_time,
+                archived_at=None,
+                error_message=None,
+                stale_reason=None,
+                stale_marked_at=None,
+                created_at=start_time,
+                updated_at=start_time,
+            )
+
+            missing_header_response = client.get("/admin/projects")
+            false_header_response = client.get(
+                "/admin/projects",
+                headers={"X-User-Is-Superuser": "false"},
+            )
+            admin_headers = {"X-User-Is-Superuser": "true"}
+            admin_list_response = client.get(
+                "/admin/projects",
+                headers=admin_headers,
+                params={"include_archived": "true"},
+            )
+            admin_get_response = client.get(
+                f"/admin/projects/{project_id}",
+                headers=admin_headers,
+            )
+            admin_members_response = client.get(
+                f"/admin/projects/{project_id}/members",
+                headers=admin_headers,
+                params={"include_inactive": "true"},
+            )
+            admin_member_response = client.get(
+                f"/admin/projects/{project_id}/members/{invited_member_id}",
+                headers=admin_headers,
+                params={"include_inactive": "true"},
+            )
+            admin_reports_response = client.get(
+                f"/admin/shifts/{shift_id}/reports",
+                headers=admin_headers,
+            )
+            admin_report_response = client.get(
+                f"/admin/reports/{report_id}",
+                headers=admin_headers,
+            )
+            admin_report_download_response = client.get(
+                f"/admin/reports/{report_id}/download-url",
+                headers=admin_headers,
+            )
+            admin_document_download_response = client.get(
+                f"/admin/documents/{document_id}/download-url",
+                headers=admin_headers,
+            )
+    finally:
+        asyncio.run(ctx.container.close())
+
+    assert missing_header_response.status_code == 403
+    assert missing_header_response.json() == {"detail": "Admin access required."}
+    assert false_header_response.status_code == 403
+    assert admin_list_response.status_code == 200
+    assert [item["oid"] for item in admin_list_response.json()["items"]] == [str(project_id)]
+    assert admin_get_response.status_code == 200
+    assert admin_get_response.json()["oid"] == str(project_id)
+    assert admin_members_response.status_code == 200
+    assert {item["user_id"] for item in admin_members_response.json()["items"]} == {
+        str(owner_id),
+        str(invited_member_id),
+    }
+    assert admin_member_response.status_code == 200
+    assert admin_member_response.json()["user_id"] == str(invited_member_id)
+    assert admin_reports_response.status_code == 200
+    assert [item["oid"] for item in admin_reports_response.json()["items"]] == [str(report_id)]
+    assert admin_report_response.status_code == 200
+    assert admin_report_response.json()["file_name"] == "admin-report.xlsx"
+    assert admin_report_download_response.status_code == 200
+    assert admin_report_download_response.json()["download_url"].endswith("reports/admin-report.xlsx")
+    assert admin_document_download_response.status_code == 200
+    assert admin_document_download_response.json()["download_url"].endswith("documents/plan.pdf")
+
+
 def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
     ctx = build_project_api_crud_context()
 
@@ -494,6 +686,7 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
     tag_names = {item["name"] for item in payload["tags"]}
     assert {
         "system",
+        "admin",
         "projects",
         "members",
         "member-resources",
@@ -505,6 +698,8 @@ def test_project_openapi_contains_domain_tags_and_service_metadata() -> None:
     }.issubset(tag_names)
 
     assert payload["paths"]["/health"]["get"]["tags"] == ["system"]
+    assert payload["paths"]["/admin/projects"]["get"]["tags"] == ["admin"]
+    assert payload["paths"]["/admin/reports/{report_id}"]["get"]["tags"] == ["admin"]
     assert payload["paths"]["/projects"]["post"]["tags"] == ["projects"]
     assert payload["paths"]["/projects/{project_id}/members"]["post"]["tags"] == ["members"]
     assert payload["paths"]["/projects/{project_id}/members/by-email"]["post"]["tags"] == ["members"]

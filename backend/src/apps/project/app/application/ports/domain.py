@@ -32,6 +32,9 @@ class ProjectRepository(Protocol):
     async def get_by_id(self, project_id: UUID) -> Project | None:
         raise NotImplementedError
 
+    async def list_all(self, *, include_archived: bool = False) -> list[Project]:
+        raise NotImplementedError
+
     async def list_by_user(self, user_id: UUID, *, include_archived: bool = False) -> list[Project]:
         raise NotImplementedError
 
