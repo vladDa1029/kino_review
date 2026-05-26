@@ -1,8 +1,18 @@
+const getProfileUsername = (profile) =>
+  profile?.username ??
+  profile?.description?.username ??
+  '';
+
+const getProfilePhone = (profile) =>
+  profile?.phone ??
+  profile?.description?.phone ??
+  '';
+
 export const PROFILE_COMPLETION_STORAGE_KEY = 'kinoflow.profileComplete';
 export const PROFILE_COMPLETION_EVENT = 'kinoflow:profile-complete-change';
 
 export const isProfileComplete = (profile) =>
-  Boolean(profile?.username?.trim() && profile?.phone?.trim());
+  Boolean(getProfileUsername(profile)?.trim() && getProfilePhone(profile)?.trim());
 
 export const setStoredProfileCompletion = (value) => {
   localStorage.setItem(PROFILE_COMPLETION_STORAGE_KEY, value ? 'true' : 'false');

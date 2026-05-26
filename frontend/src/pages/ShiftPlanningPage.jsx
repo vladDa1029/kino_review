@@ -36,20 +36,29 @@ const roleOptions = [
 ];
 
 const memberStatusLabels = {
-  0: 'Активен',
-  1: 'Неактивен',
+  0: 'Ожидает приглашения',
+  10: 'Активен',
+  20: 'Удален',
 };
 
 const participantStatusLabels = {
   0: 'Ожидает',
-  1: 'Подтвержден',
-  2: 'Отклонен',
+  10: 'Подтвержден',
+  20: 'Зарезервирован',
+  30: 'Отклонен',
+  40: 'Отменен',
+  50: 'Ошибка резерва',
 };
 
 const shiftStatusLabels = {
   0: 'Черновик',
-  1: 'Подтверждена',
+  10: 'На подтверждении',
+  20: 'Подтверждена',
+  30: 'Отменена',
+  40: 'Завершена',
 };
+
+const SHIFT_STATUS_APPROVED = 20;
 
 const documentTypeOptions = [
   { value: 'PLAN', label: 'План' },
@@ -105,6 +114,10 @@ const getRoleLabel = (role) => roleOptions.find((option) => option.value === rol
 const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Статус ${status}`;
 const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
 const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
+const formatShortId = (value = '') => {
+  const id = String(value);
+  return id.length > 13 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+};
 
 const readStorage = (key) => {
   try {
@@ -263,6 +276,19 @@ const ShiftPlanningPage = () => {
   const selectedShiftResourceRequests = useMemo(
     () => shiftResourceRequests[resourceRequestForm.shiftId] || [],
     [resourceRequestForm.shiftId, shiftResourceRequests],
+  );
+  const shiftStats = useMemo(
+    () => ({
+      shifts: selectedProjectShifts.length,
+      confirmed: selectedProjectShifts.filter((shift) => Number(shift.status) === SHIFT_STATUS_APPROVED).length,
+      participants: Object.values(shiftParticipants)
+        .flat()
+        .filter((participant) => selectedProjectShifts.some((shift) => shift.oid === participant.shift_id)).length,
+      requests: Object.values(shiftResourceRequests)
+        .flat()
+        .filter((request) => selectedProjectShifts.some((shift) => shift.oid === request.shift_id)).length,
+    }),
+    [selectedProjectShifts, shiftParticipants, shiftResourceRequests],
   );
 
   useEffect(() => {
@@ -660,12 +686,10 @@ const ShiftPlanningPage = () => {
     }
   };
 
-  const updateResourceRequestInState = (shiftId, requestId, nextRequest) => {
+  const removeResourceRequestFromState = (shiftId, requestId) => {
     setShiftResourceRequests((prev) => ({
       ...prev,
-      [shiftId]: (prev[shiftId] || []).map((request) =>
-        request.oid === requestId ? nextRequest : request,
-      ),
+      [shiftId]: (prev[shiftId] || []).filter((request) => request.oid !== requestId),
     }));
   };
 
@@ -677,8 +701,8 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      const updatedRequest = await approveResourceRequest(requestId);
-      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      await approveResourceRequest(requestId);
+      removeResourceRequestFromState(shiftId, requestId);
       toast.success('Запрос на ресурс подтвержден');
     } catch (error) {
       toast.error(error?.message || 'Не удалось подтвердить запрос на ресурс');
@@ -702,8 +726,8 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      const updatedRequest = await rejectResourceRequest(requestId, { reason });
-      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      await rejectResourceRequest(requestId, { reason });
+      removeResourceRequestFromState(shiftId, requestId);
       setRejectReasonsById((prev) => ({ ...prev, [requestId]: '' }));
       toast.success('Запрос на ресурс отклонен');
     } catch (error) {
@@ -761,11 +785,29 @@ const ShiftPlanningPage = () => {
 
   return (
     <section className="project-list-page shift-planning-page">
-      <div className="dashboard-panel project-list-hero">
+      <div className="dashboard-panel project-list-hero shift-planning-hero">
         <div>
           <span className="projects-panel-eyebrow">Смены</span>
           <h1>{memberProject ? `Планирование для "${memberProject.title}"` : 'Планирование смен'}</h1>
           <p>Создайте смену, затем пригласите участников с ролью и временным окном работы.</p>
+        </div>
+        <div className="shift-hero-stats" aria-label="Сводка по сменам">
+          <article>
+            <span>Смен</span>
+            <strong>{shiftStats.shifts}</strong>
+          </article>
+          <article>
+            <span>Подтверждено</span>
+            <strong>{shiftStats.confirmed}</strong>
+          </article>
+          <article>
+            <span>Участников</span>
+            <strong>{shiftStats.participants}</strong>
+          </article>
+          <article>
+            <span>Заявок</span>
+            <strong>{shiftStats.requests}</strong>
+          </article>
         </div>
       </div>
 
@@ -963,7 +1005,7 @@ const ShiftPlanningPage = () => {
                   <option value="">Выберите участника проекта</option>
                   {availableParticipantMembers.map((member) => (
                     <option key={member.user_id} value={member.user_id}>
-                      {member.user_id} - {member.isOwner ? 'Создатель' : getRoleLabel(member.role)}
+                      {formatShortId(member.user_id)} - {member.isOwner ? 'Создатель' : getRoleLabel(member.role)}
                     </option>
                   ))}
                 </select>
@@ -1030,7 +1072,7 @@ const ShiftPlanningPage = () => {
                     <article key={participant.oid} className="project-member-card">
                       <div>
                         <span className="project-type-label">{getParticipantStatusLabel(participant.status)}</span>
-                        <h3>{participant.user_id}</h3>
+                        <h3 title={participant.user_id}>{formatShortId(participant.user_id)}</h3>
                         <p>
                           {participantMember?.isOwner ? 'Создатель проекта' : getMemberStatusLabel(participantMember?.status)}
                           {' '}· {getRoleLabel(participant.role)}
@@ -1223,7 +1265,7 @@ const ShiftPlanningPage = () => {
                   <option value="">Выберите владельца</option>
                   {availableParticipantMembers.map((member) => (
                     <option key={member.user_id} value={member.user_id}>
-                      {member.user_id} - {member.isOwner ? 'Создатель' : getRoleLabel(member.role)}
+                      {formatShortId(member.user_id)} - {member.isOwner ? 'Создатель' : getRoleLabel(member.role)}
                     </option>
                   ))}
                 </select>
@@ -1288,11 +1330,11 @@ const ShiftPlanningPage = () => {
                   const canDecide = currentUserId && request.resource_owner_user_id === currentUserId;
 
                   return (
-                    <article key={request.oid} className="project-member-card">
-                      <div>
+                    <article key={request.oid} className="project-member-card shift-resource-request-card">
+                      <div className="shift-resource-request-copy">
                         <span className="project-type-label">{request.resource_type || 'Ресурс'}</span>
-                        <h3>{request.resource_id}</h3>
-                        <p>Владелец: {request.resource_owner_user_id}</p>
+                        <h3 title={request.resource_id}>{formatShortId(request.resource_id)}</h3>
+                        <p title={request.resource_owner_user_id}>Владелец: {formatShortId(request.resource_owner_user_id)}</p>
                         <p>{formatDateTime(request.time_from)} - {formatDateTime(request.time_to)}</p>
                         {request.rejection_reason ? <p>Причина отказа: {request.rejection_reason}</p> : null}
                         {request.reserve_failure_reason ? <p>Ошибка резерва: {request.reserve_failure_reason}</p> : null}

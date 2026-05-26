@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from './context/useAuth';
 import AuthModal from './components/AuthModal';
+import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ThemeToggle from './components/ThemeToggle';
 import AppToastContainer from './components/ToastContainer';
-import UserList from './components/UserList';
+import AdminProjectDetailsPage from './pages/AdminProjectDetailsPage';
+import AdminProjectsPage from './pages/AdminProjectsPage';
+import AdminReportsPage from './pages/AdminReportsPage';
+import AdminUserDetailsPage from './pages/AdminUserDetailsPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectListPage from './pages/ProjectListPage';
@@ -20,6 +25,7 @@ import {
   PROFILE_COMPLETION_EVENT,
   setStoredProfileCompletion,
 } from './utils/profileCompletion';
+import { ADMIN_AUTH_BYPASS } from './constants';
 import './App.css';
 
 const MenuIcon = () => (
@@ -96,15 +102,35 @@ const LogoutIcon = () => (
   </svg>
 );
 
+const AdminIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M12 3L19 6V11C19 15.4183 16.134 19.3525 12 20.7C7.86603 19.3525 5 15.4183 5 11V6L12 3Z"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.5 11.5L11.2 13.2L14.8 9.6"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, handleLogout, isAuthModalOpen, setIsAuthModalOpen } = useAuth();
+  const { token, userData, handleLogout, isAuthModalOpen, setIsAuthModalOpen } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [isAppMenuOpen, setIsAppMenuOpen] = useState(false);
   const [isProfileCompleteState, setIsProfileCompleteState] = useState(() => getStoredProfileCompletion());
   const [isProfileStatusLoading, setIsProfileStatusLoading] = useState(false);
+  const [hasProfileStatusResolved, setHasProfileStatusResolved] = useState(false);
   const hasShownProfileGuardRef = useRef(false);
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
   useEffect(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -120,6 +146,7 @@ function App() {
       setIsAppMenuOpen(false);
       setIsProfileCompleteState(false);
       setIsProfileStatusLoading(false);
+      setHasProfileStatusResolved(false);
       hasShownProfileGuardRef.current = false;
     }
   }, [token]);
@@ -131,6 +158,7 @@ function App() {
 
     let isMounted = true;
     setIsProfileStatusLoading(true);
+    setHasProfileStatusResolved(false);
 
     getUserDescription()
       .then((data) => {
@@ -158,6 +186,7 @@ function App() {
       .finally(() => {
         if (isMounted) {
           setIsProfileStatusLoading(false);
+          setHasProfileStatusResolved(true);
         }
       });
 
@@ -178,7 +207,15 @@ function App() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || isProfileStatusLoading || isProfileCompleteState || location.pathname === '/profile') {
+    if (
+      !token ||
+      userData?.is_superuser ||
+      !hasProfileStatusResolved ||
+      isProfileStatusLoading ||
+      isProfileCompleteState ||
+      location.pathname === '/profile' ||
+      location.pathname.startsWith('/admin')
+    ) {
       return;
     }
 
@@ -188,7 +225,7 @@ function App() {
     }
 
     navigate('/profile', { replace: true });
-  }, [isProfileCompleteState, isProfileStatusLoading, location.pathname, navigate, token]);
+  }, [hasProfileStatusResolved, isProfileCompleteState, isProfileStatusLoading, location.pathname, navigate, token, userData?.is_superuser]);
 
   useEffect(() => {
     setIsAppMenuOpen(false);
@@ -229,7 +266,15 @@ function App() {
   };
 
   const handleMenuNavigation = (path) => {
-    if (token && !isProfileStatusLoading && !isProfileCompleteState && path !== '/profile') {
+    if (
+      token &&
+      !userData?.is_superuser &&
+      hasProfileStatusResolved &&
+      !isProfileStatusLoading &&
+      !isProfileCompleteState &&
+      path !== '/profile' &&
+      !path.startsWith('/admin')
+    ) {
       toast.warning('Сначала заполните ФИО и телефон в профиле');
       hasShownProfileGuardRef.current = true;
       navigate('/profile');
@@ -250,7 +295,8 @@ function App() {
     <div className={`app-container ${darkMode ? 'dark-theme' : ''}`}>
       <AppToastContainer darkMode={darkMode} />
 
-      <header className="app-header">
+      {!isAdminRoute ? (
+        <header className="app-header">
         <div className="logo-container">
           <h1 className="logo">KinoFlow</h1>
         </div>
@@ -274,12 +320,20 @@ function App() {
               <MenuIcon />
             </button>
           ) : (
-            <button className="auth-btn" onClick={() => setIsAuthModalOpen(true)}>
-              Войти
-            </button>
+            <>
+              {ADMIN_AUTH_BYPASS ? (
+                <button className="secondary-btn admin-preview-btn" onClick={() => navigate('/admin')}>
+                  Admin preview
+                </button>
+              ) : null}
+              <button className="auth-btn" onClick={() => setIsAuthModalOpen(true)}>
+                Войти
+              </button>
+            </>
           )}
         </div>
-      </header>
+        </header>
+      ) : null}
 
       <Routes>
         <Route path="/" element={<HomePage onOpenAuth={() => setIsAuthModalOpen(true)} />} />
@@ -316,18 +370,33 @@ function App() {
           )}
         />
         <Route
+          path="/admin"
+          element={(
+            <ProtectedRoute requireSuperuser>
+              <AdminLayout darkMode={darkMode} onToggleTheme={toggleTheme} />
+            </ProtectedRoute>
+          )}
+        >
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:userId" element={<AdminUserDetailsPage />} />
+          <Route path="projects" element={<AdminProjectsPage />} />
+          <Route path="projects/:projectId" element={<AdminProjectDetailsPage />} />
+          <Route path="reports" element={<AdminReportsPage />} />
+        </Route>
+        <Route
           path="/users"
           element={(
-            <ProtectedRoute>
-              <UserList />
+            <ProtectedRoute requireSuperuser>
+              <AdminUsersPage />
             </ProtectedRoute>
           )}
         />
         <Route
           path="/welcome"
           element={(
-            <ProtectedRoute>
-              <UserList />
+            <ProtectedRoute requireSuperuser>
+              <AdminUsersPage />
             </ProtectedRoute>
           )}
         />
@@ -396,6 +465,16 @@ function App() {
                   <ProfileIcon />
                   <span>Профиль</span>
                 </button>
+                {userData?.is_superuser ? (
+                  <button
+                    type="button"
+                    className={`app-drawer-link ${location.pathname.startsWith('/admin') ? 'is-active' : ''}`}
+                    onClick={() => handleMenuNavigation('/admin')}
+                  >
+                    <AdminIcon />
+                    <span>РђРґРјРёРЅРєР°</span>
+                  </button>
+                ) : null}
               </nav>
 
               <div className="app-drawer-footer">

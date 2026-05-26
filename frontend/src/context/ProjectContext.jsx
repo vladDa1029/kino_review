@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 
 import { listProjects } from '../services/api';
@@ -19,8 +19,12 @@ export const ProjectProvider = ({ children }) => {
     localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || '',
   );
   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
+  const includeArchivedRef = useRef(false);
 
-  const refreshProjects = useCallback(async ({ includeArchived = false } = {}) => {
+  const refreshProjects = useCallback(async ({ includeArchived } = {}) => {
+    const shouldIncludeArchived = includeArchived ?? includeArchivedRef.current;
+    includeArchivedRef.current = shouldIncludeArchived;
+
     if (!getAccessToken()) {
       setProjects([]);
       setNewProjectIds([]);
@@ -33,7 +37,7 @@ export const ProjectProvider = ({ children }) => {
     setIsProjectsLoading(true);
 
     try {
-      const response = await listProjects({ includeArchived });
+      const response = await listProjects({ includeArchived: shouldIncludeArchived });
       const nextProjects = Array.isArray(response?.items) ? response.items : [];
       const nextProjectIds = nextProjects.map(getProjectId).filter(Boolean);
       const storedSeenIds = (() => {

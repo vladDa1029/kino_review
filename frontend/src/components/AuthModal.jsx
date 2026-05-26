@@ -93,7 +93,7 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!isLogin && passwordStrength < 3) {
+    if (!isLogin && passwordStrength < 2) {
       return;
     }
 
@@ -213,6 +213,8 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                         className="form-input"
                         value={formData.password}
                         onChange={handleInputChange}
+                        minLength={4}
+                        maxLength={24}
                         required
                       />
                       <button
@@ -231,12 +233,15 @@ const AuthModal = ({ showAuth, setShowAuth }) => {
                         strength={passwordStrength}
                       />
                     )}
+                    {!isLogin ? (
+                      <p className="auth-password-note">Пароль от 4 до 24 символов.</p>
+                    ) : null}
                   </div>
 
                   <button
                     type="submit"
                     className="auth-submit-btn"
-                    disabled={!isLogin && passwordStrength < 3}
+                    disabled={!isLogin && passwordStrength < 2}
                   >
                     {isLogin ? 'Войти' : 'Зарегистрироваться'}
                   </button>

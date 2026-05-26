@@ -57,24 +57,36 @@ const roleOptions = [
 ];
 
 const statusLabels = {
-  0: 'Активен',
-  1: 'Архивирован',
+  10: 'Активен',
+  20: 'Архивирован',
 };
 
+const PROJECT_STATUS_ACTIVE = 10;
+const PROJECT_STATUS_ARCHIVED = 20;
+
 const memberStatusLabels = {
-  0: 'Активен',
-  1: 'Неактивен',
+  0: 'Ожидает приглашения',
+  10: 'Активен',
+  20: 'Удален',
 };
+
+const PROJECT_MEMBER_STATUS_ACTIVE = 10;
 
 const participantStatusLabels = {
   0: 'Ожидает',
-  1: 'Подтвержден',
-  2: 'Отклонен',
+  10: 'Подтвержден',
+  20: 'Зарезервирован',
+  30: 'Отклонен',
+  40: 'Отменен',
+  50: 'Ошибка резерва',
 };
 
 const shiftStatusLabels = {
   0: 'Черновик',
-  1: 'Подтверждена',
+  10: 'На подтверждении',
+  20: 'Подтверждена',
+  30: 'Отменена',
+  40: 'Завершена',
 };
 
 const formatDate = (value) => {
@@ -89,6 +101,8 @@ const formatDate = (value) => {
 const getProjectId = (project) => project.oid || project.id;
 
 const getStatusLabel = (status) => statusLabels[status] || `Статус ${status}`;
+const isProjectActive = (project) => Number(project?.status) === PROJECT_STATUS_ACTIVE;
+const isProjectArchived = (project) => Number(project?.status) === PROJECT_STATUS_ARCHIVED;
 
 const getRoleLabel = (role) => roleOptions.find((option) => option.value === role)?.label || role;
 
@@ -200,6 +214,11 @@ const isUuid = (value) =>
 
 const isEmail = (value) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(value);
+
+const formatShortId = (value = '') => {
+  const id = String(value);
+  return id.length > 13 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+};
 
 const getMemberInitials = (member) => {
   const source = member.displayName || member.user_id || '';
@@ -313,8 +332,8 @@ const ProjectListPage = () => {
   const counters = useMemo(
     () => ({
       total: projects.length,
-      active: projects.filter((project) => project.status === 0).length,
-      archived: projects.filter((project) => project.status !== 0).length,
+      active: projects.filter(isProjectActive).length,
+      archived: projects.filter(isProjectArchived).length,
     }),
     [projects],
   );
@@ -377,7 +396,7 @@ const ProjectListPage = () => {
           ...member,
           displayName: member.user_id,
           displayEmail: '',
-          isPendingAcceptance: !member.isOwner && member.status !== 0,
+          isPendingAcceptance: !member.isOwner && Number(member.status) !== PROJECT_MEMBER_STATUS_ACTIVE,
         };
       }),
     [displayedMembers],
@@ -390,8 +409,8 @@ const ProjectListPage = () => {
         projectView === 'all'
           ? true
           : projectView === 'archived'
-            ? project.status !== 0
-            : project.status === 0;
+            ? isProjectArchived(project)
+            : isProjectActive(project);
 
       if (!matchesView) {
         return false;
@@ -491,6 +510,11 @@ const ProjectListPage = () => {
 
   const handleArchiveProject = async (project) => {
     const projectId = getProjectId(project);
+
+    if (isProjectArchived(project)) {
+      toast.info('Проект уже находится в архиве');
+      return;
+    }
 
     if (!projectId || !window.confirm(`Архивировать проект "${project.title}"?`)) {
       return;
@@ -642,6 +666,7 @@ const ProjectListPage = () => {
     const userId = memberForm.userId.trim();
     const email = memberForm.email.trim().toLowerCase();
     const inviteValue = inviteMode === 'email' ? email : userId;
+    const projectStillExists = projects.some((project) => getProjectId(project) === memberProjectId);
     setMemberInviteError('');
 
     if (!memberProjectId || !inviteValue) {
@@ -650,6 +675,14 @@ const ProjectListPage = () => {
         : 'Выберите проект и укажите ID пользователя для приглашения';
       setMemberInviteError(message);
       toast.error(message);
+      return;
+    }
+
+    if (!projectStillExists) {
+      const message = 'Выбранный проект больше недоступен. Обновите список проектов и попробуйте снова.';
+      setMemberInviteError(message);
+      toast.error(message);
+      await loadProjects();
       return;
     }
 
@@ -710,6 +743,14 @@ const ProjectListPage = () => {
       setMemberForm(initialMemberForm);
       setMemberInviteError('');
     } catch (error) {
+      if (error?.status === 404) {
+        const message = 'Проект не найден или больше недоступен для приглашения участников. Обновите список проектов.';
+        setMemberInviteError(message);
+        toast.error(message);
+        await loadProjects();
+        return;
+      }
+
       const message = error?.message || 'Не удалось пригласить участника';
       setMemberInviteError(message);
       toast.error(message);
@@ -1082,23 +1123,27 @@ const ProjectListPage = () => {
                 >
                   {activeProjectId === getProjectId(featuredProject) ? 'Открыт' : 'Открыть'}
                 </button>
-                <button
-                  type="button"
-                  className="ghost-action-btn project-inline-action"
-                  onClick={() => handleEditProject(featuredProject)}
-                >
-                  <EditIcon />
-                  <span>Изменить</span>
-                </button>
-                <button
-                  type="button"
-                  className="ghost-action-btn danger project-inline-action"
-                  onClick={() => handleArchiveProject(featuredProject)}
-                  disabled={archivingId === getProjectId(featuredProject)}
-                >
-                  <ArchiveIcon />
-                  <span>{archivingId === getProjectId(featuredProject) ? 'Архивируем...' : 'В архив'}</span>
-                </button>
+                {!isProjectArchived(featuredProject) ? (
+                  <>
+                    <button
+                      type="button"
+                      className="ghost-action-btn project-inline-action"
+                      onClick={() => handleEditProject(featuredProject)}
+                    >
+                      <EditIcon />
+                      <span>Изменить</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-action-btn danger project-inline-action"
+                      onClick={() => handleArchiveProject(featuredProject)}
+                      disabled={archivingId === getProjectId(featuredProject)}
+                    >
+                      <ArchiveIcon />
+                      <span>{archivingId === getProjectId(featuredProject) ? 'Архивируем...' : 'В архив'}</span>
+                    </button>
+                  </>
+                ) : null}
               </div>
             </article>
           )}
@@ -1109,6 +1154,7 @@ const ProjectListPage = () => {
               const isArchiving = archivingId === projectId;
               const isActiveProject = activeProjectId === projectId;
               const isOwner = currentUserId && project.owner_id === currentUserId;
+              const isArchived = isProjectArchived(project);
 
               return (
                 <article
@@ -1141,23 +1187,27 @@ const ProjectListPage = () => {
                     >
                       {isActiveProject ? 'Открыт' : 'Открыть'}
                     </button>
-                    <button
-                      type="button"
-                      className="ghost-action-btn project-inline-action"
-                      onClick={() => handleEditProject(project)}
-                    >
-                      <EditIcon />
-                      <span>Изменить</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-action-btn danger project-inline-action"
-                      onClick={() => handleArchiveProject(project)}
-                      disabled={isArchiving}
-                    >
-                      <ArchiveIcon />
-                      <span>{isArchiving ? 'Архивируем...' : 'В архив'}</span>
-                    </button>
+                    {!isArchived ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ghost-action-btn project-inline-action"
+                          onClick={() => handleEditProject(project)}
+                        >
+                          <EditIcon />
+                          <span>Изменить</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-action-btn danger project-inline-action"
+                          onClick={() => handleArchiveProject(project)}
+                          disabled={isArchiving}
+                        >
+                          <ArchiveIcon />
+                          <span>{isArchiving ? 'Архивируем...' : 'В архив'}</span>
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -1533,7 +1583,6 @@ const ProjectListPage = () => {
             <div className="project-members-table">
               <div className="project-members-table-head">
                 <span>Пользователь</span>
-                <span>ID user</span>
                 <span>Email</span>
                 <span>Роль</span>
                 <span>Добавлен</span>
@@ -1544,6 +1593,7 @@ const ProjectListPage = () => {
                 const isCurrentUser = member.user_id === currentUserId;
                 const isUpdating = updatingMemberId === member.user_id;
                 const isRemoving = removingMemberId === member.user_id;
+                const shortUserId = formatShortId(member.user_id);
 
                 return (
                   <div key={member.oid || member.user_id} className="project-members-table-row">
@@ -1552,15 +1602,13 @@ const ProjectListPage = () => {
                         {getMemberInitials(member)}
                       </div>
                       <div className="project-member-copy">
-                        <h3>
-                          {member.displayName}
+                        <h3 title={member.user_id}>
+                          {member.displayName && member.displayName !== member.user_id ? member.displayName : shortUserId}
                           {isCurrentUser ? <span className="project-member-self-badge">Это вы</span> : null}
                         </h3>
-                        <p>{member.user_id}</p>
+                        <p>{member.isOwner ? 'Создатель проекта' : 'Участник проекта'}</p>
                       </div>
                     </div>
-
-                    <div className="project-members-id-cell">{member.user_id}</div>
 
                     <div className="project-members-status-cell">
                       <span>{member.displayEmail || 'Почта не указана'}</span>

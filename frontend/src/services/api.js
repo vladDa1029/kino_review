@@ -117,6 +117,39 @@ const createShiftDocumentFormData = (payload) => {
   return formData;
 };
 
+const ADMIN_PROJECT_HEADERS = {
+  'X-User-Is-Superuser': 'true',
+};
+
+const getAdminUserBasePath = (userId) => `/admin/user/${userId}`;
+
+const createAdminUserCollectionHelpers = (resourcePath, buildListParams) => ({
+  create: async (userId, payload) =>
+    createJsonRequest(`${getAdminUserBasePath(userId)}/${resourcePath}`, 'POST', payload),
+  list: async (userId, params = {}) =>
+    apiClient(
+      withQuery(`${getAdminUserBasePath(userId)}/${resourcePath}`, buildListParams(params)),
+      {
+        method: 'GET',
+      },
+    ),
+  update: async (userId, itemId, payload) =>
+    createJsonRequest(`${getAdminUserBasePath(userId)}/${resourcePath}/${itemId}`, 'PUT', payload),
+  remove: async (userId, itemId) =>
+    apiClient(`${getAdminUserBasePath(userId)}/${resourcePath}/${itemId}`, {
+      method: 'DELETE',
+    }),
+});
+
+const createAdminUserFreeTimeHelper = (resourcePath) => ({
+  create: async (userId, itemId, payload) =>
+    createJsonRequest(`${getAdminUserBasePath(userId)}/${resourcePath}/${itemId}/free-times`, 'POST', payload),
+  list: async (userId, itemId) =>
+    apiClient(`${getAdminUserBasePath(userId)}/${resourcePath}/${itemId}/free-times`, {
+      method: 'GET',
+    }),
+});
+
 const microfonsApi = createCollectionHelpers('/user/users/me/microfons', buildEquipmentListParams);
 const camerasApi = createCollectionHelpers('/user/users/me/cameras', buildEquipmentListParams);
 const cameraTripodsApi = createCollectionHelpers('/user/users/me/camera-tripods', buildEquipmentListParams);
@@ -124,12 +157,20 @@ const lightsApi = createCollectionHelpers('/user/users/me/lights', buildEquipmen
 const lightTripodsApi = createCollectionHelpers('/user/users/me/light-tripods', buildEquipmentListParams);
 const soundsApi = createCollectionHelpers('/user/users/me/sounds', buildEquipmentListParams);
 const requisitesApi = createCollectionHelpers('/user/users/me/requisites', buildRequisiteListParams);
+const adminMicrofonsApi = createAdminUserCollectionHelpers('microfons', buildEquipmentListParams);
+const adminCamerasApi = createAdminUserCollectionHelpers('cameras', buildEquipmentListParams);
+const adminCameraTripodsApi = createAdminUserCollectionHelpers('camera-tripods', buildEquipmentListParams);
+const adminLightsApi = createAdminUserCollectionHelpers('lights', buildEquipmentListParams);
+const adminLightTripodsApi = createAdminUserCollectionHelpers('light-tripods', buildEquipmentListParams);
+const adminSoundsApi = createAdminUserCollectionHelpers('sounds', buildEquipmentListParams);
+const adminRequisitesApi = createAdminUserCollectionHelpers('requisites', buildRequisiteListParams);
 
 export const register = async (email, password) =>
   apiClient('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
     withCredentials: true,
+    skipAuth: true,
   });
 
 export const login = async (username, password) => {
@@ -145,7 +186,8 @@ export const login = async (username, password) => {
     },
     body: formData,
     withCredentials: true,
-  });
+    skipAuth: true,
+    });
 };
 
 export const refreshToken = async () =>
@@ -162,16 +204,174 @@ export const logout = async () =>
     withCredentials: true,
   });
 
-export const getUsers = async (page = 1, pageSize = 5) =>
+export const getUsers = async (
+  page = 1,
+  pageSize = 5,
+  {
+    baseId,
+    sortBy,
+    sortDir = 'asc',
+    search,
+    createdFrom,
+    createdTo,
+  } = {},
+) =>
   apiClient(
-    withQuery('/auth/users', {
+    withQuery('/auth/admin/users', {
+      base_id: baseId,
       page,
       page_size: pageSize,
+      sort_by: sortBy,
+      sort_dir: sortDir,
+      search,
+      created_from: createdFrom,
+      created_to: createdTo,
     }),
     {
       method: 'GET',
     },
   );
+
+export const createAdminUser = async (payload) =>
+  createJsonRequest('/auth/admin/users', 'POST', payload);
+
+export const getAdminUser = async (userId) =>
+  apiClient(`/auth/admin/users/${userId}`, {
+    method: 'GET',
+  });
+
+export const updateAdminUser = async (userId, payload) =>
+  createJsonRequest(`/auth/admin/users/${userId}`, 'PATCH', payload);
+
+export const deleteAdminUser = async (userId) =>
+  apiClient(`/auth/admin/users/${userId}`, {
+    method: 'DELETE',
+  });
+
+export const getAdminUserHealth = async () =>
+  apiClient('/admin/user/health', {
+    method: 'GET',
+  });
+
+export const checkAdminUserExists = async (userId) =>
+  apiClient(getAdminUserBasePath(userId), {
+    method: 'GET',
+  });
+
+export const createAdminUserDescription = async (userId, payload) =>
+  createJsonRequest(`${getAdminUserBasePath(userId)}/description`, 'POST', payload);
+
+export const getAdminUserDescription = async (userId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/description`, {
+    method: 'GET',
+  });
+
+export const updateAdminUserDescription = async (userId, descriptionId, payload) =>
+  createJsonRequest(`${getAdminUserBasePath(userId)}/description/${descriptionId}`, 'PUT', payload);
+
+export const createAdminSpareTime = async (userId, payload) =>
+  createJsonRequest(`${getAdminUserBasePath(userId)}/spare-times`, 'POST', payload);
+
+export const listAdminSpareTimes = async (userId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/spare-times`, {
+    method: 'GET',
+  });
+
+export const getAdminSpareTime = async (userId, spareTimeId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/spare-times/${spareTimeId}`, {
+    method: 'GET',
+  });
+
+export const updateAdminSpareTime = async (userId, spareTimeId, payload) =>
+  createJsonRequest(`${getAdminUserBasePath(userId)}/spare-times/${spareTimeId}`, 'PUT', payload);
+
+export const deleteAdminSpareTime = async (userId, spareTimeId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/spare-times/${spareTimeId}`, {
+    method: 'DELETE',
+  });
+
+export const createAdminMicrofon = adminMicrofonsApi.create;
+export const listAdminMicrofons = adminMicrofonsApi.list;
+export const updateAdminMicrofon = adminMicrofonsApi.update;
+export const deleteAdminMicrofon = adminMicrofonsApi.remove;
+export const addAdminMicrofonFreeTime = createAdminUserFreeTimeHelper('microfons').create;
+export const listAdminMicrofonFreeTimes = createAdminUserFreeTimeHelper('microfons').list;
+
+export const createAdminCamera = adminCamerasApi.create;
+export const listAdminCameras = adminCamerasApi.list;
+export const updateAdminCamera = adminCamerasApi.update;
+export const deleteAdminCamera = adminCamerasApi.remove;
+export const addAdminCameraFreeTime = createAdminUserFreeTimeHelper('cameras').create;
+export const listAdminCameraFreeTimes = createAdminUserFreeTimeHelper('cameras').list;
+
+export const createAdminCameraTripod = adminCameraTripodsApi.create;
+export const listAdminCameraTripods = adminCameraTripodsApi.list;
+export const updateAdminCameraTripod = adminCameraTripodsApi.update;
+export const deleteAdminCameraTripod = adminCameraTripodsApi.remove;
+export const addAdminCameraTripodFreeTime = createAdminUserFreeTimeHelper('camera-tripods').create;
+export const listAdminCameraTripodFreeTimes = createAdminUserFreeTimeHelper('camera-tripods').list;
+
+export const createAdminLight = adminLightsApi.create;
+export const listAdminLights = adminLightsApi.list;
+export const updateAdminLight = adminLightsApi.update;
+export const deleteAdminLight = adminLightsApi.remove;
+export const addAdminLightFreeTime = createAdminUserFreeTimeHelper('lights').create;
+export const listAdminLightFreeTimes = createAdminUserFreeTimeHelper('lights').list;
+
+export const createAdminLightTripod = adminLightTripodsApi.create;
+export const listAdminLightTripods = adminLightTripodsApi.list;
+export const updateAdminLightTripod = adminLightTripodsApi.update;
+export const deleteAdminLightTripod = adminLightTripodsApi.remove;
+export const addAdminLightTripodFreeTime = createAdminUserFreeTimeHelper('light-tripods').create;
+export const listAdminLightTripodFreeTimes = createAdminUserFreeTimeHelper('light-tripods').list;
+
+export const createAdminSound = adminSoundsApi.create;
+export const listAdminSounds = adminSoundsApi.list;
+export const updateAdminSound = adminSoundsApi.update;
+export const deleteAdminSound = adminSoundsApi.remove;
+export const addAdminSoundFreeTime = createAdminUserFreeTimeHelper('sounds').create;
+export const listAdminSoundFreeTimes = createAdminUserFreeTimeHelper('sounds').list;
+
+export const createAdminRequisite = adminRequisitesApi.create;
+export const listAdminRequisites = adminRequisitesApi.list;
+export const updateAdminRequisite = adminRequisitesApi.update;
+export const deleteAdminRequisite = adminRequisitesApi.remove;
+export const addAdminRequisiteFreeTime = createAdminUserFreeTimeHelper('requisites').create;
+export const listAdminRequisiteFreeTimes = createAdminUserFreeTimeHelper('requisites').list;
+
+export const addAdminRequisiteImage = async (userId, requisiteId, payload) =>
+  apiClient(`${getAdminUserBasePath(userId)}/requisites/${requisiteId}/images`, {
+    method: 'POST',
+    body: createImageUploadFormData(payload),
+  });
+
+export const listAdminRequisiteImages = async (userId, requisiteId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/requisites/${requisiteId}/images`, {
+    method: 'GET',
+  });
+
+export const getAdminRequisiteImage = async (userId, requisiteId, imageId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/requisites/${requisiteId}/images/${imageId}`, {
+    method: 'GET',
+  });
+
+export const removeAdminRequisiteImage = async (userId, requisiteId, imageId) =>
+  apiClient(`${getAdminUserBasePath(userId)}/requisites/${requisiteId}/images/${imageId}`, {
+    method: 'DELETE',
+  });
+
+export const confirmAdminReservation = async (token) =>
+  apiClient(`/admin/user/confirmations/${token}`, {
+    method: 'GET',
+  });
+
+export const confirmAdminProjectInvitation = async (token) =>
+  apiClient(`/admin/user/project-invitations/${token}`, {
+    method: 'GET',
+  });
+
+export const reserveAdminAvailability = async (userId, payload) =>
+  createJsonRequest(`${getAdminUserBasePath(userId)}/availability/reserve`, 'POST', payload);
 
 export const checkCurrentUserExists = async () =>
   apiClient('/user/users/me', {
@@ -401,3 +601,74 @@ export const approveResourceRequest = async (requestId) =>
 
 export const rejectResourceRequest = async (requestId, payload) =>
   createJsonRequest(`/project/resource-requests/${requestId}/reject`, 'POST', payload);
+
+export const listAdminProjects = async ({ includeArchived = false } = {}) =>
+  apiClient(
+    withQuery('/project/admin/projects', {
+      include_archived: includeArchived,
+    }),
+    {
+      method: 'GET',
+      headers: ADMIN_PROJECT_HEADERS,
+    },
+  );
+
+export const getAdminProject = async (projectId) =>
+  apiClient(`/project/admin/projects/${projectId}`, {
+    method: 'GET',
+    headers: ADMIN_PROJECT_HEADERS,
+  });
+
+export const listAdminProjectMembers = async (
+  projectId,
+  { userId, includeInactive = false } = {},
+) =>
+  apiClient(
+    withQuery(`/project/admin/projects/${projectId}/members`, {
+      user_id: userId,
+      include_inactive: includeInactive,
+    }),
+    {
+      method: 'GET',
+      headers: ADMIN_PROJECT_HEADERS,
+    },
+  );
+
+export const getAdminProjectMember = async (
+  projectId,
+  targetUserId,
+  { includeInactive = false } = {},
+) =>
+  apiClient(
+    withQuery(`/project/admin/projects/${projectId}/members/${targetUserId}`, {
+      include_inactive: includeInactive,
+    }),
+    {
+      method: 'GET',
+      headers: ADMIN_PROJECT_HEADERS,
+    },
+  );
+
+export const listAdminShiftReports = async (shiftId) =>
+  apiClient(`/project/admin/shifts/${shiftId}/reports`, {
+    method: 'GET',
+    headers: ADMIN_PROJECT_HEADERS,
+  });
+
+export const getAdminReport = async (reportId) =>
+  apiClient(`/project/admin/reports/${reportId}`, {
+    method: 'GET',
+    headers: ADMIN_PROJECT_HEADERS,
+  });
+
+export const getAdminReportDownloadUrl = async (reportId) =>
+  apiClient(`/project/admin/reports/${reportId}/download-url`, {
+    method: 'GET',
+    headers: ADMIN_PROJECT_HEADERS,
+  });
+
+export const getAdminDocumentDownloadUrl = async (documentId) =>
+  apiClient(`/project/admin/documents/${documentId}/download-url`, {
+    method: 'GET',
+    headers: ADMIN_PROJECT_HEADERS,
+  });

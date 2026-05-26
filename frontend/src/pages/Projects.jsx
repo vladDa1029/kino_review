@@ -216,6 +216,11 @@ const getColumnValue = (item, column) => (typeof column.render === 'function' ? 
 const getCurrentUserId = (userData) =>
   userData?.user_id || userData?.sub || userData?.id || userData?.oid || '';
 
+const isReservedWindow = (window) => /(reserved|booked|busy|taken|occupied)/i.test(window?.status || '');
+
+const hasReservedWindow = (resource) =>
+  Array.isArray(resource?.windows) && resource.windows.some((window) => isReservedWindow(window));
+
 const getPreviewSource = (image) => {
   const candidate = image?.file || image?.storage_key || '';
 
@@ -332,12 +337,6 @@ const getWindowPayload = (windowForm) => {
   return { start_time, end_time };
 };
 
-const CircleIconButton = ({ children, title }) => (
-  <button type="button" className="projects-icon-circle" title={title} aria-label={title}>
-    {children}
-  </button>
-);
-
 const MicrophoneIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 1 0 6 0V6a3 3 0 0 0-3-3Z" />
@@ -403,21 +402,6 @@ const ListIcon = () => (
   </svg>
 );
 
-const HelpIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M9.5 9.5a2.5 2.5 0 1 1 4.3 1.7c-.8.8-1.8 1.3-1.8 2.8" />
-    <path d="M12 17h.01" />
-  </svg>
-);
-
-const BellIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M7 10a5 5 0 1 1 10 0v3.5l1.5 2.5h-13L7 13.5z" />
-    <path d="M10 18a2 2 0 0 0 4 0" />
-  </svg>
-);
-
 const ArrowIcon = ({ direction = 'right' }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className={`projects-arrow projects-arrow-${direction}`}>
     <path d="M5 12h14" />
@@ -430,6 +414,15 @@ const PhotoIcon = () => (
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <path d="M8 13l2.5-2.5L16 16" />
     <circle cx="15.5" cy="9" r="1.5" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M8 3v4" />
+    <path d="M16 3v4" />
+    <path d="M3 10h18" />
   </svg>
 );
 
@@ -590,34 +583,12 @@ const Projects = () => {
       }, {}),
     [projectResources],
   );
-  const totalWindows = useMemo(
-    () =>
-      projectResources.reduce(
-        (acc, resource) => acc + (Array.isArray(resource.windows) ? resource.windows.length : 0),
-        0,
-      ),
+  const totalBusyResources = useMemo(
+    () => projectResources.filter((resource) => hasReservedWindow(resource)).length,
     [projectResources],
   );
-  const totalReservedWindows = useMemo(
-    () =>
-      projectResources.reduce(
-        (acc, resource) =>
-          acc + (Array.isArray(resource.windows)
-            ? resource.windows.filter((window) => /(reserved|booked|busy|taken|occupied)/i.test(window.status || '')).length
-            : 0),
-        0,
-      ),
-    [projectResources],
-  );
-  const totalAvailableWindows = Math.max(totalWindows - totalReservedWindows, 0);
-  const selectedDayStatLabel = activeDateFilterKey
-    ? selectedDateFormatter.format(new Date(`${activeDateFilterKey}T00:00:00`))
-    : selectedDateFormatter.format(new Date(`${selectedDateKey}T00:00:00`));
+  const totalAvailableResources = Math.max(projectResources.length - totalBusyResources, 0);
   const isWorkspaceLoading = loading || isProjectResourcesLoading;
-
-  const handleScrollToForm = useCallback(() => {
-    document.getElementById('workspace-resource-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
 
   const resetForm = useCallback(() => {
     setForm(createInitialResourceForm());
@@ -1201,17 +1172,6 @@ const Projects = () => {
             <div className="projects-status-chip-wrap">
               <span>Статус</span>
               <strong className="projects-status-chip">{workspaceStatusLabel}</strong>
-              <div className="projects-header-tools" aria-hidden="true">
-                <CircleIconButton title="Помощь">
-                  <HelpIcon />
-                </CircleIconButton>
-                <CircleIconButton title="Уведомления">
-                  <BellIcon />
-                </CircleIconButton>
-                <CircleIconButton title="AI">
-                  <strong>AI</strong>
-                </CircleIconButton>
-              </div>
             </div>
 
             <div className="projects-overview-stats">
@@ -1221,11 +1181,11 @@ const Projects = () => {
               </article>
               <article className="projects-stat-card">
                 <span>Доступно</span>
-                <strong>{totalAvailableWindows}</strong>
+                <strong>{totalAvailableResources}</strong>
               </article>
               <article className="projects-stat-card">
                 <span>Занято</span>
-                <strong>{totalReservedWindows}</strong>
+                <strong>{totalBusyResources}</strong>
               </article>
             </div>
 
@@ -1297,11 +1257,11 @@ const Projects = () => {
               </article>
               <article className="project-context-summary-card">
                 <span>Забронировано</span>
-                <strong>{totalReservedWindows}</strong>
+                <strong>{totalBusyResources}</strong>
               </article>
               <article className="project-context-summary-card is-green">
                 <span>Доступно</span>
-                <strong>{totalAvailableWindows}</strong>
+                <strong>{totalAvailableResources}</strong>
               </article>
             </div>
 
@@ -1337,7 +1297,7 @@ const Projects = () => {
             </div>
 
             <form id="workspace-resource-form" className="stacked-form resource-form" onSubmit={handleSubmit}>
-              <div className="projects-resource-form-grid">
+              <div className={`projects-resource-form-grid${activeResource !== 'requisites' ? ' projects-resource-form-grid-no-media' : ''}`}>
                 <div className="projects-resource-form-fields">
                   <label className="field-block">
                     <span>Название</span>
@@ -1387,12 +1347,14 @@ const Projects = () => {
                   />
                 </label>
 
-                <div className="projects-upload-tile" aria-hidden="true">
-                  <PhotoIcon />
-                  <strong>Добавьте фото</strong>
-                  <span>(необязательно)</span>
-                  <small>JPG, PNG до 5 МБ</small>
-                </div>
+                {activeResource === 'requisites' ? (
+                  <div className="projects-upload-tile" aria-hidden="true">
+                    <PhotoIcon />
+                    <strong>Добавьте фото</strong>
+                    <span>(необязательно)</span>
+                    <small>JPG, PNG до 5 МБ</small>
+                  </div>
+                ) : null}
               </div>
 
               <div className="inline-actions">
@@ -1652,7 +1614,7 @@ const Projects = () => {
         </div>
 
         <aside className="projects-right-column">
-          <section className="dashboard-panel profile-calendar-card projects-calendar-panel">
+          <section className="dashboard-panel profile-card-surface profile-calendar-section projects-calendar-panel">
             <div className="projects-calendar-header">
               <div>
                 <span className="projects-panel-eyebrow">Календарь</span>
@@ -1707,6 +1669,25 @@ const Projects = () => {
               ))}
             </div>
 
+            <div className="profile-calendar-legend projects-calendar-legend">
+              <span className="profile-legend-item">
+                <i className="is-available" />
+                Доступные окна
+              </span>
+              <span className="profile-legend-item">
+                <i className="is-multiple" />
+                Несколько окон
+              </span>
+              <span className="profile-legend-item">
+                <i className="is-empty" />
+                Нет доступных окон
+              </span>
+              <span className="profile-legend-item">
+                <i className="is-muted" />
+                Вне месяца
+              </span>
+            </div>
+
             <div className="projects-calendar-summary">
               <p>
                 {selectedItem
@@ -1725,50 +1706,18 @@ const Projects = () => {
                 </button>
               ) : null}
             </div>
-          </section>
 
-          <section className="dashboard-panel projects-side-info-card">
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="projects-panel-eyebrow">Доступность на выбранный день</span>
-                <h2>{selectedDayStatLabel}</h2>
-              </div>
-            </div>
-            <div className="projects-mini-stats-grid">
-              <article className="projects-mini-stat is-green">
-                <span>Доступно</span>
-                <strong>{selectedItem ? selectedFreeTimeDateKeys.length : selectedDayItems.length}</strong>
-              </article>
-              <article className="projects-mini-stat">
-                <span>Занято</span>
-                <strong>{selectedItem ? selectedItemFreeTimes.length : totalReservedWindows}</strong>
-              </article>
-              <article className="projects-mini-stat is-blue">
-                <span>Всего</span>
-                <strong>{selectedItem ? selectedItemFreeTimes.length + selectedFreeTimeDateKeys.length : projectResources.length}</strong>
-              </article>
-            </div>
-          </section>
-
-          <section className="dashboard-panel projects-side-info-card">
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="projects-panel-eyebrow">Последняя активность</span>
-                <h2>Журнал рабочей зоны</h2>
-              </div>
-            </div>
-            <div className="projects-activity-card">
-              <p>
-                {selectedItem
-                  ? `Сейчас в фокусе: ${selectedItem.title}. Вы можете редактировать доступность, бронирование и медиа.`
-                  : 'Нет данных о действиях. Выберите объект в таблице или день в календаре.'}
-              </p>
-              <button type="button" className="ghost-action-btn">
-                <ListIcon />
-                <span>Журнал активности</span>
+            {selectedItem && selectedFreeTimeDateKeys.length > 0 ? (
+              <button type="button" className="ghost-action-btn projects-selection-reset" onClick={() => setSelectedFreeTimeDateKeys([])}>
+                Сбросить выбор дат
               </button>
-            </div>
+            ) : activeDateFilterKey ? (
+              <button type="button" className="ghost-action-btn projects-selection-reset" onClick={() => setActiveDateFilterKey(null)}>
+                Очистить день
+              </button>
+            ) : null}
           </section>
+
         </aside>
 
         <section className="dashboard-panel projects-table-panel projects-table-full">

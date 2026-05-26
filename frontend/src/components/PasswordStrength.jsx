@@ -1,4 +1,4 @@
-﻿import { getPasswordStrengthColor, getPasswordHint } from '../utils/passwordValidator';
+import { getPasswordStrengthColor, getPasswordHint } from '../utils/passwordValidator';
 
 const PasswordStrength = ({ password, requirements, strength }) => {
   const color = getPasswordStrengthColor(strength);
@@ -6,9 +6,9 @@ const PasswordStrength = ({ password, requirements, strength }) => {
   return (
     <div className="password-feedback">
       <div className="password-strength">
-        <span>Надежность: </span>
+        <span>Проверка: </span>
         <div className="strength-meter">
-          {[1, 2, 3, 4].map((level) => (
+          {[1, 2].map((level) => (
             <div
               key={level}
               className="strength-segment"
@@ -17,16 +17,14 @@ const PasswordStrength = ({ password, requirements, strength }) => {
           ))}
         </div>
         <span className="strength-label" style={{ color }}>
-          {['Очень слабый', 'Слабый', 'Средний', 'Хороший', 'Сильный'][strength] || 'Очень слабый'}
+          {['Невалидный', 'Почти готово', 'Подходит'][strength] || 'Невалидный'}
         </span>
       </div>
       <div className="password-hints">
         <p className="hint-text">{getPasswordHint(password, requirements)}</p>
         <div className="requirement-list">
-          <span className={requirements.length ? 'met' : ''}>✓ Минимум 8 символов</span>
-          <span className={requirements.uppercase ? 'met' : ''}>✓ Заглавная буква</span>
-          <span className={requirements.number ? 'met' : ''}>✓ Цифра</span>
-          <span className={requirements.specialChar ? 'met' : ''}>✓ Спецсимвол</span>
+          <span className={requirements.minLength ? 'met' : ''}>✓ Минимум 4 символа</span>
+          <span className={requirements.maxLength ? 'met' : ''}>✓ Максимум 24 символа</span>
         </div>
       </div>
     </div>

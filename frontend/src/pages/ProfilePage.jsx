@@ -117,13 +117,6 @@ const selectedDateFormatter = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
 });
 
-const CameraIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M4 8h4l1.5-2h5L16 8h4v10H4z" />
-    <circle cx="12" cy="13" r="3.5" />
-  </svg>
-);
-
 const CalendarIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M7 3v3" />
@@ -176,7 +169,6 @@ const ProfilePage = () => {
   const [descriptionId, setDescriptionId] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState('');
 
   const [spareTimes, setSpareTimes] = useState([]);
   const [spareTimeForm, setSpareTimeForm] = useState(initialSpareTimeForm);
@@ -243,22 +235,6 @@ const ProfilePage = () => {
       setIsSpareTimesLoading(false);
     }
   }, []);
-
-  const handleAvatarChange = (event) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarPreview(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   useEffect(() => {
     const today = startOfDay(new Date());
@@ -551,23 +527,6 @@ const ProfilePage = () => {
             </div>
 
             <div className="profile-top-body">
-              <div className="profile-avatar-upload">
-                <label
-                  className={`profile-avatar-circle ${avatarPreview ? '' : 'is-empty'}`}
-                  htmlFor="avatar-upload"
-                >
-                  {avatarPreview ? <img src={avatarPreview} alt="Предпросмотр аватара" /> : <CameraIcon />}
-                </label>
-                <input
-                  id="avatar-upload"
-                  className="profile-avatar-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                />
-                <span className="profile-avatar-caption">Загрузить фото</span>
-              </div>
-
               <div className="profile-content-grid">
                 <div className="profile-field-grid">
                   <label className="field-block profile-dashboard-field">
