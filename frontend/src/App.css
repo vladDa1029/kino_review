@@ -134,11 +134,6 @@ body:not(.dark-theme) {
   font-size: 0.9rem;
 }
 
-.admin-preview-btn {
-  padding: 0.66rem 1rem;
-  font-size: 0.9rem;
-}
-
 .icon-circle-btn {
   width: 42px;
   height: 42px;

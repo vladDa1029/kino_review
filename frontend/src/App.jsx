@@ -25,7 +25,6 @@ import {
   PROFILE_COMPLETION_EVENT,
   setStoredProfileCompletion,
 } from './utils/profileCompletion';
-import { ADMIN_AUTH_BYPASS } from './constants';
 import './App.css';
 
 const MenuIcon = () => (
@@ -302,9 +301,7 @@ function App() {
         </div>
 
         <nav className="nav-links">
-          <a href="#features">Возможности</a>
-          <a href="#pricing">Тарифы</a>
-          <a href="#about">О платформе</a>
+          <a href="#home">Главная</a>
         </nav>
 
         <div className={`header-controls ${token ? 'is-authenticated' : ''}`}>
@@ -320,16 +317,9 @@ function App() {
               <MenuIcon />
             </button>
           ) : (
-            <>
-              {ADMIN_AUTH_BYPASS ? (
-                <button className="secondary-btn admin-preview-btn" onClick={() => navigate('/admin')}>
-                  Admin preview
-                </button>
-              ) : null}
-              <button className="auth-btn" onClick={() => setIsAuthModalOpen(true)}>
-                Войти
-              </button>
-            </>
+            <button className="auth-btn" onClick={() => setIsAuthModalOpen(true)}>
+              Войти
+            </button>
           )}
         </div>
         </header>

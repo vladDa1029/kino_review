@@ -478,6 +478,7 @@ const Projects = () => {
   const [isImagesLoading, setIsImagesLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [loadingImageId, setLoadingImageId] = useState(null);
   const [removingImageId, setRemovingImageId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -607,6 +608,7 @@ const Projects = () => {
     setImageForm(createInitialImageForm());
     setImageInputKey((prev) => prev + 1);
     setSelectedImage(null);
+    setPreviewImage(null);
   }, []);
 
   useEffect(() => {
@@ -786,6 +788,7 @@ const Projects = () => {
     if (activeResource !== 'requisites' || !selectedItem) {
       setImages([]);
       setSelectedImage(null);
+      setPreviewImage(null);
       return;
     }
 
@@ -1084,11 +1087,29 @@ const Projects = () => {
     try {
       const image = await getRequisiteImage(selectedItem.oid, imageId);
       setSelectedImage(image);
+      setPreviewImage(image);
     } catch (error) {
       toast.error(error.message || 'Не удалось получить информацию об изображении');
     } finally {
       setLoadingImageId(null);
     }
+  };
+
+  const handleImagePreview = (image) => {
+    setSelectedImage(image);
+    setPreviewImage(image);
+  };
+
+  const handleTableImagePreview = (item) => {
+    const itemImages = requisiteTableImagesById[item.oid] || [];
+
+    if (itemImages.length === 0) {
+      toast.info('У реквизита пока нет изображений');
+      return;
+    }
+
+    setSelectedItemId(item.oid);
+    handleImagePreview(itemImages[0]);
   };
 
   const handleRemoveImage = async (imageId) => {
@@ -1107,6 +1128,7 @@ const Projects = () => {
         [selectedItem.oid]: (prev[selectedItem.oid] || []).filter((image) => image.oid !== imageId),
       }));
       setSelectedImage((prev) => (prev?.oid === imageId ? null : prev));
+      setPreviewImage((prev) => (prev?.oid === imageId ? null : prev));
     } catch (error) {
       toast.error(error.message || 'Не удалось удалить изображение');
     } finally {
@@ -1528,11 +1550,18 @@ const Projects = () => {
                           {images.map((image) => (
                             <article key={image.oid} className="media-card">
                               {getPreviewSource(image) ? (
-                                <img
-                                  className="requisite-image-preview"
-                                  src={getPreviewSource(image)}
-                                  alt={image.title}
-                                />
+                                <button
+                                  type="button"
+                                  className="requisite-image-button"
+                                  onClick={() => handleImagePreview(image)}
+                                  aria-label={`Открыть изображение ${image.title}`}
+                                >
+                                  <img
+                                    className="requisite-image-preview"
+                                    src={getPreviewSource(image)}
+                                    alt={image.title}
+                                  />
+                                </button>
                               ) : null}
                               <h4>{image.title}</h4>
                               <p>{image.description}</p>
@@ -1543,7 +1572,7 @@ const Projects = () => {
                                   onClick={() => handleImageDetails(image.oid)}
                                   disabled={loadingImageId === image.oid}
                                 >
-                                  {loadingImageId === image.oid ? 'Загрузка...' : 'Детали'}
+                                  {loadingImageId === image.oid ? 'Загрузка...' : 'Просмотр'}
                                 </button>
                                 <button
                                   type="button"
@@ -1567,11 +1596,18 @@ const Projects = () => {
                         <section className="image-details-card">
                           <h3>Детали изображения</h3>
                           {getPreviewSource(selectedImage) ? (
-                            <img
-                              className="requisite-image-preview"
-                              src={getPreviewSource(selectedImage)}
-                              alt={selectedImage.title}
-                            />
+                            <button
+                              type="button"
+                              className="requisite-image-button"
+                              onClick={() => handleImagePreview(selectedImage)}
+                              aria-label={`Открыть изображение ${selectedImage.title}`}
+                            >
+                              <img
+                                className="requisite-image-preview"
+                                src={getPreviewSource(selectedImage)}
+                                alt={selectedImage.title}
+                              />
+                            </button>
                           ) : null}
                           <dl className="details-list">
                             <div>
@@ -1749,19 +1785,31 @@ const Projects = () => {
               <tbody>
                 {filteredItems.map((item) => {
                   const isSelected = selectedItemId === item.oid;
+                  const itemImages = requisiteTableImagesById[item.oid] || [];
+                  const firstImage = itemImages[0];
+                  const firstImageSource = firstImage ? getPreviewSource(firstImage) : '';
 
                   return (
                     <tr key={item.oid} className={isSelected ? 'table-row-selected' : ''}>
                       {activeResource === 'requisites' ? (
                         <td data-label="Фото">
-                          <span
-                            className={[
-                              'requisite-photo-status',
-                              (requisiteTableImagesById[item.oid] || []).length > 0 ? 'has-photo' : '',
-                            ].filter(Boolean).join(' ')}
-                          >
-                            {(requisiteTableImagesById[item.oid] || []).length > 0 ? 'Фото есть' : 'Нет фото'}
-                          </span>
+                          {itemImages.length > 0 ? (
+                            <button
+                              type="button"
+                              className="requisite-photo-thumb"
+                              onClick={() => handleTableImagePreview(item)}
+                              title="Открыть фото реквизита"
+                            >
+                              {firstImageSource ? (
+                                <img src={firstImageSource} alt={firstImage.title || item.title} />
+                              ) : (
+                                <span>Фото</span>
+                              )}
+                              <small>{itemImages.length}</small>
+                            </button>
+                          ) : (
+                            <span className="requisite-photo-status">Нет фото</span>
+                          )}
                         </td>
                       ) : null}
                       {currentResource.columns.map((column) => (
@@ -1823,6 +1871,53 @@ const Projects = () => {
           ) : null}
         </section>
       </div>
+
+      {previewImage ? (
+        <div className="requisite-preview-backdrop" role="dialog" aria-modal="true" aria-label="Просмотр изображения реквизита">
+          <section className="requisite-preview-modal">
+            <button
+              type="button"
+              className="close-btn requisite-preview-close"
+              onClick={() => setPreviewImage(null)}
+              aria-label="Закрыть просмотр"
+            >
+              &times;
+            </button>
+            <div className="requisite-preview-media">
+              {getPreviewSource(previewImage) ? (
+                <img src={getPreviewSource(previewImage)} alt={previewImage.title || 'Изображение реквизита'} />
+              ) : (
+                <div className="requisite-preview-empty">Изображение недоступно</div>
+              )}
+            </div>
+            <div className="requisite-preview-copy">
+              <span className="projects-panel-eyebrow">Фото реквизита</span>
+              <h2>{previewImage.title || 'Без названия'}</h2>
+              <p>{previewImage.description || 'Описание не указано'}</p>
+              <dl className="details-list">
+                {previewImage.mime_type ? (
+                  <div>
+                    <dt>Формат</dt>
+                    <dd>{previewImage.mime_type}</dd>
+                  </div>
+                ) : null}
+                {previewImage.size ? (
+                  <div>
+                    <dt>Размер</dt>
+                    <dd>{previewImage.size}</dd>
+                  </div>
+                ) : null}
+                {previewImage.create_at ? (
+                  <div>
+                    <dt>Добавлено</dt>
+                    <dd>{formatDateTime(previewImage.create_at)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 };
