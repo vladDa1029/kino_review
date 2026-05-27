@@ -4723,10 +4723,6 @@ select::-ms-expand {
   color: var(--text);
 }
 
-.admin-tab.is-muted {
-  color: var(--text-muted);
-}
-
 .admin-main {
   min-width: 0;
   width: min(1480px, 96vw);

@@ -43,7 +43,7 @@ const AdminProjectsPage = () => {
       <section className="management-card admin-panel-card">
         <div className="admin-section-header">
           <div>
-            <span className="projects-panel-eyebrow">Project admin</span>
+            <span className="projects-panel-eyebrow">Администрирование проектов</span>
             <h2>Проекты</h2>
             <p>Глобальный просмотр проектов сервиса с доступом суперпользователя.</p>
           </div>
@@ -75,10 +75,10 @@ const AdminProjectsPage = () => {
               <thead>
                 <tr>
                   <th>Название</th>
-                  <th>Owner</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Updated</th>
+                  <th>Владелец</th>
+                  <th>Статус</th>
+                  <th>Создан</th>
+                  <th>Обновлён</th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -89,10 +89,10 @@ const AdminProjectsPage = () => {
                       <strong>{project.title}</strong>
                       <div className="table-subtext">{project.description || 'Без описания'}</div>
                     </td>
-                    <td data-label="Owner">{project.owner_id}</td>
-                    <td data-label="Status">{project.status}</td>
-                    <td data-label="Created">{new Date(project.created_at).toLocaleString()}</td>
-                    <td data-label="Updated">{new Date(project.updated_at).toLocaleString()}</td>
+                    <td data-label="Владелец">{project.owner_id}</td>
+                    <td data-label="Статус">{project.status}</td>
+                    <td data-label="Создан">{new Date(project.created_at).toLocaleString()}</td>
+                    <td data-label="Обновлён">{new Date(project.updated_at).toLocaleString()}</td>
                     <td data-label="Действия">
                       <div className="table-actions">
                         <button

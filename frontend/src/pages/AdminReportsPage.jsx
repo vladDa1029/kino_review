@@ -25,7 +25,7 @@ const AdminReportsPage = () => {
       const response = await listAdminShiftReports(shiftId.trim());
       setShiftReports(response.items || []);
     } catch (err) {
-      setError(err.message || 'Не удалось получить отчеты смены');
+      setError(err.message || 'Не удалось получить отчёты смены');
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ const AdminReportsPage = () => {
       setReportMeta(meta);
       setReportDownloadUrl(download.download_url || '');
     } catch (err) {
-      setError(err.message || 'Не удалось получить данные отчета');
+      setError(err.message || 'Не удалось получить данные отчёта');
     } finally {
       setLoading(false);
     }
@@ -68,9 +68,9 @@ const AdminReportsPage = () => {
       <section className="management-card admin-panel-card">
         <div className="admin-section-header">
           <div>
-            <span className="projects-panel-eyebrow">Project admin</span>
-            <h2>Отчеты и документы</h2>
-            <p>Технический экран для метаданных отчетов и временных ссылок на скачивание.</p>
+            <span className="projects-panel-eyebrow">Администрирование отчётов</span>
+            <h2>Отчёты и документы</h2>
+            <p>Технический экран для метаданных отчётов и временных ссылок на скачивание.</p>
           </div>
         </div>
       </section>
@@ -81,8 +81,8 @@ const AdminReportsPage = () => {
         <form className="stacked-form" onSubmit={handleShiftLookup}>
           <div className="section-heading">
             <div>
-              <h3>Отчеты по смене</h3>
-              <p>Получение всех версий отчета для `shift_id`.</p>
+              <h3>Отчёты по смене</h3>
+              <p>Получение всех версий отчёта для `shift_id`.</p>
             </div>
           </div>
           <div className="grid-two-columns admin-toolbar-grid">
@@ -103,23 +103,23 @@ const AdminReportsPage = () => {
             <table className="user-table">
               <thead>
                 <tr>
-                  <th>Version</th>
-                  <th>Generation</th>
-                  <th>Actuality</th>
-                  <th>File</th>
-                  <th>Generated</th>
-                  <th>Error</th>
+                  <th>Версия</th>
+                  <th>Генерация</th>
+                  <th>Актуальность</th>
+                  <th>Файл</th>
+                  <th>Сформирован</th>
+                  <th>Ошибка</th>
                 </tr>
               </thead>
               <tbody>
                 {shiftReports.map((item) => (
                   <tr key={item.oid}>
-                    <td data-label="Version">{item.version}</td>
-                    <td data-label="Generation">{item.generation_status_name}</td>
-                    <td data-label="Actuality">{item.actuality_status_name}</td>
-                    <td data-label="File">{item.file_name}</td>
-                    <td data-label="Generated">{item.generated_at ? new Date(item.generated_at).toLocaleString() : '-'}</td>
-                    <td data-label="Error">{item.error_message || '-'}</td>
+                    <td data-label="Версия">{item.version}</td>
+                    <td data-label="Генерация">{item.generation_status_name}</td>
+                    <td data-label="Актуальность">{item.actuality_status_name}</td>
+                    <td data-label="Файл">{item.file_name}</td>
+                    <td data-label="Сформирован">{item.generated_at ? new Date(item.generated_at).toLocaleString() : '-'}</td>
+                    <td data-label="Ошибка">{item.error_message || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -132,7 +132,7 @@ const AdminReportsPage = () => {
         <form className="stacked-form" onSubmit={handleReportLookup}>
           <div className="section-heading">
             <div>
-              <h3>Метаданные отчета</h3>
+              <h3>Метаданные отчёта</h3>
               <p>Получение метаданных и ready-download URL для `report_id`.</p>
             </div>
           </div>
@@ -143,7 +143,7 @@ const AdminReportsPage = () => {
             </label>
             <div className="inline-actions admin-form-actions-end">
               <button type="submit" className="profile-save-btn compact" disabled={loading}>
-                Загрузить отчет
+                Загрузить отчёт
               </button>
             </div>
           </div>
@@ -160,11 +160,11 @@ const AdminReportsPage = () => {
               <strong>{reportMeta.shift_id}</strong>
             </div>
             <div className="admin-summary-card">
-              <span>File</span>
+              <span>Файл</span>
               <strong>{reportMeta.file_name}</strong>
             </div>
             <div className="admin-summary-card">
-              <span>Download URL</span>
+              <span>Ссылка на скачивание</span>
               <strong className="admin-break-anywhere">{reportDownloadUrl || '-'}</strong>
             </div>
           </div>
@@ -194,7 +194,7 @@ const AdminReportsPage = () => {
 
         {documentDownloadUrl ? (
           <div className="admin-summary-card">
-            <span>Download URL</span>
+            <span>Ссылка на скачивание</span>
             <strong className="admin-break-anywhere">{documentDownloadUrl}</strong>
           </div>
         ) : null}

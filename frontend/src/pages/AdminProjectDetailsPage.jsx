@@ -77,7 +77,7 @@ const AdminProjectDetailsPage = () => {
       <section className="management-card admin-panel-card">
         <div className="admin-section-header">
           <div>
-            <span className="projects-panel-eyebrow">Project admin</span>
+            <span className="projects-panel-eyebrow">Администрирование проекта</span>
             <h2>{project?.title || 'Проект'}</h2>
             <p>{project?.description || 'Описание проекта отсутствует.'}</p>
           </div>
@@ -109,15 +109,15 @@ const AdminProjectDetailsPage = () => {
               <strong>{project?.oid}</strong>
             </div>
             <div className="admin-summary-card">
-              <span>Owner</span>
+              <span>Владелец</span>
               <strong>{project?.owner_id}</strong>
             </div>
             <div className="admin-summary-card">
-              <span>Status</span>
+              <span>Статус</span>
               <strong>{project?.status}</strong>
             </div>
             <div className="admin-summary-card">
-              <span>Updated</span>
+              <span>Обновлён</span>
               <strong>{project?.updated_at ? new Date(project.updated_at).toLocaleString() : '-'}</strong>
             </div>
           </section>
@@ -135,22 +135,22 @@ const AdminProjectDetailsPage = () => {
                 <thead>
                   <tr>
                     <th>User ID</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Invited by</th>
-                    <th>Created</th>
-                    <th>Updated</th>
+                    <th>Роль</th>
+                    <th>Статус</th>
+                    <th>Пригласил</th>
+                    <th>Создан</th>
+                    <th>Обновлён</th>
                   </tr>
                 </thead>
                 <tbody>
                   {members.map((member) => (
                     <tr key={member.oid}>
                       <td data-label="User ID">{member.user_id}</td>
-                      <td data-label="Role">{member.role}</td>
-                      <td data-label="Status">{member.status}</td>
-                      <td data-label="Invited by">{member.invited_by}</td>
-                      <td data-label="Created">{new Date(member.created_at).toLocaleString()}</td>
-                      <td data-label="Updated">{new Date(member.updated_at).toLocaleString()}</td>
+                      <td data-label="Роль">{member.role}</td>
+                      <td data-label="Статус">{member.status}</td>
+                      <td data-label="Пригласил">{member.invited_by}</td>
+                      <td data-label="Создан">{new Date(member.created_at).toLocaleString()}</td>
+                      <td data-label="Обновлён">{new Date(member.updated_at).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,15 +193,15 @@ const AdminProjectDetailsPage = () => {
                   <strong>{selectedMember.user_id}</strong>
                 </div>
                 <div className="admin-summary-card">
-                  <span>Role</span>
+                  <span>Роль</span>
                   <strong>{selectedMember.role}</strong>
                 </div>
                 <div className="admin-summary-card">
-                  <span>Status</span>
+                  <span>Статус</span>
                   <strong>{selectedMember.status}</strong>
                 </div>
                 <div className="admin-summary-card">
-                  <span>Invited by</span>
+                  <span>Пригласил</span>
                   <strong>{selectedMember.invited_by}</strong>
                 </div>
               </div>

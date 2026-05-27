@@ -186,7 +186,7 @@ const UserList = () => {
       <section className="management-card admin-panel-card">
         <div className="admin-section-header">
           <div>
-            <span className="projects-panel-eyebrow">Admin</span>
+            <span className="projects-panel-eyebrow">Администрирование</span>
             <h2>Пользователи</h2>
             <p>Управление учетными записями через административные методы сервиса авторизации.</p>
           </div>
@@ -311,8 +311,8 @@ const UserList = () => {
                   <tr>
                     <th>Email</th>
                     <th>Активен</th>
-                    <th>Superuser</th>
-                    <th>Verified</th>
+                    <th>Суперпользователь</th>
+                    <th>Подтверждён</th>
                     <th>OID</th>
                     <th>Действия</th>
                   </tr>
@@ -325,8 +325,8 @@ const UserList = () => {
                       <tr key={user.oid}>
                         <td data-label="Email">{user.email}</td>
                         <td data-label="Активен">{user.is_active ? 'Да' : 'Нет'}</td>
-                        <td data-label="Superuser">{user.is_superuser ? 'Да' : 'Нет'}</td>
-                        <td data-label="Verified">{user.is_verified ? 'Да' : 'Нет'}</td>
+                        <td data-label="Суперпользователь">{user.is_superuser ? 'Да' : 'Нет'}</td>
+                        <td data-label="Подтверждён">{user.is_verified ? 'Да' : 'Нет'}</td>
                         <td data-label="OID">{user.oid}</td>
                         <td data-label="Действия">
                           <div className="table-actions">

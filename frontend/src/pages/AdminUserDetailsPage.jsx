@@ -321,7 +321,7 @@ const AdminUserDetailsPage = () => {
       <section className="management-card admin-panel-card">
         <div className="admin-section-header">
           <div>
-            <span className="projects-panel-eyebrow">User admin</span>
+            <span className="projects-panel-eyebrow">Администрирование пользователя</span>
             <h2>{authUser?.email || userId}</h2>
             <p>Карточка администратора для профиля, доступности и пользовательского инвентаря.</p>
           </div>
@@ -339,15 +339,15 @@ const AdminUserDetailsPage = () => {
           <strong>{authUser?.oid || userId}</strong>
         </div>
         <div className="admin-summary-card">
-          <span>Active</span>
+          <span>Активен</span>
           <strong>{authUser?.is_active ? 'Да' : 'Нет'}</strong>
         </div>
         <div className="admin-summary-card">
-          <span>Superuser</span>
+          <span>Суперпользователь</span>
           <strong>{authUser?.is_superuser ? 'Да' : 'Нет'}</strong>
         </div>
         <div className="admin-summary-card">
-          <span>Exists in user service</span>
+          <span>Есть в пользовательском сервисе</span>
           <strong>{userExists ? 'Да' : 'Нет данных'}</strong>
         </div>
       </section>

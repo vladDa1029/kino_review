@@ -26,18 +26,6 @@ const ReportIcon = () => (
   </svg>
 );
 
-const ShieldIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M12 3L19 6V11C19 15.4183 16.134 19.3525 12 20.7C7.86603 19.3525 5 15.4183 5 11V6L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-  </svg>
-);
-
-const ActivityIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M4 12H8L10.5 7L13.5 17L16 12H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const ExitIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path
@@ -54,13 +42,7 @@ const ExitIcon = () => (
 const navItems = [
   { to: '/admin/users', label: 'Пользователи', icon: UsersIcon },
   { to: '/admin/projects', label: 'Проекты', icon: FolderIcon },
-  { to: '/admin/reports', label: 'Отчеты', icon: ReportIcon },
-];
-
-const utilityItems = [
-  { label: 'Документы', icon: ReportIcon },
-  { label: 'Роли', icon: ShieldIcon },
-  { label: 'Активность', icon: ActivityIcon },
+  { to: '/admin/reports', label: 'Отчёты', icon: ReportIcon },
 ];
 
 const AdminLayout = ({ darkMode, onToggleTheme }) => {
@@ -74,7 +56,7 @@ const AdminLayout = ({ darkMode, onToggleTheme }) => {
         <header className="admin-topbar">
           <div className="admin-topbar-breadcrumb">
             <strong>KINOFLOW</strong>
-            <span>Админ панель</span>
+            <span>Админ-панель</span>
           </div>
 
           <div className="admin-topbar-tools">
@@ -110,15 +92,6 @@ const AdminLayout = ({ darkMode, onToggleTheme }) => {
                 <Icon />
                 <span>{item.label}</span>
               </NavLink>
-            );
-          })}
-          {utilityItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button key={item.label} type="button" className="admin-tab is-muted">
-                <Icon />
-                <span>{item.label}</span>
-              </button>
             );
           })}
         </div>

@@ -248,7 +248,7 @@ const ProjectListPage = () => {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [projectSearch, setProjectSearch] = useState('');
   const [projectView, setProjectView] = useState('active');
-  const [projectSort, setProjectSort] = useState('updated');
+  const projectSort = 'updated';
   const [submitting, setSubmitting] = useState(false);
   const [archivingId, setArchivingId] = useState(null);
   const [memberProjectId, setMemberProjectId] = useState('');
@@ -1059,20 +1059,6 @@ const ProjectListPage = () => {
               <div>
                 <h2>Список проектов</h2>
               </div>
-            </div>
-            <div className="project-list-toolbar-controls">
-              <label className="project-sort-field">
-                <span>Сортировка:</span>
-                <select value={projectSort} onChange={(event) => setProjectSort(event.target.value)}>
-                  <option value="updated">обновлению</option>
-                  <option value="created">созданию</option>
-                  <option value="title">названию</option>
-                </select>
-              </label>
-              <button type="button" className="ghost-action-btn" onClick={loadProjects} disabled={isProjectsLoading}>
-                <RefreshIcon />
-                <span>Обновить</span>
-              </button>
             </div>
           </div>
 
