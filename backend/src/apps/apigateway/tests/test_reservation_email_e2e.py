@@ -111,7 +111,12 @@ def _poll_until(fn, *, timeout: float = POLL_TIMEOUT, interval: float = POLL_INT
     raise AssertionError("Polling timed out without a captured error.")
 
 
-def _wait_for_confirmation_link(*, recipient_email: str, subject_fragment: str) -> str:
+def _extract_link_from_mailhog(
+    *,
+    recipient_email: str,
+    subject_fragment: str,
+    url_pattern: str,
+) -> str:
     def lookup() -> str:
         response = httpx.get(MAILHOG_API_URL, timeout=HTTP_TIMEOUT)
         response.raise_for_status()
@@ -128,17 +133,71 @@ def _wait_for_confirmation_link(*, recipient_email: str, subject_fragment: str) 
                 "utf-8",
                 errors="ignore",
             )
-            match = re.search(
-                r"http://[^\s\"'>]+/user/confirmations/[A-Za-z0-9._-]+",
-                decoded_body,
-            )
+            match = re.search(url_pattern, decoded_body)
             if match:
                 return match.group(0)
         raise AssertionError(
-            f"Did not find confirmation email for {recipient_email!r} with subject {subject_fragment!r}."
+            f"Did not find email for {recipient_email!r} with subject {subject_fragment!r}."
         )
 
     return _poll_until(lookup)
+
+
+def _wait_for_confirmation_link(*, recipient_email: str, subject_fragment: str) -> str:
+    return _extract_link_from_mailhog(
+        recipient_email=recipient_email,
+        subject_fragment=subject_fragment,
+        url_pattern=r"http://[^\s\"'>]+/user/confirmations/[A-Za-z0-9._-]+",
+    )
+
+
+def _wait_for_project_invitation_link(*, recipient_email: str, project_title: str) -> str:
+    return _extract_link_from_mailhog(
+        recipient_email=recipient_email,
+        subject_fragment=f"Project invitation: {project_title}",
+        url_pattern=r"http://[^\s\"'>]+/user/project-invitations/[A-Za-z0-9._-]+",
+    )
+
+
+def _wait_for_member_active(
+    client: httpx.Client,
+    session: UserSession,
+    project_id: UUID,
+) -> None:
+    def check() -> None:
+        response = client.get(
+            f"/project/projects/{project_id}/members/{session.user_id}",
+            headers=session.headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == 10  # ProjectMemberStatus.ACTIVE
+
+    _poll_until(check)
+
+
+def _invite_and_activate_project_member(
+    client: httpx.Client,
+    director: UserSession,
+    invitee: UserSession,
+    project_id: UUID,
+    role: str,
+    project_title: str,
+) -> None:
+    invite_response = client.post(
+        f"/project/projects/{project_id}/members",
+        headers=director.headers,
+        json={"user_id": str(invitee.user_id), "role": role},
+    )
+    assert invite_response.status_code == 200, invite_response.text
+
+    invite_url = _wait_for_project_invitation_link(
+        recipient_email=invitee.email,
+        project_title=project_title,
+    )
+    accept_response = client.get(invite_url, headers=invitee.headers)
+    assert accept_response.status_code == 200, accept_response.text
+
+    _wait_for_member_active(client, invitee, project_id)
 
 
 def _list_spare_times(client: httpx.Client, session: UserSession) -> list[dict]:
@@ -278,13 +337,18 @@ def test_participant_reservation_confirmation_flow_end_to_end() -> None:
         )
         assert spare_time_response.status_code == 201, spare_time_response.text
 
+        project_title = f"Participant flow {suffix}"
         project_response = client.post(
             "/project/projects",
             headers=director.headers,
-            json={"title": f"Participant flow {suffix}", "description": "live e2e"},
+            json={"title": project_title, "description": "live e2e"},
         )
         assert project_response.status_code == 200, project_response.text
         project_id = UUID(project_response.json()["oid"])
+
+        _invite_and_activate_project_member(
+            client, director, participant, project_id, "ACTOR", project_title
+        )
 
         shift_title = f"participant-shift-{suffix}"
         shift_response = client.post(
@@ -385,13 +449,18 @@ def test_resource_request_confirmation_flow_end_to_end() -> None:
         )
         assert create_camera_window.status_code == 201, create_camera_window.text
 
+        resource_project_title = f"Resource flow {suffix}"
         project_response = client.post(
             "/project/projects",
             headers=director.headers,
-            json={"title": f"Resource flow {suffix}", "description": "live e2e"},
+            json={"title": resource_project_title, "description": "live e2e"},
         )
         assert project_response.status_code == 200, project_response.text
         project_id = UUID(project_response.json()["oid"])
+
+        _invite_and_activate_project_member(
+            client, director, owner, project_id, "CAMERA", resource_project_title
+        )
 
         shift_title = f"resource-shift-{suffix}"
         shift_response = client.post(
