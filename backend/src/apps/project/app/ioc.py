@@ -86,6 +86,7 @@ from app.application.queries.resources import (
     GetProjectMemberHandler,
     GetProjectUserResourcesHandler,
     ListProjectMembersHandler,
+    ListShiftResourceRequestsHandler,
 )
 from app.application.support import SystemClock
 from app.config import (
@@ -259,6 +260,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=GetProjectMemberHandler)
     provider.provide(source=GetProjectUserResourcesHandler)
     provider.provide(source=ListProjectMembersHandler)
+    provider.provide(source=ListShiftResourceRequestsHandler)
     provider.provide(source=CreateProjectHandler)
     provider.provide(source=UpdateProjectHandler)
     provider.provide(source=DeleteProjectHandler)

@@ -17,11 +17,16 @@ from app.application.commands.reserve_availability import (
     ReserveAvailabilityCommand,
     ReserveAvailabilityHandler,
 )
+from app.application.commands.reserve_participant_availability import (
+    ReserveParticipantAvailabilityCommand,
+    ReserveParticipantAvailabilityHandler,
+)
 from app.application.commands.user_registered import (
     UserRegisteredCommand,
     UserRegisteredHandler,
 )
 from app.application.ports.broker import EventPublisher
+from app.application.ports.repositories import UserRepository
 from app.application.queries.report_snapshot import (
     ProvideShiftReportSnapshotHandler,
     ProvideShiftReportSnapshotQuery,
@@ -211,19 +216,19 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
     async def handle_participant_reservation_check_requested(
         event: BrokerShiftParticipantReservationCheckRequested,
     ) -> None:
+        # For participants (people) we only verify they exist in this service's
+        # database.  The free-time-window machinery (spare_time) is designed for
+        # equipment/resources; applying it to people requires them to pre-register
+        # their availability, which is not part of the current product flow.
+        # The participant's own "Confirm" action on the website is their implicit
+        # declaration of availability.
         async with container() as request_container:
-            handler = await request_container.get(CheckAvailabilityHandler)
+            user_repo = await request_container.get(UserRepository)
             publisher = await request_container.get(EventPublisher)
             try:
-                await handler(
-                    CheckAvailabilityCommand(
-                        user_id=BaseId(event.user_id),
-                        owner_id=BaseId(event.user_id),
-                        obj_id=BaseId(event.user_id),
-                        start_time=event.start_time,
-                        end_time=event.end_time,
-                    )
-                )
+                user = await user_repo.get(BaseId(event.user_id))
+                if user is None:
+                    raise ValueError(f"User {event.user_id} not found in user service.")
             except Exception as exc:
                 await publisher.publish(
                     "shift.participant_reservation_check_failed",
@@ -371,16 +376,17 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
     async def handle_participant_reservation_requested(
         event: BrokerShiftParticipantReservationRequested,
     ) -> None:
+        # Participants are people — no spare_time free windows needed.
+        # ReserveParticipantAvailabilityHandler writes a "reserved" entry
+        # directly into free_users_timing so the UI shows the occupied slot.
         async with container() as request_container:
-            handler = await request_container.get(ReserveAvailabilityHandler)
+            handler = await request_container.get(ReserveParticipantAvailabilityHandler)
             publisher = await request_container.get(EventPublisher)
             try:
                 reservation_id = await handler(
-                    ReserveAvailabilityCommand(
+                    ReserveParticipantAvailabilityCommand(
                         request_id=BaseId(event.request_id),
                         user_id=BaseId(event.user_id),
-                        owner_id=BaseId(event.user_id),
-                        obj_id=BaseId(event.user_id),
                         start_time=event.start_time,
                         end_time=event.end_time,
                     )

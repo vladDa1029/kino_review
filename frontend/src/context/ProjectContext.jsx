@@ -63,10 +63,6 @@ export const ProjectProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    refreshProjects();
-  }, [refreshProjects]);
-
-  useEffect(() => {
     if (!token) {
       setProjects([]);
       setNewProjectIds([]);
@@ -94,7 +90,7 @@ export const ProjectProvider = ({ children }) => {
       if (document.visibilityState === 'visible') {
         refreshProjects();
       }
-    }, 30000);
+    }, 5 * 60 * 1000); // 5 min — was 30s, reduced noise during debugging
 
     window.addEventListener('focus', refreshVisibleProjects);
     document.addEventListener('visibilitychange', refreshVisibleProjects);

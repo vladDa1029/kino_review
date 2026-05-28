@@ -16,7 +16,9 @@ from app.application.ports.repositories import (
 )
 from app.application.resource_ownership import ResourceOwnershipResolver
 from app.domain.entity.base import BaseId, Spare_time
-from app.domain.service.availability_service import AvailabilityService
+from app.domain.errors import ReservationOverlapError
+from app.domain.specification.time_overlap import NonOverlappingTimeSpec
+from app.domain.value.status import AvailabilityStatus
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -41,7 +43,6 @@ class CheckAvailabilityHandler:
         sound_free_time_repository: SoundFreeTimeRepository,
         requisite_free_time_repository: RequisiteFreeTimeRepository,
         resource_ownership: ResourceOwnershipResolver,
-        service: AvailabilityService,
     ) -> None:
         self._user_repository = user_repository
         self._spare_time_repository = spare_time_repository
@@ -56,7 +57,6 @@ class CheckAvailabilityHandler:
             requisite_free_time_repository,
         )
         self._resource_ownership = resource_ownership
-        self._service = service
 
     async def __call__(self, command: CheckAvailabilityCommand) -> None:
         user = await self._user_repository.get(command.user_id)
@@ -67,22 +67,32 @@ class CheckAvailabilityHandler:
             obj_id=command.obj_id,
         )
 
-        _, windows = await self._resolve_free_time_repository(command.obj_id)
-        # Check phase must be side-effect free, so validation runs on a detached list copy.
-        self._service.reserve(
-            user,
-            list(windows),
-            command.owner_id,
-            command.obj_id,
-            command.start_time,
-            command.end_time,
+        # Collect all RESERVED windows for this resource across every free_time
+        # table.  A resource can be booked even if it has no FREE windows
+        # registered — the absence of FREE slots is not a conflict.
+        all_reserved: list[Spare_time] = []
+        for repository in self._free_time_repositories:
+            windows = await repository.list_by_obj_id(command.obj_id)
+            for window in windows:
+                if str(window.status) == "reserved":
+                    all_reserved.append(window)
+
+        if not all_reserved:
+            # No reserved windows exist for this resource — it is free.
+            return
+
+        # Build a candidate window that represents the requested interval and
+        # check whether it overlaps any already-reserved slot.
+        candidate = Spare_time(
+            oid=command.obj_id,  # throwaway id — candidate is never persisted
+            obj=command.obj_id,
+            start_time=command.start_time,
+            end_time=command.end_time,
+            status=AvailabilityStatus("reserved"),
         )
 
-    async def _resolve_free_time_repository(
-        self, obj_id: BaseId
-    ) -> tuple[FreeTimeRepository, list[Spare_time]]:
-        for repository in self._free_time_repositories:
-            windows = await repository.list_by_obj_id(obj_id)
-            if windows:
-                return repository, windows
-        return self._spare_time_repository, []
+        spec = NonOverlappingTimeSpec()
+        if not spec.is_satisfied(candidate, all_reserved):
+            raise ReservationOverlapError(
+                "Resource is already reserved for the requested time interval."
+            )

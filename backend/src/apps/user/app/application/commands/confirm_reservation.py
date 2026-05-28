@@ -4,6 +4,10 @@ from app.application.commands.reserve_availability import (
     ReserveAvailabilityCommand,
     ReserveAvailabilityHandler,
 )
+from app.application.commands.reserve_participant_availability import (
+    ReserveParticipantAvailabilityCommand,
+    ReserveParticipantAvailabilityHandler,
+)
 from app.application.ports.approvals import (
     ConfirmationTokenPort,
     ParticipantConfirmationTokenData,
@@ -32,11 +36,13 @@ class ConfirmReservationByTokenHandler:
         confirmation_tokens: ConfirmationTokenPort,
         project_approval_states: ProjectApprovalStatePort,
         reserve_availability: ReserveAvailabilityHandler,
+        reserve_participant_availability: ReserveParticipantAvailabilityHandler,
         publisher: EventPublisher,
     ) -> None:
         self._confirmation_tokens = confirmation_tokens
         self._project_approval_states = project_approval_states
         self._reserve_availability = reserve_availability
+        self._reserve_participant_availability = reserve_participant_availability
         self._publisher = publisher
 
     async def __call__(self, token: str) -> ReservationConfirmationResult:
@@ -89,13 +95,16 @@ class ConfirmReservationByTokenHandler:
         if state.status_name != "RESERVING":
             return _already_processed_result(state.status_name)
 
+        # Participants are people — clicking this link IS their availability
+        # confirmation.  We write a "reserved" entry directly into
+        # free_users_timing (no pre-existing free windows required) so the UI
+        # can display the occupied slot.  Equipment resources use the normal
+        # ReserveAvailabilityHandler path below.
         try:
-            reservation_id = await self._reserve_availability(
-                ReserveAvailabilityCommand(
+            reservation_id = await self._reserve_participant_availability(
+                ReserveParticipantAvailabilityCommand(
                     request_id=BaseId(payload.request_id),
                     user_id=BaseId(payload.user_id),
-                    owner_id=BaseId(payload.user_id),
-                    obj_id=BaseId(payload.user_id),
                     start_time=payload.time_from,
                     end_time=payload.time_to,
                 )

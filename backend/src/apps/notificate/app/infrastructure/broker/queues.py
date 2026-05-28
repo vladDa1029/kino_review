@@ -6,6 +6,12 @@ USER_EVENTS_EXCHANGE = RabbitExchange(
     durable=True,
 )
 
+PROJECT_EVENTS_EXCHANGE = RabbitExchange(
+    name="project.events",
+    type=ExchangeType.TOPIC,
+    durable=True,
+)
+
 NOTIFICATION_EMAIL_REQUESTED_QUEUE = RabbitQueue(
     name="notification.email_requested.notificate",
     durable=True,

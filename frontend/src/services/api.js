@@ -591,6 +591,11 @@ export const getDocumentDownloadUrl = async (documentId) =>
     method: 'GET',
   });
 
+export const listShiftResourceRequests = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}/resource-requests`, {
+    method: 'GET',
+  });
+
 export const createShiftResourceRequest = async (shiftId, payload) =>
   createJsonRequest(`/project/shifts/${shiftId}/resource-requests`, 'POST', payload);
 

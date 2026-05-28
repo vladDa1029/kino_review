@@ -48,6 +48,8 @@ from app.application.queries.resources import (
     GetProjectUserResourcesQuery,
     ListProjectMembersHandler,
     ListProjectMembersQuery,
+    ListShiftResourceRequestsHandler,
+    ListShiftResourceRequestsQuery,
 )
 
 __all__ = [
@@ -91,4 +93,6 @@ __all__ = [
     "GetProjectUserResourcesHandler",
     "ListProjectMembersQuery",
     "ListProjectMembersHandler",
+    "ListShiftResourceRequestsQuery",
+    "ListShiftResourceRequestsHandler",
 ]

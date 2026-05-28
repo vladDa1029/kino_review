@@ -49,6 +49,9 @@ from app.application.commands.delete_equipment import (
 from app.application.commands.delete_spare_time import DeleteSpareTimeHandler
 from app.application.commands.remove_image import RemoveImageHandler
 from app.application.commands.reserve_availability import ReserveAvailabilityHandler
+from app.application.commands.reserve_participant_availability import (
+    ReserveParticipantAvailabilityHandler,
+)
 from app.application.commands.update_description import UpdateDescriptionHandler
 from app.application.commands.update_equipment import (
     UpdateCameraHandler,
@@ -349,6 +352,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=ConfirmProjectInvitationByTokenHandler)
     provider.provide(source=ConfirmReservationByTokenHandler)
     provider.provide(source=ReserveAvailabilityHandler)
+    provider.provide(source=ReserveParticipantAvailabilityHandler)
     provider.provide(source=UserRegisteredHandler)
     provider.provide(source=ListMicrofonsHandler)
     provider.provide(source=ListCamerasHandler)

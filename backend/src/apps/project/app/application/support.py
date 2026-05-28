@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+import structlog
+
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
     ClockPort,
@@ -28,6 +30,9 @@ class SystemClock(ClockPort):
         return datetime.now(tz=UTC)
 
 
+_log = structlog.get_logger(__name__)
+
+
 async def publish_best_effort(
     *,
     publisher: EventPublisher,
@@ -37,7 +42,7 @@ async def publish_best_effort(
     try:
         await publisher.publish(topic, payload)
     except Exception:
-        return None
+        _log.exception("broker.publish_best_effort.failed", topic=topic)
 
 
 async def get_actor_member(

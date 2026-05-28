@@ -18,7 +18,7 @@ class ConfigABC(BaseSettings, ABC):
 class Log(ConfigABC):
     level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"] = Field(
         alias="LOG_LEVEL",
-        default="WARNING",
+        default="INFO",
     )
     format: str = Field(
         alias="LOG_FORMAT",

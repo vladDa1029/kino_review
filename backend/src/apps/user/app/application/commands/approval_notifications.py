@@ -2,11 +2,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+import structlog
+
 from app.application.ports.approvals import ConfirmationTokenPort
 from app.application.ports.broker import EventPublisher
 from app.application.ports.repositories import UserRepository
 from app.config import ConfirmationSettings
 from app.domain.entity.base import BaseId
+
+log = structlog.get_logger(__name__)
 
 EMAIL_REQUESTED_TOPIC = "notification.email_requested"
 
@@ -45,6 +49,12 @@ class HandleParticipantApprovalRequestedHandler:
     ) -> None:
         user = await self._users.get(BaseId(command.user_id))
         if user is None:
+            log.warning(
+                "approval.user_not_found",
+                user_id=str(command.user_id),
+                participant_id=str(command.participant_id),
+                request_id=str(command.request_id),
+            )
             return
         token = self._confirmation_tokens.issue_participant_token(
             request_id=command.request_id,
@@ -121,6 +131,12 @@ class HandleResourceApprovalRequestedHandler:
     ) -> None:
         user = await self._users.get(BaseId(command.owner_user_id))
         if user is None:
+            log.warning(
+                "approval.resource_user_not_found",
+                owner_user_id=str(command.owner_user_id),
+                resource_request_id=str(command.resource_request_id),
+                request_id=str(command.request_id),
+            )
             return
         token = self._confirmation_tokens.issue_resource_token(
             request_id=command.request_id,
@@ -172,6 +188,12 @@ class HandleProjectMemberInvitationRequestedHandler:
     ) -> None:
         user = await self._users.get(BaseId(command.user_id))
         if user is None:
+            log.warning(
+                "approval.invitation_user_not_found",
+                user_id=str(command.user_id),
+                member_id=str(command.member_id),
+                request_id=str(command.request_id),
+            )
             return
         token = self._confirmation_tokens.issue_project_member_invitation_token(
             request_id=command.request_id,

@@ -822,11 +822,6 @@ const ProjectListPage = () => {
       return;
     }
 
-    if (!canManageMembers) {
-      toast.error('У вас нет прав подтверждать участие в этой смене');
-      return;
-    }
-
     setParticipantActionId(participantId);
 
     try {
@@ -842,11 +837,6 @@ const ProjectListPage = () => {
 
   const handleDeclineParticipant = async (shiftId, participantId) => {
     if (!participantId) {
-      return;
-    }
-
-    if (!canManageMembers) {
-      toast.error('У вас нет прав отклонять участие в этой смене');
       return;
     }
 
@@ -1415,7 +1405,7 @@ const ProjectListPage = () => {
                       type="button"
                       className="ghost-action-btn"
                       onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
-                      disabled={!canManageMembers || isProcessing}
+                      disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
                     >
                       {isProcessing ? '...' : 'Подтвердить'}
                     </button>
@@ -1423,7 +1413,7 @@ const ProjectListPage = () => {
                       type="button"
                       className="ghost-action-btn danger"
                       onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
-                      disabled={!canManageMembers || isProcessing}
+                      disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
                     >
                       {isProcessing ? '...' : 'Отклонить'}
                     </button>

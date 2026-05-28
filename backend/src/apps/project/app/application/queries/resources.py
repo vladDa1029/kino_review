@@ -2,10 +2,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from app.application.ports.domain import ProjectMemberRepository, UserServicePort
+from app.application.ports.domain import (
+    ProjectMemberRepository,
+    ResourceRequestRepository,
+    ShiftRepository,
+    UserServicePort,
+)
 from app.application.resource_access import VIEWABLE_RESOURCE_KINDS_BY_ROLE
-from app.application.support import get_actor_member
-from app.domain.entities import ProjectMember
+from app.application.support import get_actor_member, require_shift
+from app.domain.entities import ProjectMember, ShiftResourceRequest
 from app.domain.enums import ProjectRole
 from app.domain.errors.business import AccessDeniedError, EntityNotFoundError
 from app.domain.policy.member_access import ActiveMemberPolicy
@@ -212,3 +217,37 @@ class GetProjectMemberHandler:
             created_at=target.created_at,
             updated_at=target.updated_at,
         )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListShiftResourceRequestsQuery:
+    shift_id: UUID
+    actor_user_id: UUID
+
+
+class ListShiftResourceRequestsHandler:
+    def __init__(
+        self,
+        *,
+        shifts: ShiftRepository,
+        resource_requests: ResourceRequestRepository,
+        project_members: ProjectMemberRepository,
+        active_member_policy: ActiveMemberPolicy,
+    ) -> None:
+        self._shifts = shifts
+        self._resource_requests = resource_requests
+        self._project_members = project_members
+        self._active_member_policy = active_member_policy
+
+    async def __call__(
+        self,
+        query: ListShiftResourceRequestsQuery,
+    ) -> list[ShiftResourceRequest]:
+        shift = await require_shift(shifts=self._shifts, shift_id=query.shift_id)
+        actor = await get_actor_member(
+            project_members=self._project_members,
+            project_id=shift.project_id,
+            user_id=query.actor_user_id,
+        )
+        self._active_member_policy.check(actor, action="list shift resource requests")
+        return await self._resource_requests.list_by_shift(query.shift_id)

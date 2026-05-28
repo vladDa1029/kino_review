@@ -12,6 +12,7 @@ import {
   getProjectUserResources,
   inviteShiftParticipant,
   listProjectMembers,
+  listShiftResourceRequests,
   rejectResourceRequest,
   uploadShiftDocument,
 } from '../services/api';
@@ -44,6 +45,16 @@ const memberStatusLabels = {
 const participantStatusLabels = {
   0: 'Ожидает',
   10: 'Подтвержден',
+  20: 'Зарезервирован',
+  30: 'Отклонен',
+  40: 'Отменен',
+  50: 'Ошибка резерва',
+};
+
+const resourceRequestStatusLabels = {
+  0: 'Ожидает владельца',
+  10: 'Одобрен',
+  15: 'Резервируется',
   20: 'Зарезервирован',
   30: 'Отклонен',
   40: 'Отменен',
@@ -113,6 +124,7 @@ const getCurrentUserId = (userData) =>
 const getRoleLabel = (role) => roleOptions.find((option) => option.value === role)?.label || role;
 const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Статус ${status}`;
 const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
+const getResourceRequestStatusLabel = (status) => resourceRequestStatusLabels[status] || `Статус ${status}`;
 const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
 const formatShortId = (value = '') => {
   const id = String(value);
@@ -332,6 +344,47 @@ const ShiftPlanningPage = () => {
       return { ...prev, shiftId: nextShiftId };
     });
   }, [selectedProjectShifts]);
+
+  // Load resource requests from the backend whenever the selected shift changes.
+  // This makes the list durable across page refreshes and new sessions.
+  useEffect(() => {
+    const shiftId = resourceRequestForm.shiftId;
+    if (!shiftId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    listShiftResourceRequests(shiftId)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+        const items = Array.isArray(response) ? response : [];
+        if (items.length === 0) {
+          return;
+        }
+        setShiftResourceRequests((prev) => {
+          const existing = prev[shiftId] || [];
+          const existingIds = new Set(existing.map((r) => r.oid));
+          const incoming = items.filter((r) => !existingIds.has(r.oid));
+          if (incoming.length === 0) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [shiftId]: [...incoming, ...existing],
+          };
+        });
+      })
+      .catch(() => {
+        // Silently ignore — local state remains intact
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [resourceRequestForm.shiftId]);
 
   useEffect(() => {
     if (!participantForm.userId) {
@@ -572,6 +625,15 @@ const ShiftPlanningPage = () => {
     }));
   };
 
+  const updateResourceRequestInState = (shiftId, requestId, nextRequest) => {
+    setShiftResourceRequests((prev) => ({
+      ...prev,
+      [shiftId]: (prev[shiftId] || []).map((request) =>
+        request.oid === requestId ? nextRequest : request,
+      ),
+    }));
+  };
+
   const handleUploadDocument = async (event) => {
     event.preventDefault();
 
@@ -669,10 +731,15 @@ const ShiftPlanningPage = () => {
         time_to: timeTo,
       });
 
-      setShiftResourceRequests((prev) => ({
-        ...prev,
-        [resourceRequestForm.shiftId]: [request, ...(prev[resourceRequestForm.shiftId] || [])],
-      }));
+      setShiftResourceRequests((prev) => {
+        const existing = prev[resourceRequestForm.shiftId] || [];
+        // Deduplicate in case the backend-fetch effect already added it
+        const withoutDuplicate = existing.filter((r) => r.oid !== request.oid);
+        return {
+          ...prev,
+          [resourceRequestForm.shiftId]: [request, ...withoutDuplicate],
+        };
+      });
       setResourceRequestForm((prev) => ({
         ...initialResourceRequestForm,
         shiftId: prev.shiftId,
@@ -701,9 +768,9 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      await approveResourceRequest(requestId);
-      removeResourceRequestFromState(shiftId, requestId);
-      toast.success('Запрос на ресурс подтвержден');
+      const updatedRequest = await approveResourceRequest(requestId);
+      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      toast.success('Запрос на ресурс подтвержден — ожидайте письмо для подтверждения брони');
     } catch (error) {
       toast.error(error?.message || 'Не удалось подтвердить запрос на ресурс');
     } finally {
@@ -726,8 +793,8 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      await rejectResourceRequest(requestId, { reason });
-      removeResourceRequestFromState(shiftId, requestId);
+      const updatedRequest = await rejectResourceRequest(requestId, { reason });
+      updateResourceRequestInState(shiftId, requestId, updatedRequest);
       setRejectReasonsById((prev) => ({ ...prev, [requestId]: '' }));
       toast.success('Запрос на ресурс отклонен');
     } catch (error) {
@@ -739,11 +806,6 @@ const ShiftPlanningPage = () => {
 
   const handleConfirmParticipant = async (shiftId, participantId) => {
     if (!participantId) {
-      return;
-    }
-
-    if (!canManageMembers) {
-      toast.error('У вас нет прав подтверждать участие в этой смене');
       return;
     }
 
@@ -762,11 +824,6 @@ const ShiftPlanningPage = () => {
 
   const handleDeclineParticipant = async (shiftId, participantId) => {
     if (!participantId) {
-      return;
-    }
-
-    if (!canManageMembers) {
-      toast.error('У вас нет прав отклонять участие в этой смене');
       return;
     }
 
@@ -1085,7 +1142,7 @@ const ShiftPlanningPage = () => {
                           type="button"
                           className="ghost-action-btn"
                           onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
-                          disabled={!canManageMembers || isProcessing}
+                          disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
                         >
                           {isProcessing ? '...' : 'Подтвердить'}
                         </button>
@@ -1093,7 +1150,7 @@ const ShiftPlanningPage = () => {
                           type="button"
                           className="ghost-action-btn danger"
                           onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
-                          disabled={!canManageMembers || isProcessing}
+                          disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
                         >
                           {isProcessing ? '...' : 'Отклонить'}
                         </button>
@@ -1333,6 +1390,7 @@ const ShiftPlanningPage = () => {
                     <article key={request.oid} className="project-member-card shift-resource-request-card">
                       <div className="shift-resource-request-copy">
                         <span className="project-type-label">{request.resource_type || 'Ресурс'}</span>
+                        <span className="project-type-label">{getResourceRequestStatusLabel(request.status)}</span>
                         <h3 title={request.resource_id}>{formatShortId(request.resource_id)}</h3>
                         <p title={request.resource_owner_user_id}>Владелец: {formatShortId(request.resource_owner_user_id)}</p>
                         <p>{formatDateTime(request.time_from)} - {formatDateTime(request.time_to)}</p>
@@ -1340,36 +1398,38 @@ const ShiftPlanningPage = () => {
                         {request.reserve_failure_reason ? <p>Ошибка резерва: {request.reserve_failure_reason}</p> : null}
                       </div>
 
-                      <div className="project-member-actions shift-resource-actions">
-                        <label className="field-block shift-resource-reason">
-                          <span>Причина отказа</span>
-                          <input
-                            value={rejectReasonsById[request.oid] || ''}
-                            onChange={(event) =>
-                              setRejectReasonsById((prev) => ({ ...prev, [request.oid]: event.target.value }))
-                            }
-                            placeholder="Укажите причину"
-                            disabled={!canDecide || isProcessing}
-                          />
-                        </label>
+                      {request.status === 0 && (
+                        <div className="project-member-actions shift-resource-actions">
+                          <label className="field-block shift-resource-reason">
+                            <span>Причина отказа</span>
+                            <input
+                              value={rejectReasonsById[request.oid] || ''}
+                              onChange={(event) =>
+                                setRejectReasonsById((prev) => ({ ...prev, [request.oid]: event.target.value }))
+                              }
+                              placeholder="Укажите причину"
+                              disabled={!canDecide || isProcessing}
+                            />
+                          </label>
 
-                        <button
-                          type="button"
-                          className="ghost-action-btn"
-                          onClick={() => handleApproveShiftResourceRequest(request.shift_id, request.oid)}
-                          disabled={!canDecide || isProcessing}
-                        >
-                          {isProcessing ? '...' : 'Подтвердить'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-action-btn danger"
-                          onClick={() => handleRejectShiftResourceRequest(request.shift_id, request.oid)}
-                          disabled={!canDecide || isProcessing}
-                        >
-                          {isProcessing ? '...' : 'Отклонить'}
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            className="ghost-action-btn"
+                            onClick={() => handleApproveShiftResourceRequest(request.shift_id, request.oid)}
+                            disabled={!canDecide || isProcessing}
+                          >
+                            {isProcessing ? '...' : 'Подтвердить'}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleRejectShiftResourceRequest(request.shift_id, request.oid)}
+                            disabled={!canDecide || isProcessing}
+                          >
+                            {isProcessing ? '...' : 'Отклонить'}
+                          </button>
+                        </div>
+                      )}
                     </article>
                   );
                 })

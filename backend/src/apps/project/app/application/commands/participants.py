@@ -179,17 +179,27 @@ class ConfirmShiftParticipantHandler:
             )
             self._shift_participant_service.mark_reserving(participant=participant, now=now)
             await self._shift_participants.update(participant)
-            await self._reservation_outbox.add(
-                ReservationOutboxMessage(
-                    oid=request_id,
-                    operation=PARTICIPANT_RESERVE_OPERATION,
-                    aggregate_id=participant.oid,
-                    status=OUTBOX_STATUS_PENDING,
-                    attempts=0,
-                    created_at=now,
-                    updated_at=now,
+            existing_outbox = await self._reservation_outbox.get_by_id(request_id)
+            if existing_outbox is not None:
+                # Re-invite + re-confirm cycle: reset the completed entry back to
+                # pending so the outbox poller will pick it up again.
+                existing_outbox.status = OUTBOX_STATUS_PENDING
+                existing_outbox.attempts = 0
+                existing_outbox.last_error = None
+                existing_outbox.updated_at = now
+                await self._reservation_outbox.update(existing_outbox)
+            else:
+                await self._reservation_outbox.add(
+                    ReservationOutboxMessage(
+                        oid=request_id,
+                        operation=PARTICIPANT_RESERVE_OPERATION,
+                        aggregate_id=participant.oid,
+                        status=OUTBOX_STATUS_PENDING,
+                        attempts=0,
+                        created_at=now,
+                        updated_at=now,
+                    )
                 )
-            )
             await mark_shift_reports_stale(
                 shift_reports=self._shift_reports,
                 clock=self._clock,

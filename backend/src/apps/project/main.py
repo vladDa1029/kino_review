@@ -131,8 +131,13 @@ def start_app_dev() -> FastAPI:
         openapi_tags=PROJECT_OPENAPI_TAGS,
     )
 
+    _SILENT_PATHS = {"/health"}
+
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
+        if request.url.path in _SILENT_PATHS:
+            return await call_next(request)
+
         request_id = request.headers.get("X-Request-Id", str(uuid4()))
         started_at = perf_counter()
         request_logger = log.bind(

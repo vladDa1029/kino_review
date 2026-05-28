@@ -80,6 +80,8 @@ from app.application.queries import (
     ListProjectMembersQuery,
     ListShiftReportsHandler,
     ListShiftReportsQuery,
+    ListShiftResourceRequestsHandler,
+    ListShiftResourceRequestsQuery,
 )
 from app.domain.errors.business import AccessDeniedError
 from app.presentation.schemas import (
@@ -940,6 +942,27 @@ async def get_document_download_url(
         )
     )
     return DocumentDownloadUrlResponse(download_url=url)
+
+
+@router.get(
+    "/shifts/{shift_id}/resource-requests",
+    response_model=list[ShiftResourceRequestResponse],
+    tags=["resource-requests"],
+    summary="List shift resource requests",
+    description="Returns all resource requests for the specified shift visible to the caller.",
+)
+async def list_shift_resource_requests(
+    shift_id: UUID,
+    handler: FromDishka[ListShiftResourceRequestsHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> list[ShiftResourceRequestResponse]:
+    requests = await handler(
+        ListShiftResourceRequestsQuery(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return [ShiftResourceRequestResponse.from_entity(r) for r in requests]
 
 
 @router.post(
