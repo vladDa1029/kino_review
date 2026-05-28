@@ -161,6 +161,7 @@ services:
       <<: *deploy-defaults
       resources: *resources-medium
 
+
   # ─── API Gateway ──────────────────────────
 
   api-gateway:

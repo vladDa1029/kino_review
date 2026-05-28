@@ -72,9 +72,7 @@ async def healthcheck(handler: FromDishka[HealthHandler]) -> dict:
 
 def require_admin_access(
     x_user_token_type: Annotated[str | None, Header(alias="X-User-Token-Type")] = None,
-    x_user_is_superuser: Annotated[
-        str | None, Header(alias="X-User-Is-Superuser")
-    ] = None,
+    x_user_is_superuser: Annotated[str | None, Header(alias="X-User-Is-Superuser")] = None,
 ) -> None:
     ensure_admin_headers(
         x_user_token_type=x_user_token_type,
@@ -261,7 +259,7 @@ async def get_user_by_id(
     return _serialize_admin_user(user)
 
 
-@router.patch(
+@router.put(
     "/admin/users/{user_id}",
     tags=["admin"],
     summary="Update user for admin",
