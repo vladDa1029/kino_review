@@ -2,6 +2,20 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getAdminProject, getAdminProjectMember, listAdminProjectMembers } from '../services/api';
 
+const projectStatusLabels = {
+  10: 'Активен',
+  20: 'Архивирован',
+};
+
+const memberStatusLabels = {
+  0: 'Ожидает приглашения',
+  10: 'Активен',
+  20: 'Удалён',
+};
+
+const getProjectStatusLabel = (status) => projectStatusLabels[Number(status)] || `Статус ${status}`;
+const getMemberStatusLabel = (status) => memberStatusLabels[Number(status)] || `Статус ${status}`;
+
 const AdminProjectDetailsPage = () => {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
@@ -114,7 +128,7 @@ const AdminProjectDetailsPage = () => {
             </div>
             <div className="admin-summary-card">
               <span>Статус</span>
-              <strong>{project?.status}</strong>
+              <strong>{getProjectStatusLabel(project?.status)}</strong>
             </div>
             <div className="admin-summary-card">
               <span>Обновлён</span>
@@ -147,7 +161,7 @@ const AdminProjectDetailsPage = () => {
                     <tr key={member.oid}>
                       <td data-label="User ID">{member.user_id}</td>
                       <td data-label="Роль">{member.role}</td>
-                      <td data-label="Статус">{member.status}</td>
+                      <td data-label="Статус">{getMemberStatusLabel(member.status)}</td>
                       <td data-label="Пригласил">{member.invited_by}</td>
                       <td data-label="Создан">{new Date(member.created_at).toLocaleString()}</td>
                       <td data-label="Обновлён">{new Date(member.updated_at).toLocaleString()}</td>
@@ -198,7 +212,7 @@ const AdminProjectDetailsPage = () => {
                 </div>
                 <div className="admin-summary-card">
                   <span>Статус</span>
-                  <strong>{selectedMember.status}</strong>
+                  <strong>{getMemberStatusLabel(selectedMember.status)}</strong>
                 </div>
                 <div className="admin-summary-card">
                   <span>Пригласил</span>

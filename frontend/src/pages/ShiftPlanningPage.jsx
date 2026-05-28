@@ -18,7 +18,7 @@ import {
 } from '../services/api';
 import { useAuth } from '../context/useAuth';
 import { useProjectContext } from '../context/useProjectContext';
-import { formatDateTime, toIsoDateTime } from '../utils/dateTime';
+import { formatDateTime, toDateTimeLocalValue, toIsoDateTime } from '../utils/dateTime';
 
 const STORAGE_KEYS = {
   shifts: 'kinoflow.projectShifts',
@@ -70,6 +70,7 @@ const shiftStatusLabels = {
 };
 
 const SHIFT_STATUS_APPROVED = 20;
+const PROJECT_MEMBER_STATUS_ACTIVE = 10;
 
 const documentTypeOptions = [
   { value: 'PLAN', label: 'План' },
@@ -122,14 +123,19 @@ const getCurrentUserId = (userData) =>
   '';
 
 const getRoleLabel = (role) => roleOptions.find((option) => option.value === role)?.label || role;
-const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Статус ${status}`;
-const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
-const getResourceRequestStatusLabel = (status) => resourceRequestStatusLabels[status] || `Статус ${status}`;
-const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
+const getMemberStatusLabel = (status) => memberStatusLabels[Number(status)] || `Статус ${status}`;
+const getParticipantStatusLabel = (status) => participantStatusLabels[Number(status)] || `Статус ${status}`;
+const getResourceRequestStatusLabel = (status) => resourceRequestStatusLabels[Number(status)] || `Статус ${status}`;
+const getShiftStatusLabel = (status) => shiftStatusLabels[Number(status)] || `Статус ${status}`;
 const formatShortId = (value = '') => {
   const id = String(value);
   return id.length > 13 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
 };
+
+const getShiftTimeRange = (shift) => ({
+  timeFrom: toDateTimeLocalValue(shift?.start_time),
+  timeTo: toDateTimeLocalValue(shift?.end_time),
+});
 
 const readStorage = (key) => {
   try {
@@ -258,7 +264,7 @@ const ShiftPlanningPage = () => {
         oid: `owner-${memberProject.owner_id}`,
         user_id: memberProject.owner_id,
         role: 'DIRECTOR',
-        status: 0,
+        status: PROJECT_MEMBER_STATUS_ACTIVE,
         invited_by: memberProject.owner_id,
         created_at: memberProject.created_at,
         isOwner: true,
@@ -308,12 +314,18 @@ const ShiftPlanningPage = () => {
       const nextShiftId = selectedProjectShifts.some((shift) => shift.oid === prev.shiftId)
         ? prev.shiftId
         : selectedProjectShifts[0]?.oid || '';
+      const selectedShift = selectedProjectShifts.find((shift) => shift.oid === nextShiftId);
+      const shiftRange = getShiftTimeRange(selectedShift);
 
-      if (nextShiftId === prev.shiftId) {
+      if (
+        nextShiftId === prev.shiftId &&
+        shiftRange.timeFrom === prev.timeFrom &&
+        shiftRange.timeTo === prev.timeTo
+      ) {
         return prev;
       }
 
-      return { ...prev, shiftId: nextShiftId };
+      return { ...prev, shiftId: nextShiftId, ...shiftRange };
     });
   }, [selectedProjectShifts]);
 
@@ -336,12 +348,18 @@ const ShiftPlanningPage = () => {
       const nextShiftId = selectedProjectShifts.some((shift) => shift.oid === prev.shiftId)
         ? prev.shiftId
         : selectedProjectShifts[0]?.oid || '';
+      const selectedShift = selectedProjectShifts.find((shift) => shift.oid === nextShiftId);
+      const shiftRange = getShiftTimeRange(selectedShift);
 
-      if (nextShiftId === prev.shiftId) {
+      if (
+        nextShiftId === prev.shiftId &&
+        shiftRange.timeFrom === prev.timeFrom &&
+        shiftRange.timeTo === prev.timeTo
+      ) {
         return prev;
       }
 
-      return { ...prev, shiftId: nextShiftId };
+      return { ...prev, shiftId: nextShiftId, ...shiftRange };
     });
   }, [selectedProjectShifts]);
 
@@ -442,7 +460,19 @@ const ShiftPlanningPage = () => {
 
   const handleParticipantFormChange = (event) => {
     const { name, value } = event.target;
-    setParticipantForm((prev) => ({ ...prev, [name]: value }));
+    setParticipantForm((prev) => {
+      if (name === 'shiftId') {
+        const selectedShift = selectedProjectShifts.find((shift) => shift.oid === value);
+        return { ...prev, shiftId: value, ...getShiftTimeRange(selectedShift) };
+      }
+
+      if (name === 'userId') {
+        const selectedMember = displayedMembers.find((member) => member.user_id === value);
+        return { ...prev, userId: value, role: selectedMember?.role || prev.role };
+      }
+
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleDocumentFormChange = (event) => {
@@ -456,6 +486,11 @@ const ShiftPlanningPage = () => {
   const handleResourceRequestFormChange = (event) => {
     const { name, value } = event.target;
     setResourceRequestForm((prev) => {
+      if (name === 'shiftId') {
+        const selectedShift = selectedProjectShifts.find((shift) => shift.oid === value);
+        return { ...prev, shiftId: value, ...getShiftTimeRange(selectedShift) };
+      }
+
       if (name === 'ownerUserId') {
         return {
           ...prev,
@@ -522,8 +557,16 @@ const ShiftPlanningPage = () => {
       setParticipantForm((prev) => ({
         ...prev,
         shiftId: createdShift.oid,
-        timeFrom: shiftForm.startTime,
-        timeTo: shiftForm.endTime,
+        ...getShiftTimeRange(createdShift),
+      }));
+      setDocumentForm((prev) => ({
+        ...prev,
+        shiftId: createdShift.oid,
+      }));
+      setResourceRequestForm((prev) => ({
+        ...prev,
+        shiftId: createdShift.oid,
+        ...getShiftTimeRange(createdShift),
       }));
       setShiftForm(initialShiftForm);
       toast.success('Смена создана');
@@ -535,7 +578,11 @@ const ShiftPlanningPage = () => {
   };
 
   const handleSelectShift = (shiftId) => {
-    setParticipantForm((prev) => ({ ...prev, shiftId }));
+    const selectedShift = selectedProjectShifts.find((shift) => shift.oid === shiftId);
+    const shiftRange = getShiftTimeRange(selectedShift);
+    setParticipantForm((prev) => ({ ...prev, shiftId, ...shiftRange }));
+    setDocumentForm((prev) => ({ ...prev, shiftId }));
+    setResourceRequestForm((prev) => ({ ...prev, shiftId, ...shiftRange }));
   };
 
   const handleApproveShift = async (shiftId) => {
@@ -588,12 +635,14 @@ const ShiftPlanningPage = () => {
       return;
     }
 
+    const selectedMember = displayedMembers.find((member) => member.user_id === userId);
+
     setIsInvitingParticipant(true);
 
     try {
       const participant = await inviteShiftParticipant(participantForm.shiftId, {
         user_id: userId,
-        role: participantForm.role,
+        role: selectedMember?.role || participantForm.role,
         time_from: timeFrom,
         time_to: timeTo,
       });
@@ -916,10 +965,7 @@ const ShiftPlanningPage = () => {
               <p>Смена сохраняется для текущего проекта и остается доступной в меню планирования.</p>
             </div>
 
-            {!canManageMembers ? (
-              <p className="helper-note">Создавать и подтверждать смены может создатель проекта или участник с ролью DIRECTOR.</p>
-            ) : null}
-
+            {canManageMembers ? (
             <form className="shift-planning-form" onSubmit={handleCreateShift}>
               <label className="field-block">
                 <span>Название смены</span>
@@ -973,6 +1019,7 @@ const ShiftPlanningPage = () => {
                 {isCreatingShift ? 'Создаем...' : 'Создать смену'}
               </button>
             </form>
+            ) : null}
 
             <div className="project-shifts-list">
               {selectedProjectShifts.length === 0 ? (
@@ -1005,14 +1052,16 @@ const ShiftPlanningPage = () => {
                         >
                           {isSelectedShift ? 'Выбрана' : 'Выбрать'}
                         </button>
-                        <button
-                          type="button"
-                          className="profile-save-btn compact"
-                          onClick={() => handleApproveShift(shift.oid)}
-                          disabled={!canManageMembers || isApproving}
-                        >
-                          {isApproving ? 'Подтверждаем...' : 'Подтвердить смену'}
-                        </button>
+                        {canManageMembers ? (
+                          <button
+                            type="button"
+                            className="profile-save-btn compact"
+                            onClick={() => handleApproveShift(shift.oid)}
+                            disabled={isApproving}
+                          >
+                            {isApproving ? 'Подтверждаем...' : 'Подтвердить смену'}
+                          </button>
+                        ) : null}
                       </div>
                     </article>
                   );
@@ -1030,6 +1079,7 @@ const ShiftPlanningPage = () => {
               <p>Приглашения отправляются по выбранной смене и видны ниже в списке.</p>
             </div>
 
+            {canManageMembers ? (
             <form className="shift-planning-participant-form" onSubmit={handleInviteParticipant}>
               <label className="field-block">
                 <span>Смена</span>
@@ -1091,7 +1141,7 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={participantForm.timeFrom}
                   onChange={handleParticipantFormChange}
-                  disabled={!canManageMembers}
+                  readOnly
                 />
               </label>
 
@@ -1102,7 +1152,7 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={participantForm.timeTo}
                   onChange={handleParticipantFormChange}
-                  disabled={!canManageMembers}
+                  readOnly
                 />
               </label>
 
@@ -1114,6 +1164,7 @@ const ShiftPlanningPage = () => {
                 {isInvitingParticipant ? 'Приглашаем...' : 'Пригласить в смену'}
               </button>
             </form>
+            ) : null}
 
             <div className="project-participants-list">
               {!participantForm.shiftId ? (
@@ -1137,12 +1188,13 @@ const ShiftPlanningPage = () => {
                         <p>{formatDateTime(participant.time_from)} - {formatDateTime(participant.time_to)}</p>
                       </div>
 
+                      {currentUserId === participant.user_id ? (
                       <div className="project-member-actions">
                         <button
                           type="button"
                           className="ghost-action-btn"
                           onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
-                          disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
+                          disabled={isProcessing}
                         >
                           {isProcessing ? '...' : 'Подтвердить'}
                         </button>
@@ -1150,11 +1202,12 @@ const ShiftPlanningPage = () => {
                           type="button"
                           className="ghost-action-btn danger"
                           onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
-                          disabled={!currentUserId || currentUserId !== participant.user_id || isProcessing}
+                          disabled={isProcessing}
                         >
                           {isProcessing ? '...' : 'Отклонить'}
                         </button>
                       </div>
+                      ) : null}
                     </article>
                   );
                 })
@@ -1171,6 +1224,7 @@ const ShiftPlanningPage = () => {
               <p>Загрузите план или сценарий для выбранной смены и получите временную ссылку на скачивание.</p>
             </div>
 
+            {canManageMembers ? (
             <form className="shift-planning-document-form" onSubmit={handleUploadDocument}>
               <label className="field-block">
                 <span>Смена</span>
@@ -1249,6 +1303,7 @@ const ShiftPlanningPage = () => {
                 {isUploadingDocument ? 'Загружаем...' : 'Загрузить документ'}
               </button>
             </form>
+            ) : null}
 
             <div className="project-documents-list">
               {!documentForm.shiftId ? (
@@ -1290,6 +1345,7 @@ const ShiftPlanningPage = () => {
               <p>Создайте запрос на ресурс для смены, затем владелец ресурса сможет его подтвердить или отклонить.</p>
             </div>
 
+            {canManageMembers ? (
             <form className="shift-planning-resource-form" onSubmit={handleCreateResourceRequest}>
               <label className="field-block">
                 <span>Смена</span>
@@ -1354,6 +1410,7 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={resourceRequestForm.timeFrom}
                   onChange={handleResourceRequestFormChange}
+                  readOnly
                 />
               </label>
 
@@ -1364,6 +1421,7 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={resourceRequestForm.timeTo}
                   onChange={handleResourceRequestFormChange}
+                  readOnly
                 />
               </label>
 
@@ -1375,6 +1433,7 @@ const ShiftPlanningPage = () => {
                 {isSubmittingResourceRequest ? 'Создаем...' : 'Создать запрос'}
               </button>
             </form>
+            ) : null}
 
             <div className="project-resource-requests-list">
               {!resourceRequestForm.shiftId ? (
@@ -1398,7 +1457,7 @@ const ShiftPlanningPage = () => {
                         {request.reserve_failure_reason ? <p>Ошибка резерва: {request.reserve_failure_reason}</p> : null}
                       </div>
 
-                      {request.status === 0 && (
+                      {Number(request.status) === 0 && canDecide && (
                         <div className="project-member-actions shift-resource-actions">
                           <label className="field-block shift-resource-reason">
                             <span>Причина отказа</span>

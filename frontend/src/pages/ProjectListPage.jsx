@@ -100,22 +100,15 @@ const formatDate = (value) => {
 
 const getProjectId = (project) => project.oid || project.id;
 
-const getStatusLabel = (status) => statusLabels[status] || `Статус ${status}`;
+const getStatusLabel = (status) => statusLabels[Number(status)] || `Статус ${status}`;
 const isProjectActive = (project) => Number(project?.status) === PROJECT_STATUS_ACTIVE;
 const isProjectArchived = (project) => Number(project?.status) === PROJECT_STATUS_ARCHIVED;
 
 const getRoleLabel = (role) => roleOptions.find((option) => option.value === role)?.label || role;
 
-const getMemberStatusLabel = (status) => memberStatusLabels[status] || `Статус ${status}`;
-const getParticipantStatusLabel = (status) => participantStatusLabels[status] || `Статус ${status}`;
-const getShiftStatusLabel = (status) => shiftStatusLabels[status] || `Статус ${status}`;
-
-const SearchIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="11" cy="11" r="6" />
-    <path d="M20 20l-4.2-4.2" />
-  </svg>
-);
+const getMemberStatusLabel = (status) => memberStatusLabels[Number(status)] || `Статус ${status}`;
+const getParticipantStatusLabel = (status) => participantStatusLabels[Number(status)] || `Статус ${status}`;
+const getShiftStatusLabel = (status) => shiftStatusLabels[Number(status)] || `Статус ${status}`;
 
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -246,7 +239,6 @@ const ProjectListPage = () => {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [projectSearch, setProjectSearch] = useState('');
   const [projectView, setProjectView] = useState('active');
   const projectSort = 'updated';
   const [submitting, setSubmitting] = useState(false);
@@ -369,7 +361,7 @@ const ProjectListPage = () => {
         oid: `owner-${memberProject.owner_id}`,
         user_id: memberProject.owner_id,
         role: 'DIRECTOR',
-        status: 0,
+        status: PROJECT_MEMBER_STATUS_ACTIVE,
         invited_by: memberProject.owner_id,
         created_at: memberProject.created_at,
         isOwner: true,
@@ -402,8 +394,6 @@ const ProjectListPage = () => {
     [displayedMembers],
   );
   const filteredProjects = useMemo(() => {
-    const normalizedSearch = projectSearch.trim().toLowerCase();
-
     const nextProjects = projects.filter((project) => {
       const matchesView =
         projectView === 'all'
@@ -416,12 +406,7 @@ const ProjectListPage = () => {
         return false;
       }
 
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      const haystack = `${project.title || ''} ${project.description || ''}`.toLowerCase();
-      return haystack.includes(normalizedSearch);
+      return true;
     });
 
     nextProjects.sort((left, right) => {
@@ -437,7 +422,7 @@ const ProjectListPage = () => {
     });
 
     return nextProjects;
-  }, [projectSearch, projectSort, projectView, projects]);
+  }, [projectSort, projectView, projects]);
   const featuredProject = filteredProjects[0] || null;
   const secondaryProjects = filteredProjects.slice(1);
 
@@ -949,16 +934,6 @@ const ProjectListPage = () => {
       </div>
 
       <div className="dashboard-panel project-list-commandbar">
-        <label className="project-search-field">
-          <SearchIcon />
-          <input
-            type="search"
-            value={projectSearch}
-            onChange={(event) => setProjectSearch(event.target.value)}
-            placeholder="Поиск по названию или описанию"
-          />
-        </label>
-
         <div className="project-view-switcher" role="tablist" aria-label="Фильтр проектов">
           {[
             { key: 'all', label: 'Все' },
@@ -1437,10 +1412,6 @@ const ProjectListPage = () => {
           </p>
         </div>
 
-        {memberProject && !canManageMembers ? (
-          <p className="helper-note">Управлять участниками может создатель проекта или участник с ролью DIRECTOR.</p>
-        ) : null}
-
         <div className="project-members-toolbar project-members-toolbar-refined">
           <div className="project-members-toolbar-icon" aria-hidden="true">
             <UsersIcon />
@@ -1489,8 +1460,10 @@ const ProjectListPage = () => {
           </div>
         </div>
 
-        {memberInviteError ? <p className="helper-note">{memberInviteError}</p> : null}
+        {canManageMembers && memberInviteError ? <p className="helper-note">{memberInviteError}</p> : null}
 
+        {canManageMembers ? (
+        <>
         <form className="project-member-invite-form project-member-invite-form-refined" onSubmit={handleInviteMember}>
           <label className="field-block">
             <span>Пригласить по</span>
@@ -1547,6 +1520,8 @@ const ProjectListPage = () => {
             ? 'После отправки приглашения участник получит письмо со ссылкой и сможет принять приглашение только после входа в систему.'
             : 'При приглашении по ID user пользователь добавляется в проект сразу, без ожидания ответа.'}
         </p>
+        </>
+        ) : null}
 
         <div className="project-members-table-shell">
           {isMembersLoading ? <p className="helper-note">Загружаем участников...</p> : null}

@@ -11,18 +11,47 @@ import {
 import { decodeToken, shouldRefreshToken } from '../utils/tokenUtils';
 import { AuthContext } from './authContextInstance';
 
+const AUTH_EMAIL_KEY = 'kinoflow.authEmail';
+
+const readStoredAuthEmail = () => {
+  try {
+    return localStorage.getItem(AUTH_EMAIL_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const writeStoredAuthEmail = (email) => {
+  try {
+    if (email) {
+      localStorage.setItem(AUTH_EMAIL_KEY, email);
+    } else {
+      localStorage.removeItem(AUTH_EMAIL_KEY);
+    }
+  } catch {
+    // localStorage can be unavailable in restricted browser modes.
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(() => getAccessToken());
   const [userData, setUserData] = useState(() => {
     const currentToken = getAccessToken();
     return currentToken ? decodeToken(currentToken) : null;
   });
+  const [authEmail, setAuthEmail] = useState(readStoredAuthEmail);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   const applyToken = useCallback((nextToken, nextTokenType = 'Bearer') => {
     setAuthSession(nextToken, nextTokenType);
+  }, []);
+
+  const rememberAuthEmail = useCallback((email) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    setAuthEmail(normalizedEmail);
+    writeStoredAuthEmail(normalizedEmail);
   }, []);
 
   const handleRefreshToken = useCallback(async () => {
@@ -63,6 +92,7 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.login(email, password);
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
+          rememberAuthEmail(response.email || email);
           toast.success('Вы успешно вошли в систему');
           return response;
         }
@@ -72,7 +102,7 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
     },
-    [applyToken],
+    [applyToken, rememberAuthEmail],
   );
 
   const handleRegister = useCallback(
@@ -81,6 +111,7 @@ export const AuthProvider = ({ children }) => {
         const response = await authApi.register(email, password);
         if (response?.access_token) {
           applyToken(response.access_token, response.token_type);
+          rememberAuthEmail(response.email || email);
           toast.success('Регистрация и вход выполнены успешно');
           return response;
         }
@@ -88,6 +119,7 @@ export const AuthProvider = ({ children }) => {
         const loginResponse = await authApi.login(email, password);
         if (loginResponse?.access_token) {
           applyToken(loginResponse.access_token, loginResponse.token_type);
+          rememberAuthEmail(loginResponse.email || email);
           toast.success('Регистрация и вход выполнены успешно');
           return loginResponse;
         }
@@ -98,7 +130,7 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
     },
-    [applyToken],
+    [applyToken, rememberAuthEmail],
   );
 
   const handleLogout = useCallback(async () => {
@@ -108,14 +140,16 @@ export const AuthProvider = ({ children }) => {
       // Ошибки выхода на бэкенде игнорируем и очищаем локальное состояние.
     } finally {
       clearAccessToken();
+      rememberAuthEmail('');
       toast.info('Вы вышли из системы');
     }
-  }, []);
+  }, [rememberAuthEmail]);
 
   const contextValue = useMemo(
     () => ({
       token,
       userData,
+      authEmail,
       isAuthReady,
       isAuthModalOpen,
       setIsAuthModalOpen,
@@ -137,6 +171,7 @@ export const AuthProvider = ({ children }) => {
       isLogin,
       token,
       userData,
+      authEmail,
     ],
   );
 

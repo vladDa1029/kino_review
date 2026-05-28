@@ -5580,3 +5580,6 @@ select::-ms-expand {
     width: 100%;
   }
 }
+.shift-planning-participant-form .field-block:nth-child(3) {
+  display: none;
+}

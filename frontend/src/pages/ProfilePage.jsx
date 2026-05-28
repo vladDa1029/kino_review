@@ -163,7 +163,7 @@ const PlusIcon = () => (
 );
 
 const ProfilePage = () => {
-  const { userData } = useAuth();
+  const { userData, authEmail } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
   const [savedProfile, setSavedProfile] = useState(initialProfile);
   const [descriptionId, setDescriptionId] = useState(null);
@@ -260,6 +260,7 @@ const ProfilePage = () => {
     userData?.preferred_username ||
     userData?.login ||
     userData?.username ||
+    authEmail ||
     '';
 
   useEffect(() => {
@@ -546,7 +547,8 @@ const ProfilePage = () => {
                     <span>Email</span>
                     <input
                       type="text"
-                      value={userEmail || 'user@example.com'}
+                      value={userEmail || ''}
+                      placeholder="Email текущего пользователя"
                       className="profile-input profile-readonly-input"
                       readOnly
                     />

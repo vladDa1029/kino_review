@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listAdminProjects } from '../services/api';
 
+const projectStatusLabels = {
+  10: 'Активен',
+  20: 'Архивирован',
+};
+
+const getProjectStatusLabel = (status) => projectStatusLabels[Number(status)] || `Статус ${status}`;
+
 const AdminProjectsPage = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -90,7 +97,7 @@ const AdminProjectsPage = () => {
                       <div className="table-subtext">{project.description || 'Без описания'}</div>
                     </td>
                     <td data-label="Владелец">{project.owner_id}</td>
-                    <td data-label="Статус">{project.status}</td>
+                    <td data-label="Статус">{getProjectStatusLabel(project.status)}</td>
                     <td data-label="Создан">{new Date(project.created_at).toLocaleString()}</td>
                     <td data-label="Обновлён">{new Date(project.updated_at).toLocaleString()}</td>
                     <td data-label="Действия">
