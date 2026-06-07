@@ -3,6 +3,8 @@ from app.application.commands.documents import (
     UploadShiftDocumentHandler,
 )
 from app.application.commands.participants import (
+    CancelShiftParticipantCommand,
+    CancelShiftParticipantHandler,
     ConfirmShiftParticipantCommand,
     ConfirmShiftParticipantHandler,
     DeclineShiftParticipantCommand,
@@ -58,6 +60,8 @@ from app.application.commands.reservation_outbox import ProcessReservationOutbox
 from app.application.commands.resources import (
     ApproveResourceRequestCommand,
     ApproveResourceRequestHandler,
+    CancelResourceRequestCommand,
+    CancelResourceRequestHandler,
     CreateResourceRequestCommand,
     CreateResourceRequestHandler,
     RejectResourceRequestCommand,
@@ -66,8 +70,14 @@ from app.application.commands.resources import (
 from app.application.commands.shifts import (
     ApproveShiftCommand,
     ApproveShiftHandler,
+    CancelShiftCommand,
+    CancelShiftHandler,
+    CompleteShiftCommand,
+    CompleteShiftHandler,
     CreateShiftCommand,
     CreateShiftHandler,
+    UpdateShiftCommand,
+    UpdateShiftHandler,
 )
 
 __all__ = [
@@ -91,12 +101,20 @@ __all__ = [
     "CreateShiftHandler",
     "ApproveShiftCommand",
     "ApproveShiftHandler",
+    "UpdateShiftCommand",
+    "UpdateShiftHandler",
+    "CompleteShiftCommand",
+    "CompleteShiftHandler",
+    "CancelShiftCommand",
+    "CancelShiftHandler",
     "InviteShiftParticipantCommand",
     "InviteShiftParticipantHandler",
     "ConfirmShiftParticipantCommand",
     "ConfirmShiftParticipantHandler",
     "DeclineShiftParticipantCommand",
     "DeclineShiftParticipantHandler",
+    "CancelShiftParticipantCommand",
+    "CancelShiftParticipantHandler",
     "UploadShiftDocumentCommand",
     "UploadShiftDocumentHandler",
     "GenerateShiftReportCommand",
@@ -128,4 +146,6 @@ __all__ = [
     "ApproveResourceRequestHandler",
     "RejectResourceRequestCommand",
     "RejectResourceRequestHandler",
+    "CancelResourceRequestCommand",
+    "CancelResourceRequestHandler",
 ]

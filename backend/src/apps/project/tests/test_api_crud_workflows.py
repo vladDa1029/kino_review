@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.application.commands.documents import UploadShiftDocumentHandler
 from app.application.commands.participants import (
+    CancelShiftParticipantHandler,
     ConfirmShiftParticipantHandler,
     DeclineShiftParticipantHandler,
     InviteShiftParticipantHandler,
@@ -27,12 +28,24 @@ from app.application.commands.reports import (
     ArchiveShiftReportHandler,
     GenerateShiftReportHandler,
 )
+from app.application.commands.reservation_outbox import (
+    PARTICIPANT_CANCEL_OPERATION,
+    RESOURCE_CANCEL_OPERATION,
+    ProcessReservationOutboxHandler,
+)
 from app.application.commands.resources import (
     ApproveResourceRequestHandler,
+    CancelResourceRequestHandler,
     CreateResourceRequestHandler,
     RejectResourceRequestHandler,
 )
-from app.application.commands.shifts import ApproveShiftHandler, CreateShiftHandler
+from app.application.commands.shifts import (
+    ApproveShiftHandler,
+    CancelShiftHandler,
+    CompleteShiftHandler,
+    CreateShiftHandler,
+    UpdateShiftHandler,
+)
 from app.application.ports.domain import (
     ProjectMemberRepository,
     ProjectRepository,
@@ -67,8 +80,21 @@ from app.application.queries.resources import (
     GetProjectMemberHandler,
     ListProjectMembersHandler,
 )
+from app.application.queries.shifts import (
+    GetShiftHandler,
+    ListProjectShiftsHandler,
+    ListShiftDocumentsHandler,
+    ListShiftParticipantsHandler,
+)
 from app.application.support import SystemClock
-from app.domain.entities import Document, ProjectMember, Shift, ShiftReport
+from app.domain.entities import (
+    Document,
+    ProjectMember,
+    Shift,
+    ShiftParticipant,
+    ShiftReport,
+    ShiftResourceRequest,
+)
 from app.domain.enums import (
     DocumentStatus,
     DocumentType,
@@ -390,6 +416,80 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         shift_reports=reports,
         resource_request_service=ResourceRequestService(),
     )
+    cancel_resource_request_handler = CancelResourceRequestHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        project_members=members,
+        resource_requests=requests,
+        shift_reports=reports,
+        resource_request_service=ResourceRequestService(),
+    )
+    list_project_shifts_handler = ListProjectShiftsHandler(
+        shifts=shifts,
+        project_members=members,
+        active_member_policy=ActiveMemberPolicy(),
+    )
+    get_shift_handler = GetShiftHandler(
+        shifts=shifts,
+        project_members=members,
+        active_member_policy=ActiveMemberPolicy(),
+    )
+    list_shift_participants_handler = ListShiftParticipantsHandler(
+        shifts=shifts,
+        shift_participants=participants,
+        project_members=members,
+        active_member_policy=ActiveMemberPolicy(),
+    )
+    list_shift_documents_handler = ListShiftDocumentsHandler(
+        shifts=shifts,
+        documents=documents,
+        project_members=members,
+        active_member_policy=ActiveMemberPolicy(),
+    )
+    update_shift_handler = UpdateShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        shift_service=ShiftService(),
+    )
+    complete_shift_handler = CompleteShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        project_members=members,
+        shifts=shifts,
+        shift_service=ShiftService(),
+    )
+    cancel_shift_handler = CancelShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        reservation_outbox=reservation_outbox,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        shift_reports=reports,
+        shift_service=ShiftService(),
+        shift_participant_service=ShiftParticipantService(),
+        resource_request_service=ResourceRequestService(),
+    )
+    cancel_shift_participant_handler = CancelShiftParticipantHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        reservation_outbox=reservation_outbox,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        shift_reports=reports,
+        shift_participant_service=ShiftParticipantService(),
+    )
 
     provider = Provider(scope=Scope.REQUEST)
     for instance, provides in (
@@ -426,6 +526,15 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         (create_resource_request_handler, CreateResourceRequestHandler),
         (approve_resource_request_handler, ApproveResourceRequestHandler),
         (reject_resource_request_handler, RejectResourceRequestHandler),
+        (cancel_resource_request_handler, CancelResourceRequestHandler),
+        (list_project_shifts_handler, ListProjectShiftsHandler),
+        (get_shift_handler, GetShiftHandler),
+        (list_shift_participants_handler, ListShiftParticipantsHandler),
+        (list_shift_documents_handler, ListShiftDocumentsHandler),
+        (update_shift_handler, UpdateShiftHandler),
+        (complete_shift_handler, CompleteShiftHandler),
+        (cancel_shift_handler, CancelShiftHandler),
+        (cancel_shift_participant_handler, CancelShiftParticipantHandler),
         (tx, TransactionManager),
         (projects, ProjectRepository),
         (members, ProjectMemberRepository),
@@ -1064,3 +1173,354 @@ def test_project_http_management_flow_for_members_shifts_participants_and_reques
         participant_id,
         declining_participant_id,
     }
+
+
+def _active_member(project_id: UUID, user_id: UUID, role: ProjectRole, when: datetime) -> ProjectMember:
+    return ProjectMember(
+        oid=uuid4(),
+        project_id=project_id,
+        user_id=user_id,
+        role=role,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=user_id,
+        created_at=when,
+        updated_at=when,
+    )
+
+
+def test_shift_read_update_documents_participants_and_complete() -> None:
+    ctx = build_project_api_crud_context()
+    director_id = uuid4()
+    member_id = uuid4()
+    start_time = now_utc() + timedelta(hours=3)
+    end_time = start_time + timedelta(hours=5)
+
+    try:
+        with TestClient(ctx.app) as client:
+            director_headers = {"X-User-Id": str(director_id)}
+            member_headers = {"X-User-Id": str(member_id)}
+
+            project_id = client.post(
+                "/projects",
+                headers=director_headers,
+                json={"title": "Shift reads", "description": "reads"},
+            ).json()["oid"]
+            ctx.members.data[(UUID(project_id), member_id)] = _active_member(
+                UUID(project_id), member_id, ProjectRole.ACTOR, start_time
+            )
+
+            shift_id = client.post(
+                f"/projects/{project_id}/shifts",
+                headers=director_headers,
+                json={
+                    "title": "Read shift",
+                    "description": "desc",
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                },
+            ).json()["oid"]
+
+            # Any active member can read the project shifts and a single shift.
+            list_resp = client.get(f"/projects/{project_id}/shifts", headers=member_headers)
+            assert list_resp.status_code == 200
+            assert [item["oid"] for item in list_resp.json()["items"]] == [shift_id]
+
+            get_resp = client.get(f"/shifts/{shift_id}", headers=member_headers)
+            assert get_resp.status_code == 200
+            assert get_resp.json()["oid"] == shift_id
+
+            # Only the director can update a DRAFT shift.
+            member_patch = client.patch(
+                f"/shifts/{shift_id}",
+                headers=member_headers,
+                json={"title": "Hacked"},
+            )
+            assert member_patch.status_code == 403
+
+            director_patch = client.patch(
+                f"/shifts/{shift_id}",
+                headers=director_headers,
+                json={"title": "Read shift updated", "description": "updated"},
+            )
+            assert director_patch.status_code == 200
+            assert director_patch.json()["title"] == "Read shift updated"
+
+            # Documents listing returns active documents without internal fields.
+            upload_resp = client.post(
+                f"/shifts/{shift_id}/documents",
+                headers=director_headers,
+                files={"file": ("plan.txt", b"plan-bytes", "text/plain")},
+                data={"doc_type": "PLAN", "title": "Plan doc"},
+            )
+            assert upload_resp.status_code == 200
+
+            docs_resp = client.get(f"/shifts/{shift_id}/documents", headers=member_headers)
+            assert docs_resp.status_code == 200
+            doc_items = docs_resp.json()["items"]
+            assert len(doc_items) == 1
+            assert doc_items[0]["doc_type"] == "PLAN"
+            assert "storage_key" not in doc_items[0]
+            assert "bucket" not in doc_items[0]
+
+            report_filter_resp = client.get(
+                f"/shifts/{shift_id}/documents",
+                headers=member_headers,
+                params={"doc_type": "REPORT"},
+            )
+            assert report_filter_resp.status_code == 200
+            assert report_filter_resp.json()["items"] == []
+
+            # Participants listing.
+            invite_resp = client.post(
+                f"/shifts/{shift_id}/participants",
+                headers=director_headers,
+                json={
+                    "user_id": str(member_id),
+                    "role": "ACTOR",
+                    "time_from": start_time.isoformat(),
+                    "time_to": end_time.isoformat(),
+                },
+            )
+            assert invite_resp.status_code == 200
+
+            participants_resp = client.get(
+                f"/shifts/{shift_id}/participants",
+                headers=member_headers,
+            )
+            assert participants_resp.status_code == 200
+            assert [item["user_id"] for item in participants_resp.json()["items"]] == [
+                str(member_id)
+            ]
+
+            # Approve then complete.
+            assert client.post(f"/shifts/{shift_id}/approve", headers=director_headers).status_code == 200
+            complete_resp = client.post(f"/shifts/{shift_id}/complete", headers=director_headers)
+            assert complete_resp.status_code == 200
+            assert complete_resp.json()["status"] == int(ShiftStatus.COMPLETED)
+    finally:
+        asyncio.run(ctx.container.close())
+
+
+def test_cancel_participant_and_resource_request_endpoints() -> None:
+    ctx = build_project_api_crud_context()
+    director_id = uuid4()
+    participant_user_id = uuid4()
+    owner_user_id = uuid4()
+    resource_id = uuid4()
+    start_time = now_utc() + timedelta(hours=2)
+    end_time = start_time + timedelta(hours=2)
+
+    try:
+        with TestClient(ctx.app) as client:
+            director_headers = {"X-User-Id": str(director_id)}
+
+            project_id = client.post(
+                "/projects",
+                headers=director_headers,
+                json={"title": "Cancellations", "description": "cancel"},
+            ).json()["oid"]
+            for user_id, role in (
+                (participant_user_id, ProjectRole.ACTOR),
+                (owner_user_id, ProjectRole.CAMERA),
+            ):
+                ctx.members.data[(UUID(project_id), user_id)] = _active_member(
+                    UUID(project_id), user_id, role, start_time
+                )
+            ctx.user_service.resources[(owner_user_id, "cameras")] = [
+                UserResourceItem(
+                    resource_kind="cameras",
+                    resource_id=resource_id,
+                    title="Camera",
+                    description="Main",
+                    resource_type="mirrorless",
+                    size=None,
+                    created_at=start_time,
+                    windows=(),
+                )
+            ]
+
+            shift_id = client.post(
+                f"/projects/{project_id}/shifts",
+                headers=director_headers,
+                json={
+                    "title": "Cancel shift",
+                    "description": "desc",
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                },
+            ).json()["oid"]
+
+            participant_id = client.post(
+                f"/shifts/{shift_id}/participants",
+                headers=director_headers,
+                json={
+                    "user_id": str(participant_user_id),
+                    "role": "ACTOR",
+                    "time_from": start_time.isoformat(),
+                    "time_to": end_time.isoformat(),
+                },
+            ).json()["oid"]
+
+            # Director cancels an INVITED participant: no reservation cancellation enqueued.
+            cancel_part_resp = client.delete(
+                f"/participants/{participant_id}",
+                headers=director_headers,
+            )
+            assert cancel_part_resp.status_code == 200
+            assert cancel_part_resp.json()["status"] == int(ShiftParticipantStatus.CANCELLED)
+            assert len(ctx.reservation_outbox.data) == 0
+
+            # Cancelled participants are hidden by default, visible with include_cancelled.
+            default_parts = client.get(
+                f"/shifts/{shift_id}/participants",
+                headers=director_headers,
+            ).json()["items"]
+            assert default_parts == []
+            all_parts = client.get(
+                f"/shifts/{shift_id}/participants",
+                headers=director_headers,
+                params={"include_cancelled": "true"},
+            ).json()["items"]
+            assert [item["oid"] for item in all_parts] == [participant_id]
+
+            # Re-cancelling a finalized participant fails.
+            assert (
+                client.delete(f"/participants/{participant_id}", headers=director_headers).status_code
+                == 409
+            )
+
+            # Resource request cancellation by the request author.
+            request_id = client.post(
+                f"/shifts/{shift_id}/resource-requests",
+                headers=director_headers,
+                json={
+                    "resource_type": "camera",
+                    "resource_id": str(resource_id),
+                    "resource_owner_user_id": str(owner_user_id),
+                    "time_from": start_time.isoformat(),
+                    "time_to": end_time.isoformat(),
+                },
+            ).json()["oid"]
+
+            cancel_request_resp = client.delete(
+                f"/resource-requests/{request_id}",
+                headers=director_headers,
+            )
+            assert cancel_request_resp.status_code == 200
+            assert cancel_request_resp.json()["status"] == int(ResourceRequestStatus.CANCELLED)
+
+            # A second cancel is rejected.
+            assert (
+                client.delete(f"/resource-requests/{request_id}", headers=director_headers).status_code
+                == 409
+            )
+    finally:
+        asyncio.run(ctx.container.close())
+
+
+def test_cancel_shift_dispatches_reservation_cancellations() -> None:
+    ctx = build_project_api_crud_context()
+    director_id = uuid4()
+    participant_user_id = uuid4()
+    owner_user_id = uuid4()
+    participant_record_id = uuid4()
+    request_record_id = uuid4()
+    user_reservation_id = uuid4()
+    resource_reservation_id = uuid4()
+    resource_id = uuid4()
+    start_time = now_utc() + timedelta(hours=2)
+    end_time = start_time + timedelta(hours=2)
+
+    try:
+        with TestClient(ctx.app) as client:
+            director_headers = {"X-User-Id": str(director_id)}
+
+            project_id = client.post(
+                "/projects",
+                headers=director_headers,
+                json={"title": "Cancel shift", "description": "cancel"},
+            ).json()["oid"]
+            for user_id, role in (
+                (participant_user_id, ProjectRole.ACTOR),
+                (owner_user_id, ProjectRole.CAMERA),
+            ):
+                ctx.members.data[(UUID(project_id), user_id)] = _active_member(
+                    UUID(project_id), user_id, role, start_time
+                )
+
+            shift_id = client.post(
+                f"/projects/{project_id}/shifts",
+                headers=director_headers,
+                json={
+                    "title": "Cancel target",
+                    "description": "desc",
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                },
+            ).json()["oid"]
+            assert client.post(f"/shifts/{shift_id}/approve", headers=director_headers).status_code == 200
+
+            # Seed a RESERVED participant and a RESERVED resource request.
+            reserved_participant = ShiftParticipant(
+                oid=participant_record_id,
+                shift_id=UUID(shift_id),
+                user_id=participant_user_id,
+                role=ProjectRole.ACTOR,
+                time_from=start_time,
+                time_to=end_time,
+                status=ShiftParticipantStatus.RESERVED,
+                added_by=director_id,
+                created_at=start_time,
+                updated_at=start_time,
+                user_reservation_id=user_reservation_id,
+            )
+            asyncio.run(ctx.participants.add(reserved_participant))
+            reserved_request = ShiftResourceRequest(
+                oid=request_record_id,
+                project_id=UUID(project_id),
+                shift_id=UUID(shift_id),
+                resource_type="camera",
+                resource_id=resource_id,
+                resource_owner_user_id=owner_user_id,
+                requested_by_user_id=director_id,
+                time_from=start_time,
+                time_to=end_time,
+                status=ResourceRequestStatus.RESERVED,
+                created_at=start_time,
+                updated_at=start_time,
+                resource_reservation_id=resource_reservation_id,
+            )
+            asyncio.run(ctx.requests.add(reserved_request))
+
+            cancel_resp = client.post(
+                f"/shifts/{shift_id}/cancel",
+                headers=director_headers,
+                json={"reason": "weather"},
+            )
+            assert cancel_resp.status_code == 200
+            assert cancel_resp.json()["status"] == int(ShiftStatus.CANCELLED)
+
+            # Both reserved entities are cancelled and a cancellation message was enqueued.
+            assert ctx.participants.by_id[participant_record_id].status == ShiftParticipantStatus.CANCELLED
+            assert ctx.requests.data[request_record_id].status == ResourceRequestStatus.CANCELLED
+            operations = {message.operation for message in ctx.reservation_outbox.data.values()}
+            assert PARTICIPANT_CANCEL_OPERATION in operations
+            assert RESOURCE_CANCEL_OPERATION in operations
+
+            # Processing the outbox dispatches reservation cancellations to the user service.
+            processor = ProcessReservationOutboxHandler(
+                transaction_manager=ctx.tx,
+                clock=SystemClock(),
+                publisher=ctx.publisher,
+                user_service=ctx.user_service,
+                project_members=ctx.members,
+                shifts=ctx.shifts,
+                shift_participants=ctx.participants,
+                resource_requests=ctx.requests,
+                reservation_outbox=ctx.reservation_outbox,
+            )
+            asyncio.run(processor())
+            assert user_reservation_id in ctx.user_service.cancelled_user_reservations
+            assert resource_reservation_id in ctx.user_service.cancelled_resource_reservations
+    finally:
+        asyncio.run(ctx.container.close())

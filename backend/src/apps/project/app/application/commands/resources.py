@@ -288,3 +288,71 @@ class RejectResourceRequestHandler:
             },
         )
         return request
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CancelResourceRequestCommand:
+    request_id: UUID
+    actor_user_id: UUID
+
+
+class CancelResourceRequestHandler:
+    def __init__(
+        self,
+        *,
+        transaction_manager: TransactionManager,
+        clock: ClockPort,
+        publisher: EventPublisher,
+        project_members: ProjectMemberRepository,
+        resource_requests: ResourceRequestRepository,
+        shift_reports: ShiftReportRepository,
+        resource_request_service: ResourceRequestService,
+    ) -> None:
+        self._tx = transaction_manager
+        self._clock = clock
+        self._publisher = publisher
+        self._project_members = project_members
+        self._resource_requests = resource_requests
+        self._shift_reports = shift_reports
+        self._resource_request_service = resource_request_service
+
+    async def __call__(self, command: CancelResourceRequestCommand) -> ShiftResourceRequest:
+        now = self._clock.now()
+        try:
+            request = await require_resource_request(
+                resource_requests=self._resource_requests,
+                request_id=command.request_id,
+            )
+            actor = await get_actor_member(
+                project_members=self._project_members,
+                project_id=request.project_id,
+                user_id=command.actor_user_id,
+            )
+            self._resource_request_service.cancel(
+                request=request,
+                actor=actor,
+                now=now,
+            )
+            await self._resource_requests.update(request)
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=request.shift_id,
+                reason="Resource request status changed.",
+            )
+            await self._tx.commit()
+        except Exception:
+            await self._tx.rollback()
+            raise
+
+        await publish_best_effort(
+            publisher=self._publisher,
+            topic="shift.resource_request_cancelled",
+            payload={
+                "project_id": str(request.project_id),
+                "shift_id": str(request.shift_id),
+                "request_id": str(request.oid),
+                "cancelled_by": str(command.actor_user_id),
+            },
+        )
+        return request

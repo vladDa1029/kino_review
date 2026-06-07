@@ -73,3 +73,10 @@ class ShiftReportGenerationStatus(IntEnum):
 class ShiftReportActualityStatus(IntEnum):
     ACTUAL = 10
     STALE = 20
+
+
+class ShiftReminderStatus(IntEnum):
+    PENDING = 10
+    PROCESSING = 20
+    SENT = 30
+    CANCELLED = 40

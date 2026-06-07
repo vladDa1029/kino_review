@@ -145,7 +145,10 @@ class JWTServices:
                 key=self._config.PUBLIC_KEY,
                 algorithms=[self._config.algoritm],
             )
-        except (jwt.ExpiredSignatureError, jwt.InvalidSignatureError) as ex:
+        # ``InvalidTokenError`` is the base class for every PyJWT failure
+        # (expired, bad signature, malformed, wrong algorithm, …), so any
+        # invalid token surfaces as a clean 401 instead of an unhandled 500.
+        except jwt.InvalidTokenError as ex:
             log.info(ex)
             raise NoValidTokenError()
         return payload

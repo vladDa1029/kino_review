@@ -12,8 +12,16 @@ from app.application.commands import (
     ApproveShiftHandler,
     ArchiveShiftReportCommand,
     ArchiveShiftReportHandler,
+    CancelResourceRequestCommand,
+    CancelResourceRequestHandler,
+    CancelShiftCommand,
+    CancelShiftHandler,
+    CancelShiftParticipantCommand,
+    CancelShiftParticipantHandler,
     ChangeProjectMemberRoleCommand,
     ChangeProjectMemberRoleHandler,
+    CompleteShiftCommand,
+    CompleteShiftHandler,
     ConfirmShiftParticipantCommand,
     ConfirmShiftParticipantHandler,
     CreateProjectCommand,
@@ -40,6 +48,8 @@ from app.application.commands import (
     RemoveProjectMemberHandler,
     UpdateProjectCommand,
     UpdateProjectHandler,
+    UpdateShiftCommand,
+    UpdateShiftHandler,
     UploadShiftDocumentCommand,
     UploadShiftDocumentHandler,
 )
@@ -66,6 +76,8 @@ from app.application.queries import (
     GetReportDownloadUrlQuery,
     GetReportHandler,
     GetReportQuery,
+    GetShiftHandler,
+    GetShiftQuery,
     HealthHandler,
     HealthQuery,
     ListActorProjectsHandler,
@@ -78,17 +90,26 @@ from app.application.queries import (
     ListAdminShiftReportsQuery,
     ListProjectMembersHandler,
     ListProjectMembersQuery,
+    ListProjectShiftsHandler,
+    ListProjectShiftsQuery,
+    ListShiftDocumentsHandler,
+    ListShiftDocumentsQuery,
+    ListShiftParticipantsHandler,
+    ListShiftParticipantsQuery,
     ListShiftReportsHandler,
     ListShiftReportsQuery,
     ListShiftResourceRequestsHandler,
     ListShiftResourceRequestsQuery,
 )
+from app.domain.enums import ShiftStatus
 from app.domain.errors.business import AccessDeniedError
 from app.presentation.schemas import (
+    CancelShiftRequest,
     ChangeProjectMemberRoleRequest,
     CreateResourceRequestBody,
     CreateShiftRequest,
     DocumentDownloadUrlResponse,
+    DocumentTypeFilterInput,
     DocumentTypeInput,
     DocumentUploadResponse,
     InviteProjectMemberByEmailRequest,
@@ -107,9 +128,14 @@ from app.presentation.schemas import (
     ReportListResponse,
     ReportResponse,
     ResourceTimeWindowResponse,
+    ShiftDocumentListResponse,
+    ShiftDocumentResponse,
+    ShiftListResponse,
+    ShiftParticipantListResponse,
     ShiftParticipantResponse,
     ShiftResourceRequestResponse,
     ShiftResponse,
+    UpdateShiftRequest,
     to_project_role_input,
 )
 
@@ -694,6 +720,128 @@ async def create_shift(
     return ShiftResponse.from_entity(shift)
 
 
+@router.get(
+    "/projects/{project_id}/shifts",
+    response_model=ShiftListResponse,
+    tags=["shifts"],
+    summary="List project shifts",
+    description=(
+        "Returns shifts of the project ordered by start time descending. "
+        "Available to any active project member."
+    ),
+)
+async def list_project_shifts(
+    project_id: UUID,
+    handler: FromDishka[ListProjectShiftsHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    status: int | None = None,
+    include_cancelled: bool = False,
+) -> ShiftListResponse:
+    shifts = await handler(
+        ListProjectShiftsQuery(
+            project_id=project_id,
+            actor_user_id=x_user_id,
+            status_filter=ShiftStatus(status) if status is not None else None,
+            include_cancelled=include_cancelled,
+        )
+    )
+    return ShiftListResponse(items=[ShiftResponse.from_entity(shift) for shift in shifts])
+
+
+@router.get(
+    "/shifts/{shift_id}",
+    response_model=ShiftResponse,
+    tags=["shifts"],
+    summary="Get shift",
+    description="Returns a single shift visible to any active member of its project.",
+)
+async def get_shift(
+    shift_id: UUID,
+    handler: FromDishka[GetShiftHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ShiftResponse:
+    shift = await handler(
+        GetShiftQuery(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ShiftResponse.from_entity(shift)
+
+
+@router.patch(
+    "/shifts/{shift_id}",
+    response_model=ShiftResponse,
+    tags=["shifts"],
+    summary="Update shift",
+    description="Updates editable fields of a DRAFT shift. Director only.",
+)
+async def update_shift(
+    shift_id: UUID,
+    payload: UpdateShiftRequest,
+    handler: FromDishka[UpdateShiftHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ShiftResponse:
+    shift = await handler(
+        UpdateShiftCommand(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+            title=payload.title,
+            description=payload.description,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+        )
+    )
+    return ShiftResponse.from_entity(shift)
+
+
+@router.post(
+    "/shifts/{shift_id}/complete",
+    response_model=ShiftResponse,
+    tags=["shifts"],
+    summary="Complete shift",
+    description="Marks an APPROVED shift as COMPLETED. Director only.",
+)
+async def complete_shift(
+    shift_id: UUID,
+    handler: FromDishka[CompleteShiftHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ShiftResponse:
+    shift = await handler(
+        CompleteShiftCommand(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ShiftResponse.from_entity(shift)
+
+
+@router.post(
+    "/shifts/{shift_id}/cancel",
+    response_model=ShiftResponse,
+    tags=["shifts"],
+    summary="Cancel shift",
+    description=(
+        "Cancels a DRAFT/PENDING_APPROVAL/APPROVED shift. Director only. "
+        "Reserved participants and resources receive a reservation cancellation."
+    ),
+)
+async def cancel_shift(
+    shift_id: UUID,
+    handler: FromDishka[CancelShiftHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    payload: CancelShiftRequest | None = None,
+) -> ShiftResponse:
+    shift = await handler(
+        CancelShiftCommand(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+            reason=payload.reason if payload else None,
+        )
+    )
+    return ShiftResponse.from_entity(shift)
+
+
 @router.post(
     "/shifts/{shift_id}/approve",
     response_model=ShiftResponse,
@@ -741,6 +889,31 @@ async def invite_shift_participant(
     return ShiftParticipantResponse.from_entity(participant)
 
 
+@router.get(
+    "/shifts/{shift_id}/participants",
+    response_model=ShiftParticipantListResponse,
+    tags=["participants"],
+    summary="List shift participants",
+    description="Returns participants of the shift. Available to any active project member.",
+)
+async def list_shift_participants(
+    shift_id: UUID,
+    handler: FromDishka[ListShiftParticipantsHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    include_cancelled: bool = False,
+) -> ShiftParticipantListResponse:
+    participants = await handler(
+        ListShiftParticipantsQuery(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+            include_cancelled=include_cancelled,
+        )
+    )
+    return ShiftParticipantListResponse(
+        items=[ShiftParticipantResponse.from_entity(participant) for participant in participants]
+    )
+
+
 @router.post(
     "/participants/{participant_id}/confirm",
     response_model=ShiftParticipantResponse,
@@ -783,6 +956,30 @@ async def decline_shift_participant(
     return ShiftParticipantResponse.from_entity(participant)
 
 
+@router.delete(
+    "/participants/{participant_id}",
+    response_model=ShiftParticipantResponse,
+    tags=["participants"],
+    summary="Cancel shift participant",
+    description=(
+        "Cancels a shift participant. Director only. "
+        "If the participant was reserved, a reservation cancellation is dispatched."
+    ),
+)
+async def cancel_shift_participant(
+    participant_id: UUID,
+    handler: FromDishka[CancelShiftParticipantHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ShiftParticipantResponse:
+    participant = await handler(
+        CancelShiftParticipantCommand(
+            participant_id=participant_id,
+            actor_user_id=x_user_id,
+        )
+    )
+    return ShiftParticipantResponse.from_entity(participant)
+
+
 @router.post(
     "/shifts/{shift_id}/documents",
     response_model=DocumentUploadResponse,
@@ -816,6 +1013,34 @@ async def upload_document(
         )
     )
     return DocumentUploadResponse.from_entity(document)
+
+
+@router.get(
+    "/shifts/{shift_id}/documents",
+    response_model=ShiftDocumentListResponse,
+    tags=["documents"],
+    summary="List shift documents",
+    description=(
+        "Returns active documents of the shift. Available to any active project member. "
+        "Optional doc_type filter: PLAN, SCENARIO, REPORT."
+    ),
+)
+async def list_shift_documents(
+    shift_id: UUID,
+    handler: FromDishka[ListShiftDocumentsHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    doc_type: DocumentTypeFilterInput | None = None,
+) -> ShiftDocumentListResponse:
+    documents = await handler(
+        ListShiftDocumentsQuery(
+            shift_id=shift_id,
+            actor_user_id=x_user_id,
+            doc_type_filter=doc_type.to_domain() if doc_type is not None else None,
+        )
+    )
+    return ShiftDocumentListResponse(
+        items=[ShiftDocumentResponse.from_entity(document) for document in documents]
+    )
 
 
 @router.post(
@@ -1031,6 +1256,31 @@ async def reject_resource_request(
             request_id=request_id,
             actor_user_id=x_user_id,
             reason=payload.reason,
+        )
+    )
+    return ShiftResourceRequestResponse.from_entity(request)
+
+
+@router.delete(
+    "/resource-requests/{request_id}",
+    response_model=ShiftResourceRequestResponse,
+    tags=["resource-requests"],
+    summary="Cancel resource request",
+    description=(
+        "Cancels a PENDING_OWNER or APPROVED_OWNER resource request. "
+        "Available to the request author or a project director. "
+        "Already reserved requests cannot be cancelled here."
+    ),
+)
+async def cancel_resource_request(
+    request_id: UUID,
+    handler: FromDishka[CancelResourceRequestHandler],
+    x_user_id: Annotated[UUID, Header(alias="X-User-Id")],
+) -> ShiftResourceRequestResponse:
+    request = await handler(
+        CancelResourceRequestCommand(
+            request_id=request_id,
+            actor_user_id=x_user_id,
         )
     )
     return ShiftResourceRequestResponse.from_entity(request)

@@ -4,6 +4,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -20,6 +21,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReminder,
     ShiftReport,
     ShiftResourceRequest,
 )
@@ -31,6 +33,7 @@ from app.domain.enums import (
     ProjectStatus,
     ResourceRequestStatus,
     ShiftParticipantStatus,
+    ShiftReminderStatus,
     ShiftReportActualityStatus,
     ShiftReportGenerationStatus,
     ShiftStatus,
@@ -67,7 +70,9 @@ users_project_role = Table(
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
     Column("user_id", Uuid(as_uuid=True), nullable=False, index=True),
-    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column(
+        "project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True
+    ),
     Column("role", Integer, nullable=False, default=int(ProjectRole.DIRECTOR)),
     Column("status", Integer, nullable=False, default=int(ProjectMemberStatus.INVITED)),
     Column("invited_by", Uuid(as_uuid=True), nullable=False),
@@ -80,7 +85,9 @@ shift = Table(
     "shift",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column(
+        "project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True
+    ),
     Column("title", String(255), nullable=False),
     Column("description", String(2000), nullable=False, default=""),
     Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
@@ -140,7 +147,9 @@ shift_resource_requests = Table(
     "shift_resource_requests",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column(
+        "project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True
+    ),
     Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
     Column("resource_type", String(64), nullable=False),
     Column("resource_id", Uuid(as_uuid=True), nullable=False),
@@ -166,7 +175,9 @@ shift_reports = Table(
     "shift_reports",
     metadata,
     Column("oid", Uuid(as_uuid=True), primary_key=True),
-    Column("project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True),
+    Column(
+        "project_id", Uuid(as_uuid=True), ForeignKey("projects.oid"), nullable=False, index=True
+    ),
     Column("shift_id", Uuid(as_uuid=True), ForeignKey("shift.oid"), nullable=False, index=True),
     Column("version", Integer, nullable=False),
     Column(
@@ -209,6 +220,22 @@ reservation_outbox = Table(
     Column("last_error", String(2000), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
     Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+)
+shift_reminder = Table(
+    "shift_reminders",
+    metadata,
+    Column("oid", Uuid(as_uuid=True), primary_key=True),
+    Column("shift_id", Uuid(as_uuid=True), nullable=False, unique=True),
+    Column("fire_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+    Column("updated_at", DateTime(timezone=True), nullable=False, default=datetime.now),
+    Column(
+        "status",
+        Integer,
+        nullable=False,
+        default=int(ShiftReminderStatus.PENDING),
+    ),
+    Index(None, "status", "fire_at"),
 )
 
 
@@ -419,6 +446,19 @@ def start_mappers() -> None:
             "last_error": reservation_outbox.c.last_error,
             "created_at": reservation_outbox.c.created_at,
             "updated_at": reservation_outbox.c.updated_at,
+        },
+        column_prefix="_",
+    )
+    mapper_registry.map_imperatively(
+        ShiftReminder,
+        shift_reminder,
+        properties={
+            "oid": shift_reminder.c.oid,
+            "shift_id": shift_reminder.c.shift_id,
+            "fire_at": shift_reminder.c.fire_at,
+            "status": shift_reminder.c.status,
+            "updated_at": shift_reminder.c.updated_at,
+            "created_at": shift_reminder.c.created_at,
         },
         column_prefix="_",
     )

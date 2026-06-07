@@ -1,4 +1,5 @@
 # Функции для настройки main фабрик.
+import http.cookiejar
 from collections.abc import AsyncIterator
 
 import httpx
@@ -33,10 +34,27 @@ def CORS_Middleware(app: FastAPI):
     return app
 
 
+class _RejectAllCookiePolicy(http.cookiejar.DefaultCookiePolicy):
+    """Refuse to ever store a cookie.
+
+    The gateway proxies requests through a single shared ``httpx.AsyncClient``.
+    httpx clients keep a cookie jar by default, so an upstream ``Set-Cookie``
+    (e.g. the auth service ``refresh`` cookie) would be captured once and then
+    silently replayed on every subsequent proxied request — leaking one user's
+    session to everyone else. The proxy forwards the caller's ``Cookie`` header
+    and the upstream ``Set-Cookie`` header verbatim, so the client itself must
+    stay completely stateless about cookies.
+    """
+
+    def set_ok(self, cookie, request) -> bool:  # noqa: ANN001 - urllib signature
+        return False
+
+
 async def get_aclient() -> AsyncIterator[httpx.AsyncClient]:
     client = httpx.AsyncClient(
         timeout=10.0,
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        cookies=http.cookiejar.CookieJar(policy=_RejectAllCookiePolicy()),
     )
     yield client
     await client.aclose()

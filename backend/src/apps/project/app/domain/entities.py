@@ -10,6 +10,7 @@ from app.domain.enums import (
     ProjectStatus,
     ResourceRequestStatus,
     ShiftParticipantStatus,
+    ShiftReminderStatus,
     ShiftReportActualityStatus,
     ShiftReportGenerationStatus,
     ShiftStatus,
@@ -157,3 +158,15 @@ class ReservationOutboxMessage:
     created_at: datetime
     updated_at: datetime
     last_error: str | None = None
+
+
+@dataclass
+class ShiftReminder:
+    """Сущность уведомления о смене."""
+
+    oid: UUID
+    shift_id: UUID
+    fire_at: datetime
+    status: ShiftReminderStatus
+    created_at: datetime
+    updated_at: datetime

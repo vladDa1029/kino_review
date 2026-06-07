@@ -10,7 +10,11 @@ from app.application.commands import (
     ApproveResourceRequestHandler,
     ApproveShiftHandler,
     ArchiveShiftReportHandler,
+    CancelResourceRequestHandler,
+    CancelShiftHandler,
+    CancelShiftParticipantHandler,
     ChangeProjectMemberRoleHandler,
+    CompleteShiftHandler,
     ConfirmShiftParticipantHandler,
     CreateProjectHandler,
     CreateResourceRequestHandler,
@@ -34,6 +38,7 @@ from app.application.commands import (
     RejectResourceRequestHandler,
     RemoveProjectMemberHandler,
     UpdateProjectHandler,
+    UpdateShiftHandler,
     UploadShiftDocumentHandler,
 )
 from app.application.ports.broker import EventPublisher
@@ -87,6 +92,12 @@ from app.application.queries.resources import (
     GetProjectUserResourcesHandler,
     ListProjectMembersHandler,
     ListShiftResourceRequestsHandler,
+)
+from app.application.queries.shifts import (
+    GetShiftHandler,
+    ListProjectShiftsHandler,
+    ListShiftDocumentsHandler,
+    ListShiftParticipantsHandler,
 )
 from app.application.support import SystemClock
 from app.config import (
@@ -261,6 +272,10 @@ def use_case_provider() -> Provider:
     provider.provide(source=GetProjectUserResourcesHandler)
     provider.provide(source=ListProjectMembersHandler)
     provider.provide(source=ListShiftResourceRequestsHandler)
+    provider.provide(source=ListProjectShiftsHandler)
+    provider.provide(source=GetShiftHandler)
+    provider.provide(source=ListShiftParticipantsHandler)
+    provider.provide(source=ListShiftDocumentsHandler)
     provider.provide(source=CreateProjectHandler)
     provider.provide(source=UpdateProjectHandler)
     provider.provide(source=DeleteProjectHandler)
@@ -271,9 +286,13 @@ def use_case_provider() -> Provider:
     provider.provide(source=RemoveProjectMemberHandler)
     provider.provide(source=CreateShiftHandler)
     provider.provide(source=ApproveShiftHandler)
+    provider.provide(source=UpdateShiftHandler)
+    provider.provide(source=CompleteShiftHandler)
+    provider.provide(source=CancelShiftHandler)
     provider.provide(source=InviteShiftParticipantHandler)
     provider.provide(source=ConfirmShiftParticipantHandler)
     provider.provide(source=DeclineShiftParticipantHandler)
+    provider.provide(source=CancelShiftParticipantHandler)
     provider.provide(source=HandleParticipantReservationCheckSucceededHandler)
     provider.provide(source=HandleParticipantReservationCheckFailedHandler)
     provider.provide(source=HandleParticipantReservationSucceededHandler)
@@ -284,6 +303,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=CreateResourceRequestHandler)
     provider.provide(source=ApproveResourceRequestHandler)
     provider.provide(source=RejectResourceRequestHandler)
+    provider.provide(source=CancelResourceRequestHandler)
     provider.provide(source=HandleResourceReservationCheckSucceededHandler)
     provider.provide(source=HandleResourceReservationCheckFailedHandler)
     provider.provide(source=HandleResourceReservationSucceededHandler)

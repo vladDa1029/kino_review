@@ -562,13 +562,53 @@ export const getProjectUserResources = async (projectId, targetUserId) =>
 export const createShift = async (projectId, payload) =>
   createJsonRequest(`/project/projects/${projectId}/shifts`, 'POST', payload);
 
+export const listProjectShifts = async (projectId, { status, includeCancelled = false } = {}) =>
+  apiClient(
+    withQuery(`/project/projects/${projectId}/shifts`, {
+      status,
+      include_cancelled: includeCancelled,
+    }),
+    {
+      method: 'GET',
+    },
+  );
+
+export const getShift = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}`, {
+    method: 'GET',
+  });
+
+export const updateShift = async (shiftId, payload) =>
+  createJsonRequest(`/project/shifts/${shiftId}`, 'PATCH', payload);
+
 export const approveShift = async (shiftId) =>
   apiClient(`/project/shifts/${shiftId}/approve`, {
     method: 'POST',
   });
 
+export const completeShift = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}/complete`, {
+    method: 'POST',
+  });
+
+export const cancelShift = async (shiftId, payload) =>
+  apiClient(`/project/shifts/${shiftId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(payload ?? {}),
+  });
+
 export const inviteShiftParticipant = async (shiftId, payload) =>
   createJsonRequest(`/project/shifts/${shiftId}/participants`, 'POST', payload);
+
+export const listShiftParticipants = async (shiftId, { includeCancelled = false } = {}) =>
+  apiClient(
+    withQuery(`/project/shifts/${shiftId}/participants`, {
+      include_cancelled: includeCancelled,
+    }),
+    {
+      method: 'GET',
+    },
+  );
 
 export const confirmShiftParticipant = async (participantId) =>
   apiClient(`/project/participants/${participantId}/confirm`, {
@@ -580,11 +620,26 @@ export const declineShiftParticipant = async (participantId) =>
     method: 'POST',
   });
 
+export const cancelShiftParticipant = async (participantId) =>
+  apiClient(`/project/participants/${participantId}`, {
+    method: 'DELETE',
+  });
+
 export const uploadShiftDocument = async (shiftId, payload) =>
   apiClient(`/project/shifts/${shiftId}/documents`, {
     method: 'POST',
     body: createShiftDocumentFormData(payload),
   });
+
+export const listShiftDocuments = async (shiftId, { docType } = {}) =>
+  apiClient(
+    withQuery(`/project/shifts/${shiftId}/documents`, {
+      doc_type: docType,
+    }),
+    {
+      method: 'GET',
+    },
+  );
 
 export const getDocumentDownloadUrl = async (documentId) =>
   apiClient(`/project/documents/${documentId}/download-url`, {
@@ -606,6 +661,36 @@ export const approveResourceRequest = async (requestId) =>
 
 export const rejectResourceRequest = async (requestId, payload) =>
   createJsonRequest(`/project/resource-requests/${requestId}/reject`, 'POST', payload);
+
+export const cancelResourceRequest = async (requestId) =>
+  apiClient(`/project/resource-requests/${requestId}`, {
+    method: 'DELETE',
+  });
+
+export const generateShiftReport = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}/reports/generate`, {
+    method: 'POST',
+  });
+
+export const listShiftReports = async (shiftId) =>
+  apiClient(`/project/shifts/${shiftId}/reports`, {
+    method: 'GET',
+  });
+
+export const getShiftReport = async (reportId) =>
+  apiClient(`/project/reports/${reportId}`, {
+    method: 'GET',
+  });
+
+export const getShiftReportDownloadUrl = async (reportId) =>
+  apiClient(`/project/reports/${reportId}/download-url`, {
+    method: 'GET',
+  });
+
+export const archiveShiftReport = async (reportId) =>
+  apiClient(`/project/reports/${reportId}`, {
+    method: 'DELETE',
+  });
 
 export const listAdminProjects = async ({ includeArchived = false } = {}) =>
   apiClient(

@@ -92,6 +92,46 @@ class ResourceRequestService:
         request.rejection_reason = reason.strip() or "Rejected by owner."
         request.updated_at = now
 
+    def cancel(
+        self,
+        *,
+        request: ShiftResourceRequest,
+        actor: ProjectMember,
+        now: datetime,
+    ) -> None:
+        self.active_member_policy.check(actor, action="cancel resource requests")
+        is_requester = request.requested_by_user_id == actor.user_id
+        is_director = actor.role == ProjectRole.DIRECTOR
+        if not (is_requester or is_director):
+            raise AccessDeniedError("Only the request author or a director can cancel the request.")
+        if request.status == ResourceRequestStatus.RESERVED:
+            raise StateTransitionError(
+                "Reserved resource request cannot be cancelled without explicit confirmation."
+            )
+        if request.status not in {
+            ResourceRequestStatus.PENDING_OWNER,
+            ResourceRequestStatus.APPROVED_OWNER,
+        }:
+            raise StateTransitionError("Resource request cannot be cancelled in its current status.")
+        request.status = ResourceRequestStatus.CANCELLED
+        request.updated_at = now
+
+    def cancel_due_to_shift(self, *, request: ShiftResourceRequest, now: datetime) -> bool:
+        """Cancel a request because its shift is being cancelled.
+
+        Returns ``True`` when a reservation cancellation must be dispatched
+        (the request had already been reserved on the user side).
+        """
+        if request.status in {
+            ResourceRequestStatus.CANCELLED,
+            ResourceRequestStatus.REJECTED_OWNER,
+        }:
+            return False
+        needs_reservation_cancel = request.resource_reservation_id is not None
+        request.status = ResourceRequestStatus.CANCELLED
+        request.updated_at = now
+        return needs_reservation_cancel
+
     def mark_reserving(self, *, request: ShiftResourceRequest, now: datetime) -> None:
         if request.status != ResourceRequestStatus.APPROVED_OWNER:
             raise StateTransitionError("Only APPROVED_OWNER request can move to RESERVING.")

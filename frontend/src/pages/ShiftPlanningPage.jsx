@@ -4,14 +4,25 @@ import { toast } from 'react-toastify';
 import {
   approveShift,
   approveResourceRequest,
+  archiveShiftReport,
+  cancelResourceRequest,
+  cancelShift,
+  cancelShiftParticipant,
+  completeShift,
   createShift,
   createShiftResourceRequest,
   declineShiftParticipant,
   confirmShiftParticipant,
+  generateShiftReport,
   getDocumentDownloadUrl,
   getProjectUserResources,
+  getShiftReportDownloadUrl,
   inviteShiftParticipant,
   listProjectMembers,
+  listProjectShifts,
+  listShiftDocuments,
+  listShiftParticipants,
+  listShiftReports,
   listShiftResourceRequests,
   rejectResourceRequest,
   uploadShiftDocument,
@@ -19,13 +30,6 @@ import {
 import { useAuth } from '../context/useAuth';
 import { useProjectContext } from '../context/useProjectContext';
 import { formatDateTime, toDateTimeLocalValue, toIsoDateTime } from '../utils/dateTime';
-
-const STORAGE_KEYS = {
-  shifts: 'kinoflow.projectShifts',
-  participants: 'kinoflow.shiftParticipants',
-  documents: 'kinoflow.shiftDocuments',
-  resourceRequests: 'kinoflow.shiftResourceRequests',
-};
 
 const roleOptions = [
   { value: 'DIRECTOR', label: 'Режиссер' },
@@ -70,7 +74,63 @@ const shiftStatusLabels = {
 };
 
 const SHIFT_STATUS_APPROVED = 20;
+const SHIFT_STATUS_CANCELLED = 30;
+const SHIFT_STATUS_COMPLETED = 40;
 const PROJECT_MEMBER_STATUS_ACTIVE = 10;
+
+const PARTICIPANT_STATUS_DECLINED = 30;
+const PARTICIPANT_STATUS_CANCELLED = 40;
+
+const RESOURCE_REQUEST_STATUS_PENDING_OWNER = 0;
+const RESOURCE_REQUEST_STATUS_APPROVED_OWNER = 10;
+
+const canCancelParticipantStatus = (status) =>
+  ![PARTICIPANT_STATUS_DECLINED, PARTICIPANT_STATUS_CANCELLED].includes(Number(status));
+
+const canCancelResourceRequestStatus = (status) =>
+  [RESOURCE_REQUEST_STATUS_PENDING_OWNER, RESOURCE_REQUEST_STATUS_APPROVED_OWNER].includes(
+    Number(status),
+  );
+
+const canCompleteShiftStatus = (status) => Number(status) === SHIFT_STATUS_APPROVED;
+
+const canCancelShiftStatus = (status) =>
+  ![SHIFT_STATUS_CANCELLED, SHIFT_STATUS_COMPLETED].includes(Number(status));
+
+const canApproveShiftStatus = (status) =>
+  ![SHIFT_STATUS_APPROVED, SHIFT_STATUS_CANCELLED, SHIFT_STATUS_COMPLETED].includes(Number(status));
+
+// Generating a report is only meaningful once a shift has been approved.
+const canGenerateReportForShiftStatus = (status) =>
+  [SHIFT_STATUS_APPROVED, SHIFT_STATUS_COMPLETED].includes(Number(status));
+
+const REPORT_GENERATION_STATUS_READY = 40;
+const REPORT_GENERATION_STATUS_FAILED = 50;
+const REPORT_GENERATION_STATUS_ARCHIVED = 60;
+const REPORT_ACTUALITY_STALE = 20;
+
+const reportGenerationStatusLabels = {
+  10: 'В очереди',
+  20: 'Сбор данных',
+  30: 'Формирование',
+  40: 'Готов',
+  50: 'Ошибка',
+  60: 'В архиве',
+};
+
+const REPORT_IN_PROGRESS_STATUSES = [10, 20, 30];
+
+const getReportGenerationStatusLabel = (status) =>
+  reportGenerationStatusLabels[Number(status)] || `Статус ${status}`;
+
+const isReportInProgress = (status) => REPORT_IN_PROGRESS_STATUSES.includes(Number(status));
+const isReportReady = (status) => Number(status) === REPORT_GENERATION_STATUS_READY;
+const canArchiveReportStatus = (status) =>
+  !isReportInProgress(status) && Number(status) !== REPORT_GENERATION_STATUS_ARCHIVED;
+
+// Roles allowed to create resource requests (mirrors the backend rule: any
+// active crew member except a plain actor).
+const RESOURCE_REQUEST_ROLES = ['DIRECTOR', 'PROP_MASTER', 'CAMERA', 'SOUND', 'LIGHT'];
 
 const documentTypeOptions = [
   { value: 'PLAN', label: 'План' },
@@ -127,6 +187,11 @@ const getMemberStatusLabel = (status) => memberStatusLabels[Number(status)] || `
 const getParticipantStatusLabel = (status) => participantStatusLabels[Number(status)] || `Статус ${status}`;
 const getResourceRequestStatusLabel = (status) => resourceRequestStatusLabels[Number(status)] || `Статус ${status}`;
 const getShiftStatusLabel = (status) => shiftStatusLabels[Number(status)] || `Статус ${status}`;
+const getDocumentTypeLabel = (docType) => {
+  const normalized = String(docType ?? '').toUpperCase();
+  const labels = { PLAN: 'План', SCENARIO: 'Сценарий', REPORT: 'Отчет' };
+  return labels[normalized] || (docType ?? 'Документ');
+};
 const formatShortId = (value = '') => {
   const id = String(value);
   return id.length > 13 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
@@ -137,17 +202,17 @@ const getShiftTimeRange = (shift) => ({
   timeTo: toDateTimeLocalValue(shift?.end_time),
 });
 
-const readStorage = (key) => {
-  try {
-    const rawValue = localStorage.getItem(key);
-    return rawValue ? JSON.parse(rawValue) : {};
-  } catch {
-    return {};
-  }
-};
+// datetime-local strings ("YYYY-MM-DDTHH:mm") sort lexically in chronological
+// order, so a plain string comparison verifies a sub-interval sits inside the
+// shift window without timezone conversions.
+const isWithinDateTimeBounds = (from, to, bounds) =>
+  !bounds?.timeFrom || !bounds?.timeTo || (from >= bounds.timeFrom && to <= bounds.timeTo);
 
-const writeStorage = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
+const extractItems = (response) => {
+  if (Array.isArray(response)) {
+    return response;
+  }
+  return Array.isArray(response?.items) ? response.items : [];
 };
 
 const ShiftPlanningPage = () => {
@@ -160,12 +225,17 @@ const ShiftPlanningPage = () => {
   const [participantForm, setParticipantForm] = useState(initialParticipantForm);
   const [documentForm, setDocumentForm] = useState(initialDocumentForm);
   const [resourceRequestForm, setResourceRequestForm] = useState(initialResourceRequestForm);
-  const [projectShifts, setProjectShifts] = useState(() => readStorage(STORAGE_KEYS.shifts));
-  const [shiftParticipants, setShiftParticipants] = useState(() => readStorage(STORAGE_KEYS.participants));
-  const [shiftDocuments, setShiftDocuments] = useState(() => readStorage(STORAGE_KEYS.documents));
-  const [shiftResourceRequests, setShiftResourceRequests] = useState(() => readStorage(STORAGE_KEYS.resourceRequests));
+  const [projectShifts, setProjectShifts] = useState({});
+  const [shiftParticipants, setShiftParticipants] = useState({});
+  const [shiftDocuments, setShiftDocuments] = useState({});
+  const [shiftResourceRequests, setShiftResourceRequests] = useState({});
+  const [isShiftsLoading, setIsShiftsLoading] = useState(false);
+  const [isParticipantsLoading, setIsParticipantsLoading] = useState(false);
+  const [isDocumentsLoading, setIsDocumentsLoading] = useState(false);
+  const [isResourceRequestsLoading, setIsResourceRequestsLoading] = useState(false);
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [approvingShiftId, setApprovingShiftId] = useState(null);
+  const [shiftActionId, setShiftActionId] = useState(null);
   const [isInvitingParticipant, setIsInvitingParticipant] = useState(false);
   const [participantActionId, setParticipantActionId] = useState(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
@@ -176,28 +246,17 @@ const ShiftPlanningPage = () => {
   const [isSubmittingResourceRequest, setIsSubmittingResourceRequest] = useState(false);
   const [resourceRequestActionId, setResourceRequestActionId] = useState(null);
   const [rejectReasonsById, setRejectReasonsById] = useState({});
+  const [shiftReports, setShiftReports] = useState({});
+  const [reportShiftId, setReportShiftId] = useState('');
+  const [isReportsLoading, setIsReportsLoading] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportActionId, setReportActionId] = useState(null);
 
   const currentUserId = getCurrentUserId(userData);
 
   useEffect(() => {
     refreshProjects();
   }, [refreshProjects]);
-
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.shifts, projectShifts);
-  }, [projectShifts]);
-
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.participants, shiftParticipants);
-  }, [shiftParticipants]);
-
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.documents, shiftDocuments);
-  }, [shiftDocuments]);
-
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.resourceRequests, shiftResourceRequests);
-  }, [shiftResourceRequests]);
 
   useEffect(() => {
     if (memberProjectId && projects.some((project) => getProjectId(project) === memberProjectId)) {
@@ -237,16 +296,128 @@ const ShiftPlanningPage = () => {
     loadMembers();
   }, [loadMembers]);
 
+  const loadProjectShifts = useCallback(async (projectId) => {
+    if (!projectId) {
+      return;
+    }
+
+    setIsShiftsLoading(true);
+
+    try {
+      const response = await listProjectShifts(projectId);
+      const items = extractItems(response);
+      setProjectShifts((prev) => ({ ...prev, [projectId]: items }));
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось загрузить смены проекта');
+    } finally {
+      setIsShiftsLoading(false);
+    }
+  }, []);
+
+  const loadShiftParticipants = useCallback(async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    setIsParticipantsLoading(true);
+
+    try {
+      const response = await listShiftParticipants(shiftId);
+      const items = extractItems(response);
+      setShiftParticipants((prev) => ({ ...prev, [shiftId]: items }));
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось загрузить участников смены');
+    } finally {
+      setIsParticipantsLoading(false);
+    }
+  }, []);
+
+  const loadShiftDocuments = useCallback(async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    setIsDocumentsLoading(true);
+
+    try {
+      const response = await listShiftDocuments(shiftId);
+      const items = extractItems(response);
+      setShiftDocuments((prev) => ({ ...prev, [shiftId]: items }));
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось загрузить документы смены');
+    } finally {
+      setIsDocumentsLoading(false);
+    }
+  }, []);
+
+  const loadShiftResourceRequests = useCallback(async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    setIsResourceRequestsLoading(true);
+
+    try {
+      const response = await listShiftResourceRequests(shiftId);
+      const items = extractItems(response);
+      setShiftResourceRequests((prev) => ({ ...prev, [shiftId]: items }));
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось загрузить запросы на ресурсы');
+    } finally {
+      setIsResourceRequestsLoading(false);
+    }
+  }, []);
+
+  // Load shifts from the backend whenever the selected project changes so that
+  // shift data stays durable across browsers, devices and incognito sessions.
+  useEffect(() => {
+    loadProjectShifts(memberProjectId);
+  }, [memberProjectId, loadProjectShifts]);
+
   const currentProjectMember = useMemo(
     () => members.find((member) => member.user_id === currentUserId) || null,
     [currentUserId, members],
   );
 
+  const isProjectOwner = Boolean(
+    memberProject && currentUserId && memberProject.owner_id === currentUserId,
+  );
+
+  // Effective role of the current user in this project (the owner always acts
+  // as a director). Used to render only the controls the role can actually use.
+  const currentUserRole = isProjectOwner ? 'DIRECTOR' : currentProjectMember?.role || null;
+
   const canManageMembers = Boolean(
-    memberProject && currentUserId && (
-      memberProject.owner_id === currentUserId ||
-      currentProjectMember?.role === 'DIRECTOR'
-    ),
+    memberProject && currentUserId && (isProjectOwner || currentUserRole === 'DIRECTOR'),
+  );
+
+  // Crew members (everyone except a plain actor) may create resource requests.
+  const canRequestResources = Boolean(
+    currentUserRole && RESOURCE_REQUEST_ROLES.includes(currentUserRole),
+  );
+
+  // Reports are restricted to directors on the backend; only fetch them when the
+  // current user is allowed to manage the project to avoid noisy 403 toasts.
+  // Declared after `canManageMembers` so the dependency is initialised in time.
+  const loadShiftReports = useCallback(
+    async (shiftId) => {
+      if (!shiftId || !canManageMembers) {
+        return;
+      }
+
+      setIsReportsLoading(true);
+
+      try {
+        const response = await listShiftReports(shiftId);
+        const items = extractItems(response);
+        setShiftReports((prev) => ({ ...prev, [shiftId]: items }));
+      } catch (error) {
+        toast.error(error?.message || 'Не удалось загрузить отчёты смены');
+      } finally {
+        setIsReportsLoading(false);
+      }
+    },
+    [canManageMembers],
   );
 
   const displayedMembers = useMemo(() => {
@@ -294,6 +465,25 @@ const ShiftPlanningPage = () => {
   const selectedShiftResourceRequests = useMemo(
     () => shiftResourceRequests[resourceRequestForm.shiftId] || [],
     [resourceRequestForm.shiftId, shiftResourceRequests],
+  );
+  const selectedShiftReports = useMemo(
+    () => shiftReports[reportShiftId] || [],
+    [reportShiftId, shiftReports],
+  );
+
+  // datetime-local bounds (min/max) of the shift a sub-interval is being picked
+  // for, so participant/resource windows stay inside the shift but may be shorter.
+  const participantShiftBounds = useMemo(
+    () => getShiftTimeRange(selectedProjectShifts.find((shift) => shift.oid === participantForm.shiftId)),
+    [participantForm.shiftId, selectedProjectShifts],
+  );
+  const resourceShiftBounds = useMemo(
+    () => getShiftTimeRange(selectedProjectShifts.find((shift) => shift.oid === resourceRequestForm.shiftId)),
+    [resourceRequestForm.shiftId, selectedProjectShifts],
+  );
+  const reportShift = useMemo(
+    () => selectedProjectShifts.find((shift) => shift.oid === reportShiftId) || null,
+    [reportShiftId, selectedProjectShifts],
   );
   const shiftStats = useMemo(
     () => ({
@@ -363,46 +553,34 @@ const ShiftPlanningPage = () => {
     });
   }, [selectedProjectShifts]);
 
-  // Load resource requests from the backend whenever the selected shift changes.
-  // This makes the list durable across page refreshes and new sessions.
+  // Load shift composition from the backend whenever the selected shift changes.
+  // This keeps participants, documents and resource requests durable across
+  // page refreshes, new browser sessions and devices.
   useEffect(() => {
-    const shiftId = resourceRequestForm.shiftId;
-    if (!shiftId) {
-      return;
-    }
+    loadShiftParticipants(participantForm.shiftId);
+  }, [participantForm.shiftId, loadShiftParticipants]);
 
-    let isMounted = true;
+  useEffect(() => {
+    loadShiftDocuments(documentForm.shiftId);
+  }, [documentForm.shiftId, loadShiftDocuments]);
 
-    listShiftResourceRequests(shiftId)
-      .then((response) => {
-        if (!isMounted) {
-          return;
-        }
-        const items = Array.isArray(response) ? response : [];
-        if (items.length === 0) {
-          return;
-        }
-        setShiftResourceRequests((prev) => {
-          const existing = prev[shiftId] || [];
-          const existingIds = new Set(existing.map((r) => r.oid));
-          const incoming = items.filter((r) => !existingIds.has(r.oid));
-          if (incoming.length === 0) {
-            return prev;
-          }
-          return {
-            ...prev,
-            [shiftId]: [...incoming, ...existing],
-          };
-        });
-      })
-      .catch(() => {
-        // Silently ignore — local state remains intact
-      });
+  useEffect(() => {
+    loadShiftResourceRequests(resourceRequestForm.shiftId);
+  }, [resourceRequestForm.shiftId, loadShiftResourceRequests]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [resourceRequestForm.shiftId]);
+  // Keep the report panel pointed at a valid shift of the current project.
+  useEffect(() => {
+    setReportShiftId((prev) => {
+      if (selectedProjectShifts.some((shift) => shift.oid === prev)) {
+        return prev;
+      }
+      return selectedProjectShifts[0]?.oid || '';
+    });
+  }, [selectedProjectShifts]);
+
+  useEffect(() => {
+    loadShiftReports(reportShiftId);
+  }, [reportShiftId, loadShiftReports]);
 
   useEffect(() => {
     if (!participantForm.userId) {
@@ -583,6 +761,16 @@ const ShiftPlanningPage = () => {
     setParticipantForm((prev) => ({ ...prev, shiftId, ...shiftRange }));
     setDocumentForm((prev) => ({ ...prev, shiftId }));
     setResourceRequestForm((prev) => ({ ...prev, shiftId, ...shiftRange }));
+    setReportShiftId(shiftId);
+  };
+
+  const updateShiftInState = (shiftId, nextShift) => {
+    setProjectShifts((prev) => ({
+      ...prev,
+      [memberProjectId]: (prev[memberProjectId] || []).map((shift) =>
+        shift.oid === shiftId ? nextShift : shift,
+      ),
+    }));
   };
 
   const handleApproveShift = async (shiftId) => {
@@ -599,17 +787,64 @@ const ShiftPlanningPage = () => {
 
     try {
       const updatedShift = await approveShift(shiftId);
-      setProjectShifts((prev) => ({
-        ...prev,
-        [memberProjectId]: (prev[memberProjectId] || []).map((shift) =>
-          shift.oid === shiftId ? updatedShift : shift,
-        ),
-      }));
+      updateShiftInState(shiftId, updatedShift);
       toast.success('Смена подтверждена');
     } catch (error) {
       toast.error(error?.message || 'Не удалось подтвердить смену');
     } finally {
       setApprovingShiftId(null);
+    }
+  };
+
+  const handleCompleteShift = async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав завершать смены в этом проекте');
+      return;
+    }
+
+    setShiftActionId(shiftId);
+
+    try {
+      const updatedShift = await completeShift(shiftId);
+      updateShiftInState(shiftId, updatedShift);
+      toast.success('Смена завершена');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось завершить смену');
+    } finally {
+      setShiftActionId(null);
+    }
+  };
+
+  const handleCancelShift = async (shiftId) => {
+    if (!shiftId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав отменять смены в этом проекте');
+      return;
+    }
+
+    setShiftActionId(shiftId);
+
+    try {
+      const updatedShift = await cancelShift(shiftId);
+      updateShiftInState(shiftId, updatedShift);
+      toast.success('Смена отменена');
+      // Cancelling a shift cancels its participants and resource requests on the
+      // server, so refresh them from the backend to reflect the new statuses.
+      await Promise.all([
+        loadShiftParticipants(shiftId),
+        loadShiftResourceRequests(shiftId),
+      ]);
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось отменить смену');
+    } finally {
+      setShiftActionId(null);
     }
   };
 
@@ -635,52 +870,37 @@ const ShiftPlanningPage = () => {
       return;
     }
 
+    if (!isWithinDateTimeBounds(participantForm.timeFrom, participantForm.timeTo, participantShiftBounds)) {
+      toast.error('Время участия должно быть в пределах времени смены');
+      return;
+    }
+
     const selectedMember = displayedMembers.find((member) => member.user_id === userId);
 
     setIsInvitingParticipant(true);
 
     try {
-      const participant = await inviteShiftParticipant(participantForm.shiftId, {
+      await inviteShiftParticipant(participantForm.shiftId, {
         user_id: userId,
         role: selectedMember?.role || participantForm.role,
         time_from: timeFrom,
         time_to: timeTo,
       });
 
-      setShiftParticipants((prev) => ({
-        ...prev,
-        [participantForm.shiftId]: [participant, ...(prev[participantForm.shiftId] || [])],
-      }));
       setParticipantForm((prev) => ({
         ...initialParticipantForm,
         shiftId: prev.shiftId,
         timeFrom: prev.timeFrom,
         timeTo: prev.timeTo,
       }));
+      // Reload from the server so the participant list reflects the source of truth.
+      await loadShiftParticipants(participantForm.shiftId);
       toast.success('Участник приглашен в смену');
     } catch (error) {
       toast.error(error?.message || 'Не удалось пригласить участника в смену');
     } finally {
       setIsInvitingParticipant(false);
     }
-  };
-
-  const updateParticipantInState = (shiftId, participantId, nextParticipant) => {
-    setShiftParticipants((prev) => ({
-      ...prev,
-      [shiftId]: (prev[shiftId] || []).map((participant) =>
-        participant.oid === participantId ? nextParticipant : participant,
-      ),
-    }));
-  };
-
-  const updateResourceRequestInState = (shiftId, requestId, nextRequest) => {
-    setShiftResourceRequests((prev) => ({
-      ...prev,
-      [shiftId]: (prev[shiftId] || []).map((request) =>
-        request.oid === requestId ? nextRequest : request,
-      ),
-    }));
   };
 
   const handleUploadDocument = async (event) => {
@@ -699,23 +919,20 @@ const ShiftPlanningPage = () => {
     setIsUploadingDocument(true);
 
     try {
-      const uploadedDocument = await uploadShiftDocument(documentForm.shiftId, {
+      await uploadShiftDocument(documentForm.shiftId, {
         file: documentForm.file,
         doc_type: documentForm.docType,
         title: documentForm.title.trim(),
         description: documentForm.description.trim(),
       });
 
-      setShiftDocuments((prev) => ({
-        ...prev,
-        [documentForm.shiftId]: [uploadedDocument, ...(prev[documentForm.shiftId] || [])],
-      }));
       setDocumentForm((prev) => ({
         ...initialDocumentForm,
         shiftId: prev.shiftId,
         docType: prev.docType,
       }));
       setDocumentInputKey((prev) => prev + 1);
+      await loadShiftDocuments(documentForm.shiftId);
       toast.success('Документ загружен');
     } catch (error) {
       toast.error(error?.message || 'Не удалось загрузить документ');
@@ -769,10 +986,15 @@ const ShiftPlanningPage = () => {
       return;
     }
 
+    if (!isWithinDateTimeBounds(resourceRequestForm.timeFrom, resourceRequestForm.timeTo, resourceShiftBounds)) {
+      toast.error('Время запроса должно быть в пределах времени смены');
+      return;
+    }
+
     setIsSubmittingResourceRequest(true);
 
     try {
-      const request = await createShiftResourceRequest(resourceRequestForm.shiftId, {
+      await createShiftResourceRequest(resourceRequestForm.shiftId, {
         resource_type: resourceRequestForm.resourceType,
         resource_id: resourceRequestForm.resourceId,
         resource_owner_user_id: resourceRequestForm.ownerUserId,
@@ -780,33 +1002,18 @@ const ShiftPlanningPage = () => {
         time_to: timeTo,
       });
 
-      setShiftResourceRequests((prev) => {
-        const existing = prev[resourceRequestForm.shiftId] || [];
-        // Deduplicate in case the backend-fetch effect already added it
-        const withoutDuplicate = existing.filter((r) => r.oid !== request.oid);
-        return {
-          ...prev,
-          [resourceRequestForm.shiftId]: [request, ...withoutDuplicate],
-        };
-      });
       setResourceRequestForm((prev) => ({
         ...initialResourceRequestForm,
         shiftId: prev.shiftId,
         ownerUserId: prev.ownerUserId,
       }));
+      await loadShiftResourceRequests(resourceRequestForm.shiftId);
       toast.success('Запрос на ресурс создан');
     } catch (error) {
       toast.error(error?.message || 'Не удалось создать запрос на ресурс');
     } finally {
       setIsSubmittingResourceRequest(false);
     }
-  };
-
-  const removeResourceRequestFromState = (shiftId, requestId) => {
-    setShiftResourceRequests((prev) => ({
-      ...prev,
-      [shiftId]: (prev[shiftId] || []).filter((request) => request.oid !== requestId),
-    }));
   };
 
   const handleApproveShiftResourceRequest = async (shiftId, requestId) => {
@@ -817,9 +1024,9 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      const updatedRequest = await approveResourceRequest(requestId);
-      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      await approveResourceRequest(requestId);
       toast.success('Запрос на ресурс подтвержден — ожидайте письмо для подтверждения брони');
+      await loadShiftResourceRequests(shiftId);
     } catch (error) {
       toast.error(error?.message || 'Не удалось подтвердить запрос на ресурс');
     } finally {
@@ -842,12 +1049,30 @@ const ShiftPlanningPage = () => {
     setResourceRequestActionId(requestId);
 
     try {
-      const updatedRequest = await rejectResourceRequest(requestId, { reason });
-      updateResourceRequestInState(shiftId, requestId, updatedRequest);
+      await rejectResourceRequest(requestId, { reason });
       setRejectReasonsById((prev) => ({ ...prev, [requestId]: '' }));
       toast.success('Запрос на ресурс отклонен');
+      await loadShiftResourceRequests(shiftId);
     } catch (error) {
       toast.error(error?.message || 'Не удалось отклонить запрос на ресурс');
+    } finally {
+      setResourceRequestActionId(null);
+    }
+  };
+
+  const handleCancelShiftResourceRequest = async (shiftId, requestId) => {
+    if (!requestId) {
+      return;
+    }
+
+    setResourceRequestActionId(requestId);
+
+    try {
+      await cancelResourceRequest(requestId);
+      toast.success('Запрос на ресурс отменен');
+      await loadShiftResourceRequests(shiftId);
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось отменить запрос на ресурс');
     } finally {
       setResourceRequestActionId(null);
     }
@@ -861,9 +1086,9 @@ const ShiftPlanningPage = () => {
     setParticipantActionId(participantId);
 
     try {
-      const updatedParticipant = await confirmShiftParticipant(participantId);
-      updateParticipantInState(shiftId, participantId, updatedParticipant);
+      await confirmShiftParticipant(participantId);
       toast.success('Участие подтверждено');
+      await loadShiftParticipants(shiftId);
     } catch (error) {
       toast.error(error?.message || 'Не удалось подтвердить участие');
     } finally {
@@ -879,13 +1104,94 @@ const ShiftPlanningPage = () => {
     setParticipantActionId(participantId);
 
     try {
-      const updatedParticipant = await declineShiftParticipant(participantId);
-      updateParticipantInState(shiftId, participantId, updatedParticipant);
+      await declineShiftParticipant(participantId);
       toast.success('Участие отклонено');
+      await loadShiftParticipants(shiftId);
     } catch (error) {
       toast.error(error?.message || 'Не удалось отклонить участие');
     } finally {
       setParticipantActionId(null);
+    }
+  };
+
+  const handleCancelParticipant = async (shiftId, participantId) => {
+    if (!participantId) {
+      return;
+    }
+
+    if (!canManageMembers) {
+      toast.error('У вас нет прав отменять участников смены');
+      return;
+    }
+
+    setParticipantActionId(participantId);
+
+    try {
+      await cancelShiftParticipant(participantId);
+      toast.success('Участник отменен');
+      await loadShiftParticipants(shiftId);
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось отменить участника');
+    } finally {
+      setParticipantActionId(null);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!reportShiftId || !canManageMembers) {
+      return;
+    }
+
+    setIsGeneratingReport(true);
+
+    try {
+      await generateShiftReport(reportShiftId);
+      toast.success('Отчёт поставлен в очередь на формирование');
+      await loadShiftReports(reportShiftId);
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось запустить формирование отчёта');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleDownloadReport = async (reportId) => {
+    if (!reportId) {
+      return;
+    }
+
+    setReportActionId(reportId);
+
+    try {
+      const response = await getShiftReportDownloadUrl(reportId);
+      if (!response?.download_url) {
+        toast.error('Ссылка на скачивание не получена');
+        return;
+      }
+
+      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось получить ссылку на отчёт');
+    } finally {
+      setReportActionId(null);
+    }
+  };
+
+  const handleArchiveReport = async (reportId) => {
+    if (!reportId || !canManageMembers) {
+      return;
+    }
+
+    setReportActionId(reportId);
+
+    try {
+      await archiveShiftReport(reportId);
+      toast.success('Отчёт перемещён в архив');
+      await loadShiftReports(reportShiftId);
+    } catch (error) {
+      toast.error(error?.message || 'Не удалось архивировать отчёт');
+    } finally {
+      setReportActionId(null);
     }
   };
 
@@ -1022,12 +1328,15 @@ const ShiftPlanningPage = () => {
             ) : null}
 
             <div className="project-shifts-list">
-              {selectedProjectShifts.length === 0 ? (
+              {isShiftsLoading ? (
+                <p className="helper-note">Загружаем смены...</p>
+              ) : selectedProjectShifts.length === 0 ? (
                 <p className="helper-note">Смены появятся здесь после создания.</p>
               ) : (
                 selectedProjectShifts.map((shift) => {
                   const isSelectedShift = participantForm.shiftId === shift.oid;
                   const isApproving = approvingShiftId === shift.oid;
+                  const isShiftBusy = shiftActionId === shift.oid;
 
                   return (
                     <article
@@ -1052,7 +1361,7 @@ const ShiftPlanningPage = () => {
                         >
                           {isSelectedShift ? 'Выбрана' : 'Выбрать'}
                         </button>
-                        {canManageMembers ? (
+                        {canManageMembers && canApproveShiftStatus(shift.status) ? (
                           <button
                             type="button"
                             className="profile-save-btn compact"
@@ -1060,6 +1369,26 @@ const ShiftPlanningPage = () => {
                             disabled={isApproving}
                           >
                             {isApproving ? 'Подтверждаем...' : 'Подтвердить смену'}
+                          </button>
+                        ) : null}
+                        {canManageMembers && canCompleteShiftStatus(shift.status) ? (
+                          <button
+                            type="button"
+                            className="profile-save-btn compact"
+                            onClick={() => handleCompleteShift(shift.oid)}
+                            disabled={isShiftBusy}
+                          >
+                            {isShiftBusy ? 'Сохраняем...' : 'Завершить смену'}
+                          </button>
+                        ) : null}
+                        {canManageMembers && canCancelShiftStatus(shift.status) ? (
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleCancelShift(shift.oid)}
+                            disabled={isShiftBusy}
+                          >
+                            {isShiftBusy ? '...' : 'Отменить смену'}
                           </button>
                         ) : null}
                       </div>
@@ -1141,7 +1470,8 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={participantForm.timeFrom}
                   onChange={handleParticipantFormChange}
-                  readOnly
+                  min={participantShiftBounds.timeFrom}
+                  max={participantShiftBounds.timeTo}
                 />
               </label>
 
@@ -1152,14 +1482,22 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={participantForm.timeTo}
                   onChange={handleParticipantFormChange}
-                  readOnly
+                  min={participantShiftBounds.timeFrom}
+                  max={participantShiftBounds.timeTo}
                 />
               </label>
+
+              {participantShiftBounds.timeFrom ? (
+                <p className="helper-note shift-planning-window-hint">
+                  Окно участия можно сузить, но оно должно оставаться в пределах смены:
+                  {' '}{formatDateTime(participantShiftBounds.timeFrom)} — {formatDateTime(participantShiftBounds.timeTo)}
+                </p>
+              ) : null}
 
               <button
                 type="submit"
                 className="profile-save-btn compact shift-planning-submit"
-                disabled={!participantForm.shiftId || !canManageMembers || isInvitingParticipant}
+                disabled={!participantForm.shiftId || isInvitingParticipant}
               >
                 {isInvitingParticipant ? 'Приглашаем...' : 'Пригласить в смену'}
               </button>
@@ -1169,12 +1507,17 @@ const ShiftPlanningPage = () => {
             <div className="project-participants-list">
               {!participantForm.shiftId ? (
                 <p className="helper-note">Выберите смену, чтобы увидеть приглашенных участников.</p>
+              ) : isParticipantsLoading ? (
+                <p className="helper-note">Загружаем участников...</p>
               ) : selectedShiftParticipants.length === 0 ? (
                 <p className="helper-note">Для этой смены пока нет приглашенных участников.</p>
               ) : (
                 selectedShiftParticipants.map((participant) => {
                   const isProcessing = participantActionId === participant.oid;
                   const participantMember = displayedMembers.find((member) => member.user_id === participant.user_id);
+                  const isParticipantSelf = currentUserId === participant.user_id;
+                  const canCancelParticipant =
+                    canManageMembers && canCancelParticipantStatus(participant.status);
 
                   return (
                     <article key={participant.oid} className="project-member-card">
@@ -1188,24 +1531,38 @@ const ShiftPlanningPage = () => {
                         <p>{formatDateTime(participant.time_from)} - {formatDateTime(participant.time_to)}</p>
                       </div>
 
-                      {currentUserId === participant.user_id ? (
+                      {isParticipantSelf || canCancelParticipant ? (
                       <div className="project-member-actions">
-                        <button
-                          type="button"
-                          className="ghost-action-btn"
-                          onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
-                          disabled={isProcessing}
-                        >
-                          {isProcessing ? '...' : 'Подтвердить'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-action-btn danger"
-                          onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
-                          disabled={isProcessing}
-                        >
-                          {isProcessing ? '...' : 'Отклонить'}
-                        </button>
+                        {isParticipantSelf ? (
+                          <>
+                            <button
+                              type="button"
+                              className="ghost-action-btn"
+                              onClick={() => handleConfirmParticipant(participant.shift_id, participant.oid)}
+                              disabled={isProcessing}
+                            >
+                              {isProcessing ? '...' : 'Подтвердить'}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-action-btn danger"
+                              onClick={() => handleDeclineParticipant(participant.shift_id, participant.oid)}
+                              disabled={isProcessing}
+                            >
+                              {isProcessing ? '...' : 'Отклонить'}
+                            </button>
+                          </>
+                        ) : null}
+                        {canCancelParticipant ? (
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleCancelParticipant(participant.shift_id, participant.oid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing ? '...' : 'Отменить'}
+                          </button>
+                        ) : null}
                       </div>
                       ) : null}
                     </article>
@@ -1308,13 +1665,15 @@ const ShiftPlanningPage = () => {
             <div className="project-documents-list">
               {!documentForm.shiftId ? (
                 <p className="helper-note">Выберите смену, чтобы увидеть документы.</p>
+              ) : isDocumentsLoading ? (
+                <p className="helper-note">Загружаем документы...</p>
               ) : selectedShiftDocuments.length === 0 ? (
                 <p className="helper-note">Для этой смены пока нет документов.</p>
               ) : (
                 selectedShiftDocuments.map((document) => (
                   <article key={document.oid} className="project-member-card">
                     <div>
-                      <span className="project-type-label">{document.doc_type}</span>
+                      <span className="project-type-label">{getDocumentTypeLabel(document.doc_type)}</span>
                       <h3>{document.title}</h3>
                       <p>{document.description || 'Описание не указано'}</p>
                       <p>{document.filename || document.storage_key || 'Файл без имени'} · {formatDateTime(document.created_at)}</p>
@@ -1345,7 +1704,7 @@ const ShiftPlanningPage = () => {
               <p>Создайте запрос на ресурс для смены, затем владелец ресурса сможет его подтвердить или отклонить.</p>
             </div>
 
-            {canManageMembers ? (
+            {canRequestResources ? (
             <form className="shift-planning-resource-form" onSubmit={handleCreateResourceRequest}>
               <label className="field-block">
                 <span>Смена</span>
@@ -1410,7 +1769,8 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={resourceRequestForm.timeFrom}
                   onChange={handleResourceRequestFormChange}
-                  readOnly
+                  min={resourceShiftBounds.timeFrom}
+                  max={resourceShiftBounds.timeTo}
                 />
               </label>
 
@@ -1421,9 +1781,17 @@ const ShiftPlanningPage = () => {
                   type="datetime-local"
                   value={resourceRequestForm.timeTo}
                   onChange={handleResourceRequestFormChange}
-                  readOnly
+                  min={resourceShiftBounds.timeFrom}
+                  max={resourceShiftBounds.timeTo}
                 />
               </label>
+
+              {resourceShiftBounds.timeFrom ? (
+                <p className="helper-note shift-planning-window-hint">
+                  Время можно сузить, но оно должно оставаться в пределах смены:
+                  {' '}{formatDateTime(resourceShiftBounds.timeFrom)} — {formatDateTime(resourceShiftBounds.timeTo)}
+                </p>
+              ) : null}
 
               <button
                 type="submit"
@@ -1438,12 +1806,19 @@ const ShiftPlanningPage = () => {
             <div className="project-resource-requests-list">
               {!resourceRequestForm.shiftId ? (
                 <p className="helper-note">Выберите смену, чтобы увидеть запросы на ресурсы.</p>
+              ) : isResourceRequestsLoading ? (
+                <p className="helper-note">Загружаем запросы на ресурсы...</p>
               ) : selectedShiftResourceRequests.length === 0 ? (
                 <p className="helper-note">Для этой смены пока нет запросов на ресурсы.</p>
               ) : (
                 selectedShiftResourceRequests.map((request) => {
                   const isProcessing = resourceRequestActionId === request.oid;
                   const canDecide = currentUserId && request.resource_owner_user_id === currentUserId;
+                  const isRequester =
+                    currentUserId && request.requested_by_user_id === currentUserId;
+                  const canCancelRequest =
+                    (isRequester || canManageMembers) &&
+                    canCancelResourceRequestStatus(request.status);
 
                   return (
                     <article key={request.oid} className="project-member-card shift-resource-request-card">
@@ -1489,12 +1864,142 @@ const ShiftPlanningPage = () => {
                           </button>
                         </div>
                       )}
+
+                      {canCancelRequest && (
+                        <div className="project-member-actions shift-resource-actions">
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleCancelShiftResourceRequest(request.shift_id, request.oid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing ? '...' : 'Отменить запрос'}
+                          </button>
+                        </div>
+                      )}
                     </article>
                   );
                 })
               )}
             </div>
           </section>
+
+          {canManageMembers ? (
+          <section className="dashboard-panel shift-planning-card">
+            <div className="section-heading">
+              <div>
+                <span className="projects-panel-eyebrow">Отчётность</span>
+                <h2>Отчёты по смене</h2>
+              </div>
+              <p>Сформируйте XLSX-отчёт по смене, скачайте готовую версию или отправьте устаревшую в архив.</p>
+            </div>
+
+            <form className="shift-planning-report-form" onSubmit={(event) => event.preventDefault()}>
+              <label className="field-block">
+                <span>Смена</span>
+                <select
+                  value={reportShiftId}
+                  onChange={(event) => setReportShiftId(event.target.value)}
+                  disabled={selectedProjectShifts.length === 0}
+                >
+                  {selectedProjectShifts.length === 0 ? (
+                    <option value="">Нет смен</option>
+                  ) : (
+                    selectedProjectShifts.map((shift) => (
+                      <option key={shift.oid} value={shift.oid}>
+                        {shift.title}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+
+              <div className="shift-planning-report-actions">
+                <button
+                  type="button"
+                  className="profile-save-btn compact shift-planning-submit"
+                  onClick={handleGenerateReport}
+                  disabled={
+                    !reportShiftId ||
+                    isGeneratingReport ||
+                    !canGenerateReportForShiftStatus(reportShift?.status)
+                  }
+                >
+                  {isGeneratingReport ? 'Формируем...' : 'Сформировать отчёт'}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-action-btn"
+                  onClick={() => loadShiftReports(reportShiftId)}
+                  disabled={!reportShiftId || isReportsLoading}
+                >
+                  {isReportsLoading ? 'Обновляем...' : 'Обновить'}
+                </button>
+              </div>
+
+              {reportShiftId && !canGenerateReportForShiftStatus(reportShift?.status) ? (
+                <p className="helper-note shift-planning-window-hint">
+                  Отчёт можно сформировать только после подтверждения смены.
+                </p>
+              ) : null}
+            </form>
+
+            <div className="project-reports-list">
+              {!reportShiftId ? (
+                <p className="helper-note">Выберите смену, чтобы увидеть отчёты.</p>
+              ) : isReportsLoading ? (
+                <p className="helper-note">Загружаем отчёты...</p>
+              ) : selectedShiftReports.length === 0 ? (
+                <p className="helper-note">Для этой смены ещё нет отчётов.</p>
+              ) : (
+                selectedShiftReports.map((report) => {
+                  const isProcessing = reportActionId === report.oid;
+                  const isStale = Number(report.actuality_status) === REPORT_ACTUALITY_STALE;
+                  const isFailed = Number(report.generation_status) === REPORT_GENERATION_STATUS_FAILED;
+
+                  return (
+                    <article key={report.oid} className="project-member-card">
+                      <div>
+                        <div className="project-card-meta">
+                          <span className="project-type-label">Версия {report.version}</span>
+                          <span className="project-type-label">{getReportGenerationStatusLabel(report.generation_status)}</span>
+                          <span className="project-type-label">{isStale ? 'Устарел' : 'Актуален'}</span>
+                        </div>
+                        <h3>{report.file_name || `Отчёт смены v${report.version}`}</h3>
+                        <p>{formatDateTime(report.generated_at || report.created_at)}</p>
+                        {isFailed && report.error_message ? <p>Ошибка: {report.error_message}</p> : null}
+                        {isStale && report.stale_reason ? <p>Причина устаревания: {report.stale_reason}</p> : null}
+                      </div>
+
+                      <div className="project-member-actions">
+                        {isReportReady(report.generation_status) ? (
+                          <button
+                            type="button"
+                            className="ghost-action-btn"
+                            onClick={() => handleDownloadReport(report.oid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing ? '...' : 'Скачать'}
+                          </button>
+                        ) : null}
+                        {canArchiveReportStatus(report.generation_status) ? (
+                          <button
+                            type="button"
+                            className="ghost-action-btn danger"
+                            onClick={() => handleArchiveReport(report.oid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing ? '...' : 'В архив'}
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+          ) : null}
         </div>
       )}
     </section>

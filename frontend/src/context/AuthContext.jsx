@@ -68,8 +68,35 @@ export const AuthProvider = ({ children }) => {
       setUserData(accessToken ? decodeToken(accessToken) : null);
     });
 
-    setIsAuthReady(true);
-    return unsubscribe;
+    // The access token lives only in memory, so after a full page reload it is
+    // gone even when the session is still valid. Attempt a silent refresh using
+    // the HttpOnly refresh-token cookie before rendering protected routes, so an
+    // authenticated user is not bounced back to the landing page on refresh.
+    //
+    // We only do this when a previous session marker is present so that a brand
+    // new anonymous visitor is never silently signed in.
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      if (!getAccessToken() && readStoredAuthEmail()) {
+        try {
+          await refreshAccessToken({ preserveSessionOnNetworkError: true });
+        } catch {
+          // No valid session to restore — the user stays logged out.
+        }
+      }
+
+      if (!cancelled) {
+        setIsAuthReady(true);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

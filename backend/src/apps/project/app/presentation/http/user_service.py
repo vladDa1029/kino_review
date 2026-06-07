@@ -280,6 +280,52 @@ class UserServiceHttpClient(UserServicePort):
             },
         )
 
+    async def cancel_user_reservation(
+        self,
+        *,
+        request_id: UUID,
+        user_id: UUID,
+        reservation_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        await self._publisher.publish(
+            "shift.participant_reservation_cancel_requested",
+            {
+                "request_id": str(request_id),
+                "project_id": str(project_id),
+                "shift_id": str(shift_id),
+                "participant_id": str(entity_id),
+                "user_id": str(user_id),
+                "reservation_id": str(reservation_id),
+            },
+        )
+
+    async def cancel_resource_reservation(
+        self,
+        *,
+        request_id: UUID,
+        owner_user_id: UUID,
+        resource_id: UUID,
+        reservation_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        await self._publisher.publish(
+            "shift.resource_request_reservation_cancel_requested",
+            {
+                "request_id": str(request_id),
+                "project_id": str(project_id),
+                "shift_id": str(shift_id),
+                "resource_request_id": str(entity_id),
+                "owner_user_id": str(owner_user_id),
+                "resource_id": str(resource_id),
+                "reservation_id": str(reservation_id),
+            },
+        )
+
     async def _request(
         self,
         method: str,

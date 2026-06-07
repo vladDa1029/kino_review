@@ -4,8 +4,11 @@ from uuid import UUID
 
 from app.application.commands.reservation_outbox import (
     OUTBOX_STATUS_PENDING,
+    PARTICIPANT_CANCEL_OPERATION,
     PARTICIPANT_RESERVE_OPERATION,
+    build_participant_cancel_request_id,
     build_participant_reservation_request_id,
+    enqueue_reservation_message,
 )
 from app.application.ports.broker import EventPublisher
 from app.application.ports.domain import (
@@ -28,7 +31,7 @@ from app.application.support import (
     require_shift,
 )
 from app.domain.entities import ReservationOutboxMessage, ShiftParticipant
-from app.domain.enums import ProjectRole
+from app.domain.enums import ProjectRole, ShiftParticipantStatus
 from app.domain.services import ShiftParticipantService
 
 
@@ -269,6 +272,88 @@ class DeclineShiftParticipantHandler:
             publisher=self._publisher,
             topic="shift.participant_declined",
             payload={
+                "shift_id": str(participant.shift_id),
+                "participant_id": str(participant.oid),
+                "user_id": str(participant.user_id),
+            },
+        )
+        return participant
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CancelShiftParticipantCommand:
+    participant_id: UUID
+    actor_user_id: UUID
+
+
+class CancelShiftParticipantHandler:
+    def __init__(
+        self,
+        *,
+        transaction_manager: TransactionManager,
+        clock: ClockPort,
+        publisher: EventPublisher,
+        reservation_outbox: ReservationOutboxRepository,
+        project_members: ProjectMemberRepository,
+        shifts: ShiftRepository,
+        shift_participants: ShiftParticipantRepository,
+        shift_reports: ShiftReportRepository,
+        shift_participant_service: ShiftParticipantService,
+    ) -> None:
+        self._tx = transaction_manager
+        self._clock = clock
+        self._publisher = publisher
+        self._reservation_outbox = reservation_outbox
+        self._project_members = project_members
+        self._shifts = shifts
+        self._shift_participants = shift_participants
+        self._shift_reports = shift_reports
+        self._shift_participant_service = shift_participant_service
+
+    async def __call__(self, command: CancelShiftParticipantCommand) -> ShiftParticipant:
+        now = self._clock.now()
+        try:
+            participant = await require_participant(
+                shift_participants=self._shift_participants,
+                participant_id=command.participant_id,
+            )
+            shift = await require_shift(shifts=self._shifts, shift_id=participant.shift_id)
+            actor = await get_actor_member(
+                project_members=self._project_members,
+                project_id=shift.project_id,
+                user_id=command.actor_user_id,
+            )
+            was_reserved = participant.status == ShiftParticipantStatus.RESERVED
+            self._shift_participant_service.cancel(
+                actor=actor,
+                participant=participant,
+                now=now,
+            )
+            await self._shift_participants.update(participant)
+            if was_reserved:
+                await enqueue_reservation_message(
+                    reservation_outbox=self._reservation_outbox,
+                    clock=self._clock,
+                    request_id=build_participant_cancel_request_id(participant.oid),
+                    operation=PARTICIPANT_CANCEL_OPERATION,
+                    aggregate_id=participant.oid,
+                )
+            await mark_shift_reports_stale(
+                shift_reports=self._shift_reports,
+                clock=self._clock,
+                shift_id=shift.oid,
+                reason="Participant status changed.",
+            )
+            await self._tx.commit()
+        except Exception:
+            await self._tx.rollback()
+            raise
+
+        await publish_best_effort(
+            publisher=self._publisher,
+            topic="shift.participant_cancelled",
+            payload={
+                "project_id": str(shift.project_id),
                 "shift_id": str(participant.shift_id),
                 "participant_id": str(participant.oid),
                 "user_id": str(participant.user_id),

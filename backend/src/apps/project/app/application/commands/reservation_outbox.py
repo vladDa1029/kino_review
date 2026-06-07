@@ -19,6 +19,8 @@ from app.domain.enums import ResourceRequestStatus, ShiftParticipantStatus
 RESERVATION_OUTBOX_NAMESPACE = UUID("3d46f2ae-2d14-4edf-aeb8-b0e4f15f6f20")
 PARTICIPANT_RESERVE_OPERATION = "participant_reserve"
 RESOURCE_RESERVE_OPERATION = "resource_request_reserve"
+PARTICIPANT_CANCEL_OPERATION = "participant_cancel_reserve"
+RESOURCE_CANCEL_OPERATION = "resource_request_cancel_reserve"
 OUTBOX_STATUS_PENDING = "pending"
 OUTBOX_STATUS_COMPLETED = "completed"
 
@@ -29,6 +31,49 @@ def build_participant_reservation_request_id(participant_id: UUID) -> UUID:
 
 def build_resource_reservation_request_id(request_id: UUID) -> UUID:
     return uuid5(RESERVATION_OUTBOX_NAMESPACE, f"resource-request-reserve:{request_id}")
+
+
+def build_participant_cancel_request_id(participant_id: UUID) -> UUID:
+    return uuid5(RESERVATION_OUTBOX_NAMESPACE, f"participant-cancel:{participant_id}")
+
+
+def build_resource_cancel_request_id(request_id: UUID) -> UUID:
+    return uuid5(RESERVATION_OUTBOX_NAMESPACE, f"resource-request-cancel:{request_id}")
+
+
+async def enqueue_reservation_message(
+    *,
+    reservation_outbox: ReservationOutboxRepository,
+    clock: ClockPort,
+    request_id: UUID,
+    operation: str,
+    aggregate_id: UUID,
+) -> None:
+    """Add a pending reservation outbox message, resetting an existing one.
+
+    The deterministic ``request_id`` keeps the operation idempotent: a repeated
+    request reuses the same row instead of creating a duplicate.
+    """
+    now = clock.now()
+    existing = await reservation_outbox.get_by_id(request_id)
+    if existing is not None:
+        existing.status = OUTBOX_STATUS_PENDING
+        existing.attempts = 0
+        existing.last_error = None
+        existing.updated_at = now
+        await reservation_outbox.update(existing)
+        return
+    await reservation_outbox.add(
+        ReservationOutboxMessage(
+            oid=request_id,
+            operation=operation,
+            aggregate_id=aggregate_id,
+            status=OUTBOX_STATUS_PENDING,
+            attempts=0,
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +123,10 @@ class ProcessReservationOutboxHandler:
             return await self._process_participant_reserve(message)
         if message.operation == RESOURCE_RESERVE_OPERATION:
             return await self._process_resource_reserve(message)
+        if message.operation == PARTICIPANT_CANCEL_OPERATION:
+            return await self._process_participant_cancel(message)
+        if message.operation == RESOURCE_CANCEL_OPERATION:
+            return await self._process_resource_cancel(message)
 
         message.status = OUTBOX_STATUS_COMPLETED
         message.attempts += 1
@@ -180,6 +229,71 @@ class ProcessReservationOutboxHandler:
 
         return await self._complete_message(message)
 
+    async def _process_participant_cancel(
+        self,
+        message: ReservationOutboxMessage,
+    ) -> ProcessReservationOutboxResult:
+        participant = await self._shift_participants.get_by_id(message.aggregate_id)
+        if participant is None:
+            return await self._complete_missing_message(message, "Shift participant is not found.")
+        if participant.user_reservation_id is None:
+            # Nothing was reserved on the user side, no cancellation needed.
+            return await self._complete_message(message)
+
+        shift = await self._shifts.get_by_id(participant.shift_id)
+        if shift is None:
+            return await self._complete_missing_message(message, "Shift is not found.")
+
+        try:
+            await self._user_service.cancel_user_reservation(
+                request_id=message.oid,
+                user_id=participant.user_id,
+                reservation_id=participant.user_reservation_id,
+                project_id=shift.project_id,
+                shift_id=shift.oid,
+                entity_id=participant.oid,
+            )
+        except Exception as exc:
+            message.attempts += 1
+            message.last_error = str(exc)
+            message.updated_at = self._clock.now()
+            await self._reservation_outbox.update(message)
+            await self._tx.commit()
+            return ProcessReservationOutboxResult(status="failed", error=str(exc))
+
+        return await self._complete_message(message)
+
+    async def _process_resource_cancel(
+        self,
+        message: ReservationOutboxMessage,
+    ) -> ProcessReservationOutboxResult:
+        request = await self._resource_requests.get_by_id(message.aggregate_id)
+        if request is None:
+            return await self._complete_missing_message(message, "Resource request is not found.")
+        if request.resource_reservation_id is None:
+            # Nothing was reserved on the user side, no cancellation needed.
+            return await self._complete_message(message)
+
+        try:
+            await self._user_service.cancel_resource_reservation(
+                request_id=message.oid,
+                owner_user_id=request.resource_owner_user_id,
+                resource_id=request.resource_id,
+                reservation_id=request.resource_reservation_id,
+                project_id=request.project_id,
+                shift_id=request.shift_id,
+                entity_id=request.oid,
+            )
+        except Exception as exc:
+            message.attempts += 1
+            message.last_error = str(exc)
+            message.updated_at = self._clock.now()
+            await self._reservation_outbox.update(message)
+            await self._tx.commit()
+            return ProcessReservationOutboxResult(status="failed", error=str(exc))
+
+        return await self._complete_message(message)
+
     async def _is_active_project_member(self, *, project_id: UUID, user_id: UUID) -> bool:
         member = await self._project_members.get_by_project_and_user(
             project_id=project_id,
@@ -215,7 +329,9 @@ class ProcessReservationOutboxHandler:
         return ProcessReservationOutboxResult(status="failed", error=error)
 
 
-def _enum_name(value: object, enum_cls: type[ShiftParticipantStatus] | type[ResourceRequestStatus]) -> str:
+def _enum_name(
+    value: object, enum_cls: type[ShiftParticipantStatus] | type[ResourceRequestStatus]
+) -> str:
     if hasattr(value, "name"):
         return str(getattr(value, "name"))
     return enum_cls(int(value)).name

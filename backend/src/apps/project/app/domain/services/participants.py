@@ -123,3 +123,19 @@ class ShiftParticipantService:
             raise StateTransitionError("Participant invitation is already finalized.")
         participant.status = ShiftParticipantStatus.CANCELLED
         participant.updated_at = now
+
+    def cancel_due_to_shift(self, *, participant: ShiftParticipant, now: datetime) -> bool:
+        """Cancel a participant because its shift is being cancelled.
+
+        Returns ``True`` when a reservation cancellation must be dispatched
+        (the participant had already been reserved on the user side).
+        """
+        if participant.status in {
+            ShiftParticipantStatus.CANCELLED,
+            ShiftParticipantStatus.DECLINED,
+        }:
+            return False
+        needs_reservation_cancel = participant.user_reservation_id is not None
+        participant.status = ShiftParticipantStatus.CANCELLED
+        participant.updated_at = now
+        return needs_reservation_cancel

@@ -24,7 +24,7 @@ from app.domain.entities import (
     ShiftReport,
     ShiftResourceRequest,
 )
-from app.domain.enums import ProjectMemberStatus, ProjectStatus
+from app.domain.enums import ProjectMemberStatus, ProjectStatus, ShiftStatus
 from app.infrastructure.adapters.orm import documents as documents_table
 from app.infrastructure.adapters.orm import projects as projects_table
 from app.infrastructure.adapters.orm import (
@@ -32,6 +32,7 @@ from app.infrastructure.adapters.orm import (
     shift_participants,
     users_project_role,
 )
+from app.infrastructure.adapters.orm import shift as shift_table
 from app.infrastructure.adapters.orm import shift_reports as shift_reports_table
 
 T = TypeVar("T")
@@ -103,6 +104,21 @@ class SqlAlchemyProjectMemberRepository(
 class SqlAlchemyShiftRepository(SqlAlchemyRepository[Shift], ShiftRepository):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Shift)
+
+    async def list_by_project(
+        self,
+        project_id: UUID,
+        *,
+        include_cancelled: bool = False,
+        status_filter: ShiftStatus | None = None,
+    ) -> list[Shift]:
+        stmt = select(Shift).where(shift_table.c.project_id == project_id)
+        if status_filter is not None:
+            stmt = stmt.where(shift_table.c.status == int(status_filter))
+        elif not include_cancelled:
+            stmt = stmt.where(shift_table.c.status != int(ShiftStatus.CANCELLED))
+        stmt = stmt.order_by(shift_table.c.start_time.desc())
+        return list((await self._session.execute(stmt)).scalars().all())
 
 
 class SqlAlchemyShiftParticipantRepository(

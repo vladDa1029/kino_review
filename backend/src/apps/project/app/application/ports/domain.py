@@ -13,6 +13,7 @@ from app.domain.entities import (
     ShiftReport,
     ShiftResourceRequest,
 )
+from app.domain.enums import ShiftStatus
 
 
 class ClockPort(Protocol):
@@ -63,6 +64,15 @@ class ShiftRepository(Protocol):
         raise NotImplementedError
 
     async def get_by_id(self, shift_id: UUID) -> Shift | None:
+        raise NotImplementedError
+
+    async def list_by_project(
+        self,
+        project_id: UUID,
+        *,
+        include_cancelled: bool = False,
+        status_filter: ShiftStatus | None = None,
+    ) -> list[Shift]:
         raise NotImplementedError
 
     async def update(self, shift: Shift) -> None:
@@ -213,6 +223,31 @@ class UserServicePort(Protocol):
         resource_id: UUID,
         time_from: datetime,
         time_to: datetime,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        raise NotImplementedError
+
+    async def cancel_user_reservation(
+        self,
+        *,
+        request_id: UUID,
+        user_id: UUID,
+        reservation_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        raise NotImplementedError
+
+    async def cancel_resource_reservation(
+        self,
+        *,
+        request_id: UUID,
+        owner_user_id: UUID,
+        resource_id: UUID,
+        reservation_id: UUID,
         project_id: UUID,
         shift_id: UUID,
         entity_id: UUID,

@@ -51,6 +51,16 @@ from app.application.queries.resources import (
     ListShiftResourceRequestsHandler,
     ListShiftResourceRequestsQuery,
 )
+from app.application.queries.shifts import (
+    GetShiftHandler,
+    GetShiftQuery,
+    ListProjectShiftsHandler,
+    ListProjectShiftsQuery,
+    ListShiftDocumentsHandler,
+    ListShiftDocumentsQuery,
+    ListShiftParticipantsHandler,
+    ListShiftParticipantsQuery,
+)
 
 __all__ = [
     "ListAdminProjectsQuery",
@@ -95,4 +105,12 @@ __all__ = [
     "ListProjectMembersHandler",
     "ListShiftResourceRequestsQuery",
     "ListShiftResourceRequestsHandler",
+    "ListProjectShiftsQuery",
+    "ListProjectShiftsHandler",
+    "GetShiftQuery",
+    "GetShiftHandler",
+    "ListShiftParticipantsQuery",
+    "ListShiftParticipantsHandler",
+    "ListShiftDocumentsQuery",
+    "ListShiftDocumentsHandler",
 ]

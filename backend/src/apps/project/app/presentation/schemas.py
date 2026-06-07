@@ -44,6 +44,15 @@ class DocumentTypeInput(StrEnum):
         return DocumentType[self.value]
 
 
+class DocumentTypeFilterInput(StrEnum):
+    PLAN = "PLAN"
+    SCENARIO = "SCENARIO"
+    REPORT = "REPORT"
+
+    def to_domain(self) -> DocumentType:
+        return DocumentType[self.value]
+
+
 def to_project_role_input(value: ProjectRole | int) -> ProjectRoleInput:
     role = value if isinstance(value, ProjectRole) else ProjectRole(int(value))
     return ProjectRoleInput[role.name]
@@ -182,6 +191,17 @@ class CreateShiftRequest(BaseModel):
     end_time: datetime
 
 
+class UpdateShiftRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+
+
+class CancelShiftRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=2000)
+
+
 class ShiftResponse(BaseModel):
     oid: UUID
     project_id: UUID
@@ -212,6 +232,10 @@ class ShiftResponse(BaseModel):
             created_at=shift.created_at,
             updated_at=shift.updated_at,
         )
+
+
+class ShiftListResponse(BaseModel):
+    items: list[ShiftResponse]
 
 
 class InviteShiftParticipantRequest(BaseModel):
@@ -253,6 +277,10 @@ class ShiftParticipantResponse(BaseModel):
             created_at=participant.created_at,
             updated_at=participant.updated_at,
         )
+
+
+class ShiftParticipantListResponse(BaseModel):
+    items: list[ShiftParticipantResponse]
 
 
 class ParticipantApprovalStateResponse(BaseModel):
@@ -374,6 +402,47 @@ class DocumentUploadResponse(BaseModel):
             status=int(document.status),
             created_at=document.created_at,
         )
+
+
+class ShiftDocumentResponse(BaseModel):
+    oid: UUID
+    shift_id: UUID
+    doc_type: str
+    title: str
+    filename: str
+    description: str | None
+    mime_type: str
+    size: int
+    version: int
+    status: int
+    owner_id: UUID
+    created_at: datetime
+
+    @classmethod
+    def from_entity(cls, document: Document) -> ShiftDocumentResponse:
+        doc_type = (
+            document.doc_type
+            if isinstance(document.doc_type, DocumentType)
+            else DocumentType(int(document.doc_type))
+        )
+        return cls(
+            oid=document.oid,
+            shift_id=document.shift_id,
+            doc_type=doc_type.name,
+            title=document.title,
+            filename=document.filename,
+            description=document.description,
+            mime_type=document.mime_type,
+            size=document.size,
+            version=document.version,
+            status=int(document.status),
+            owner_id=document.owner_id,
+            created_at=document.created_at,
+        )
+
+
+class ShiftDocumentListResponse(BaseModel):
+    items: list[ShiftDocumentResponse]
 
 
 class DocumentDownloadUrlResponse(BaseModel):

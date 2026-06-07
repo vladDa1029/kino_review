@@ -134,6 +134,8 @@ class FakeUserService:
         self.users_by_email: dict[str, UUID] = {}
         self.resources: dict[tuple[UUID, str], list[UserResourceItem]] = {}
         self.request_ids: list[UUID] = []
+        self.cancelled_user_reservations: list[UUID] = []
+        self.cancelled_resource_reservations: list[UUID] = []
 
     async def ensure_user_exists(self, user_id: UUID) -> None:
         self.existing_users.add(user_id)
@@ -184,6 +186,33 @@ class FakeUserService:
         entity_id: UUID,
     ) -> None:
         self.request_ids.append(request_id)
+        return None
+
+    async def cancel_user_reservation(
+        self,
+        *,
+        request_id: UUID,
+        user_id: UUID,
+        reservation_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        self.cancelled_user_reservations.append(reservation_id)
+        return None
+
+    async def cancel_resource_reservation(
+        self,
+        *,
+        request_id: UUID,
+        owner_user_id: UUID,
+        resource_id: UUID,
+        reservation_id: UUID,
+        project_id: UUID,
+        shift_id: UUID,
+        entity_id: UUID,
+    ) -> None:
+        self.cancelled_resource_reservations.append(reservation_id)
         return None
 
     async def list_user_resources(
@@ -299,6 +328,21 @@ class InMemoryShiftRepo:
 
     async def get_by_id(self, shift_id: UUID) -> Shift | None:
         return self.data.get(shift_id)
+
+    async def list_by_project(
+        self,
+        project_id: UUID,
+        *,
+        include_cancelled: bool = False,
+        status_filter: ShiftStatus | None = None,
+    ) -> list[Shift]:
+        shifts = [shift for shift in self.data.values() if shift.project_id == project_id]
+        if status_filter is not None:
+            shifts = [shift for shift in shifts if shift.status == status_filter]
+        elif not include_cancelled:
+            shifts = [shift for shift in shifts if shift.status != ShiftStatus.CANCELLED]
+        shifts.sort(key=lambda item: item.start_time, reverse=True)
+        return shifts
 
     async def update(self, shift: Shift) -> None:
         self.data[shift.oid] = shift

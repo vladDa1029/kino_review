@@ -11,6 +11,7 @@ from faststream.rabbit import RabbitBroker
 from app.application.common.filters import Filter
 from app.application.common.pagination import Pagination
 from app.application.common.sorting import Sorting
+from app.application.errors.errors import InvalidCredentialsError
 from app.application.queries.health import HealthHandler, HealthQuery
 from app.application.use_case.authenticate_uc import JWTAuthServices
 from app.application.use_case.user_uc import AdminUserService
@@ -140,8 +141,10 @@ async def login(
 async def refresh(
     response: Response,
     authser: FromDishka[JWTAuthServices],
-    refresh_token: str = Cookie(alias="refresh"),
+    refresh_token: str | None = Cookie(default=None, alias="refresh"),
 ) -> TokenResponse:
+    if not refresh_token:
+        raise InvalidCredentialsError(msg="Refresh token is missing.")
     tokens = await authser.refresh_tokens(refresh_token)
     response.delete_cookie(
         "refresh",

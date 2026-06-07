@@ -106,6 +106,7 @@ class UserService(ConfigABC):
     base_url: str = Field(alias="USER_SERVICE_BASE_URL")
     timeout_seconds: float = Field(alias="USER_SERVICE_TIMEOUT_SECONDS", default=10.0)
 
+
 class ReservationOutbox(ConfigABC):
     poll_interval_seconds: float = Field(
         alias="RESERVATION_OUTBOX_POLL_INTERVAL_SECONDS",
@@ -141,6 +142,19 @@ class Minio(ConfigABC):
     presign_expires_seconds: int = Field(alias="MINIO_PRESIGN_EXPIRES_SECONDS", default=900)
 
 
+class ShiftReminder(ConfigABC):
+    """Класс настроек уведомлений о скором начале смены.
+
+    Args:
+        offset_seconds (int): За сколько секунд до начала смены отправляется напоминание.
+        poll_interval_seconds (int): Интервал поллинга. Определяет фактическую точность.
+    """
+
+    offset_seconds: int = Field(alias="SHIFT_REMINDER_OFFSET_SECONDS", default=3600)
+    poll_interval_seconds: int = Field(alias="SHIFT_REMINDER_POLL_INTERVAL_SECONDS", default=60)
+
+
+# WARN: Множественное чтение одного и того же файла при каждом вызове
 class Settings(ConfigABC):
     log: Log = Log()
     db: DatabaseSettings = DatabaseSettings()
@@ -151,6 +165,7 @@ class Settings(ConfigABC):
     taskiq: TaskIQ = TaskIQ()
     report_generation: ReportGeneration = ReportGeneration()
     minio: Minio = Minio()
+    shift_rm: ShiftReminder = ShiftReminder()
 
 
 @lru_cache(1)
