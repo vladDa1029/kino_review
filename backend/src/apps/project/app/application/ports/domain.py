@@ -10,6 +10,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReminder,
     ShiftReport,
     ShiftResourceRequest,
 )
@@ -89,6 +90,9 @@ class ShiftParticipantRepository(Protocol):
     async def list_by_shift(self, shift_id: UUID) -> list[ShiftParticipant]:
         raise NotImplementedError
 
+    async def list_active_by_user(self, user_id: UUID) -> list[ShiftParticipant]:
+        raise NotImplementedError
+
     async def get_by_shift_and_user(self, shift_id: UUID, user_id: UUID) -> ShiftParticipant | None:
         raise NotImplementedError
 
@@ -149,6 +153,23 @@ class ReservationOutboxRepository(Protocol):
         raise NotImplementedError
 
     async def update(self, message: ReservationOutboxMessage) -> None:
+        raise NotImplementedError
+
+
+class ShiftReminderRepository(Protocol):
+    async def add(self, reminder: ShiftReminder) -> None:
+        raise NotImplementedError
+
+    async def get_by_id(self, reminder_id: UUID) -> ShiftReminder | None:
+        raise NotImplementedError
+
+    async def get_by_shift(self, shift_id: UUID) -> ShiftReminder | None:
+        raise NotImplementedError
+
+    async def list_due(self, *, now: datetime, limit: int) -> list[ShiftReminder]:
+        raise NotImplementedError
+
+    async def update(self, reminder: ShiftReminder) -> None:
         raise NotImplementedError
 
 

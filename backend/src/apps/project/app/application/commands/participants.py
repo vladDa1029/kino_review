@@ -173,6 +173,14 @@ class ConfirmShiftParticipantHandler:
             user_id=participant.user_id,
             message="Participant user is not an active project member.",
         )
+        # A user may be invited to several overlapping shifts but can confirm only one.
+        active_participations = await self._shift_participants.list_active_by_user(
+            participant.user_id
+        )
+        self._shift_participant_service.ensure_no_overlapping_commitment(
+            participant=participant,
+            active_participations=active_participations,
+        )
         request_id = build_participant_reservation_request_id(participant.oid)
         try:
             self._shift_participant_service.confirm(

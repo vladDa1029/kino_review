@@ -441,6 +441,20 @@ async def confirm_reservation(
     return _confirmation_page(result.title, result.message, result.page)
 
 
+@router.post(
+    "/confirmations/{token}",
+    tags=["confirmations"],
+    summary="Confirm reservation from email link (JSON)",
+    description="Confirms reservation approval by signed email link and returns a JSON status for the frontend page.",
+)
+async def confirm_reservation_json(
+    token: str,
+    handler: FromDishka[ConfirmReservationByTokenHandler],
+) -> dict[str, str]:
+    result = await handler(token)
+    return {"status": result.page, "title": result.title, "message": result.message}
+
+
 @router.get(
     "/project-invitations/{token}",
     response_class=HTMLResponse,
@@ -455,6 +469,21 @@ async def confirm_project_invitation(
 ) -> HTMLResponse:
     result = await handler(token=token, actor_user_id=x_user_id)
     return _confirmation_page(result.title, result.message, result.page)
+
+
+@router.post(
+    "/project-invitations/{token}",
+    tags=["confirmations"],
+    summary="Accept project invitation from email link (JSON)",
+    description="Accepts a project invitation by signed email link for the authenticated frontend user.",
+)
+async def confirm_project_invitation_json(
+    token: str,
+    handler: FromDishka[ConfirmProjectInvitationByTokenHandler],
+    x_user_id: UUID = Header(alias="x-user-id"),
+) -> dict[str, str]:
+    result = await handler(token=token, actor_user_id=x_user_id)
+    return {"status": result.page, "title": result.title, "message": result.message}
 
 
 @router.put(

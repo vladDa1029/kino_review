@@ -129,7 +129,7 @@ def _wait_for_confirmation_link(*, recipient_email: str, subject_fragment: str) 
                 errors="ignore",
             )
             match = re.search(
-                r"http://[^\s\"'>]+/user/confirmations/[A-Za-z0-9._-]+",
+                r"http://[^\s\"'>]+/confirm/[A-Za-z0-9._-]+",
                 decoded_body,
             )
             if match:
@@ -187,9 +187,15 @@ def _assert_confirmation_page(
     *,
     expected_text: str,
 ) -> str:
-    response = client.get(confirm_url)
+    # Email links now point to the frontend SPA (".../confirm/<token>"); the page
+    # performs the action via the backend JSON endpoint, so the e2e check does the
+    # same: pull the token and POST it through the gateway.
+    token = confirm_url.rstrip("/").rsplit("/", 1)[-1]
+    response = client.post(f"/user/confirmations/{token}")
     assert response.status_code == 200, response.text
-    assert expected_text in response.text
+    body = response.json()
+    haystack = f"{body.get('title', '')} {body.get('message', '')}"
+    assert expected_text in haystack, response.text
     return response.text
 
 

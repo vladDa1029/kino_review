@@ -77,11 +77,16 @@ def test_shift_report_renderer_uses_russian_labels() -> None:
     assert summary_sheet["A3"].value == "Проект"
     assert summary_sheet["A8"].value == "Актуальность"
     assert summary_sheet["B8"].value == "Актуальный"
+    # Время переводится из UTC в московское (UTC+3) и форматируется как ДД.ММ.ГГГГ ЧЧ:ММ.
+    assert summary_sheet["B5"].value == "22.04.2026 23:00 - 23.04.2026 05:00"
+    assert summary_sheet["B7"].value == "22.04.2026 21:30"
 
     participants_sheet = workbook["Участники"]
     assert participants_sheet["A1"].value == "Участник"
     assert participants_sheet["D2"].value == "Актер"
     assert participants_sheet["E2"].value == "Оператор"
+    assert participants_sheet["F2"].value == "22.04.2026 23:00"
+    assert participants_sheet["G2"].value == "23.04.2026 05:00"
 
     owner_sheet = workbook["Иван Иванов"]
     assert owner_sheet["A1"].value == "Ресурсы: Иван Иванов"

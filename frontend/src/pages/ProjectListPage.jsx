@@ -11,6 +11,7 @@ import {
   declineShiftParticipant,
   confirmShiftParticipant,
   inviteProjectMember,
+  inviteProjectMemberByEmail,
   inviteShiftParticipant,
   listProjectMembers,
   removeProjectMember,
@@ -709,10 +710,17 @@ const ProjectListPage = () => {
     setIsInvitingMember(true);
 
     try {
-      await inviteProjectMember(memberProjectId, {
-        role: memberForm.role,
-        ...(inviteMode === 'email' ? { email } : { user_id: userId }),
-      });
+      if (inviteMode === 'email') {
+        await inviteProjectMemberByEmail(memberProjectId, {
+          role: memberForm.role,
+          email,
+        });
+      } else {
+        await inviteProjectMember(memberProjectId, {
+          role: memberForm.role,
+          user_id: userId,
+        });
+      }
       if (inviteMode === 'email') {
         setIncludeInactiveMembers(true);
       }

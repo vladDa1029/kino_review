@@ -3,7 +3,10 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 
-from app.application.commands import ProcessReservationOutboxHandler
+from app.application.commands import (
+    ProcessReservationOutboxHandler,
+    ProcessShiftRemindersHandler,
+)
 from main import lifespan
 
 
@@ -44,7 +47,10 @@ class FakeRequestContainer:
         return None
 
     async def get(self, dependency):
-        assert dependency is ProcessReservationOutboxHandler
+        assert dependency in (
+            ProcessReservationOutboxHandler,
+            ProcessShiftRemindersHandler,
+        )
         return FakeHandler()
 
 
@@ -84,6 +90,7 @@ def test_api_lifespan_starts_and_stops_task_manager(monkeypatch) -> None:
     app.state.task_manager = task_manager
     app.state.dishka_container = container
     app.state.reservation_outbox = SimpleNamespace(poll_interval_seconds=60)
+    app.state.shift_reminder = SimpleNamespace(poll_interval_seconds=60)
 
     async def exercise() -> None:
         async with lifespan(app):

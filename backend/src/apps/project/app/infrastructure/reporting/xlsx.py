@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Iterable
 
@@ -5,6 +6,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 from app.application.ports.reporting import ShiftReportRendererPort
+
+# Время в БД хранится в UTC. По умолчанию показываем в московском времени (UTC+3,
+# без перехода на летнее время), чтобы отчёт был читаем без указания смещения.
+DEFAULT_REPORT_TIMEZONE = timezone(timedelta(hours=3))
+DATETIME_FORMAT = "%d.%m.%Y %H:%M"
 
 
 class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
@@ -74,9 +80,12 @@ class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
         rows = [
             ("Проект", project_title),
             ("Смена", shift_title),
-            ("Интервал смены", f"{shift_start_time} - {shift_end_time}"),
+            (
+                "Интервал смены",
+                f"{self._format_dt(shift_start_time)} - {self._format_dt(shift_end_time)}",
+            ),
             ("Версия отчета", report_version),
-            ("Сформирован", str(generated_at)),
+            ("Сформирован", self._format_dt(generated_at)),
             ("Актуальность", _translate_actuality_status(actuality_status)),
         ]
         sheet["A1"] = "Отчет по смене"
@@ -116,8 +125,8 @@ class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
                 column=5,
                 value=_translate_project_role(participant["shift_role"]),
             )
-            sheet.cell(row=row_index, column=6, value=str(participant["time_from"]))
-            sheet.cell(row=row_index, column=7, value=str(participant["time_to"]))
+            sheet.cell(row=row_index, column=6, value=self._format_dt(participant["time_from"]))
+            sheet.cell(row=row_index, column=7, value=self._format_dt(participant["time_to"]))
         _set_column_widths(sheet, [28, 18, 28, 16, 16, 24, 24, 12, 16, 28])
 
     def _write_owner_resources(
@@ -162,8 +171,8 @@ class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
                 column=5,
                 value=_translate_display_text(resource["owner_display_name"]),
             )
-            sheet.cell(row=row_index, column=6, value=str(resource["time_from"]))
-            sheet.cell(row=row_index, column=7, value=str(resource["time_to"]))
+            sheet.cell(row=row_index, column=6, value=self._format_dt(resource["time_from"]))
+            sheet.cell(row=row_index, column=7, value=self._format_dt(resource["time_to"]))
         _set_column_widths(sheet, [28, 18, 40, 12, 24, 24, 24, 14, 18, 28])
 
     def _write_external_owners(self, sheet, sections: tuple[dict[str, object], ...]) -> None:
@@ -204,8 +213,8 @@ class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
                     column=5,
                     value=_translate_display_text(resource["owner_display_name"]),
                 )
-                sheet.cell(row=row, column=6, value=str(resource["time_from"]))
-                sheet.cell(row=row, column=7, value=str(resource["time_to"]))
+                sheet.cell(row=row, column=6, value=self._format_dt(resource["time_from"]))
+                sheet.cell(row=row, column=7, value=self._format_dt(resource["time_to"]))
                 row += 1
             row += 2
         _set_column_widths(sheet, [28, 18, 40, 12, 24, 24, 24, 14, 18, 28])
@@ -214,6 +223,12 @@ class OpenpyxlShiftReportRenderer(ShiftReportRendererPort):
         for col_index, header in enumerate(headers, start=1):
             cell = sheet.cell(row=row, column=col_index, value=header)
             _style_header(cell)
+
+    def _format_dt(self, value: object) -> object:
+        if not isinstance(value, datetime):
+            return value
+        moment = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+        return moment.astimezone(DEFAULT_REPORT_TIMEZONE).strftime(DATETIME_FORMAT)
 
 
 def _style_title(cell) -> None:

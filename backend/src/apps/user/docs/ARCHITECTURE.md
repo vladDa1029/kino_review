@@ -158,18 +158,18 @@ Key adapters:
 ### Approval email flow
 
 1. `project` emits `shift.participant_approval_requested` or `shift.resource_request_approval_requested`.
-2. `user` loads the recipient, issues a signed confirmation token, and builds the public link.
+2. `user` loads the recipient, issues a signed confirmation token, and builds the frontend link `${FRONTEND_BASE_URL}/confirm/{token}`.
 3. `user` emits `notification.email_requested`.
 4. `notificate` sends the email.
-5. The user clicks `/user/confirmations/{token}` through the gateway.
+5. The user opens the frontend `/confirm/{token}` page, which `POST`s `/user/confirmations/{token}` (public path) through the gateway.
 
 ### Project invitation email flow
 
 1. `project` resolves the invite email through `user.email_lookup_requested`; only registered users can be invited by email.
 2. `project` writes the project member as `INVITED` and emits `project.member_invitation_requested`.
-3. `user` loads the invitee, issues a signed `project_member_invitation` token, and emits `notification.email_requested`.
+3. `user` loads the invitee, issues a signed `project_member_invitation` token, builds the frontend link `${FRONTEND_BASE_URL}/invitations/{token}`, and emits `notification.email_requested`.
 4. `notificate` sends the email.
-5. The invitee clicks `/user/project-invitations/{token}` through the gateway while authenticated.
+5. The invitee opens the frontend `/invitations/{token}` page (signing in if needed), which `POST`s `/user/project-invitations/{token}` through the gateway while authenticated.
 6. `user` verifies the token user id matches `X-User-Id` and emits `project.member.approved`.
 7. `project` activates the invited member if the invitation is still in `INVITED`.
 

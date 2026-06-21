@@ -8,6 +8,9 @@ from app.application.commands.approval_notifications import (
     HandleProjectMemberInvitationRequestedHandler,
     HandleResourceApprovalRequestedCommand,
     HandleResourceApprovalRequestedHandler,
+    HandleShiftReminderRequestedCommand,
+    HandleShiftReminderRequestedHandler,
+    ShiftReminderResourceItem,
 )
 from app.application.commands.check_availability import (
     CheckAvailabilityCommand,
@@ -46,6 +49,7 @@ from app.infrastructure.adapters.broker import (
     SHIFT_PARTICIPANT_APPROVAL_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_CHECK_REQUESTED_QUEUE,
     SHIFT_PARTICIPANT_RESERVATION_REQUESTED_QUEUE,
+    SHIFT_REMINDER_REQUESTED_QUEUE,
     SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_APPROVAL_REQUESTED_QUEUE,
     SHIFT_RESOURCE_REQUEST_RESERVATION_CHECK_REQUESTED_QUEUE,
@@ -62,6 +66,7 @@ from app.presentation.schemas import (
     BrokerShiftParticipantApprovalRequested,
     BrokerShiftParticipantReservationCheckRequested,
     BrokerShiftParticipantReservationRequested,
+    BrokerShiftReminderRequested,
     BrokerShiftReportSnapshotRequested,
     BrokerShiftResourceRequestApprovalRequested,
     BrokerShiftResourceRequestReservationCheckRequested,
@@ -341,6 +346,38 @@ def create_broker_router(container: AsyncContainer, reply_inbox: BrokerReplyInbo
                     role=event.role,
                     time_from=event.time_from,
                     time_to=event.time_to,
+                )
+            )
+
+    @router.subscriber(
+        SHIFT_REMINDER_REQUESTED_QUEUE,
+        exchange=PROJECT_EVENTS_EXCHANGE,
+    )
+    async def handle_shift_reminder_requested(
+        event: BrokerShiftReminderRequested,
+    ) -> None:
+        async with container() as request_container:
+            handler = await request_container.get(HandleShiftReminderRequestedHandler)
+            await handler(
+                HandleShiftReminderRequestedCommand(
+                    notification_id=event.notification_id,
+                    project_id=event.project_id,
+                    project_title=event.project_title,
+                    shift_id=event.shift_id,
+                    shift_title=event.shift_title,
+                    shift_description=event.shift_description,
+                    start_time=event.start_time,
+                    end_time=event.end_time,
+                    user_id=event.user_id,
+                    role=event.role,
+                    resources=tuple(
+                        ShiftReminderResourceItem(
+                            resource_type=item.resource_type,
+                            time_from=item.time_from,
+                            time_to=item.time_to,
+                        )
+                        for item in event.resources
+                    ),
                 )
             )
 

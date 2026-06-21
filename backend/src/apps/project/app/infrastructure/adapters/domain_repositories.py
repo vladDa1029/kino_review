@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Generic, TypeVar
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from app.application.ports.domain import (
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReminderRepository,
     ShiftReportRepository,
     ShiftRepository,
 )
@@ -21,10 +23,17 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReminder,
     ShiftReport,
     ShiftResourceRequest,
 )
-from app.domain.enums import ProjectMemberStatus, ProjectStatus, ShiftStatus
+from app.domain.enums import (
+    ProjectMemberStatus,
+    ProjectStatus,
+    ShiftParticipantStatus,
+    ShiftReminderStatus,
+    ShiftStatus,
+)
 from app.infrastructure.adapters.orm import documents as documents_table
 from app.infrastructure.adapters.orm import projects as projects_table
 from app.infrastructure.adapters.orm import (
@@ -33,6 +42,7 @@ from app.infrastructure.adapters.orm import (
     users_project_role,
 )
 from app.infrastructure.adapters.orm import shift as shift_table
+from app.infrastructure.adapters.orm import shift_reminder as shift_reminder_table
 from app.infrastructure.adapters.orm import shift_reports as shift_reports_table
 
 T = TypeVar("T")
@@ -131,6 +141,18 @@ class SqlAlchemyShiftParticipantRepository(
         stmt = select(ShiftParticipant).where(shift_participants.c.shift_id == shift_id)
         return list((await self._session.execute(stmt)).scalars().all())
 
+    async def list_active_by_user(self, user_id: UUID) -> list[ShiftParticipant]:
+        active_statuses = (
+            int(ShiftParticipantStatus.CONFIRMED),
+            int(ShiftParticipantStatus.RESERVING),
+            int(ShiftParticipantStatus.RESERVED),
+        )
+        stmt = select(ShiftParticipant).where(
+            shift_participants.c.user_id == user_id,
+            shift_participants.c.status.in_(active_statuses),
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
     async def get_by_shift_and_user(self, shift_id: UUID, user_id: UUID) -> ShiftParticipant | None:
         stmt = select(ShiftParticipant).where(
             shift_participants.c.shift_id == shift_id,
@@ -199,3 +221,26 @@ class SqlAlchemyReservationOutboxRepository(ReservationOutboxRepository):
 
     async def update(self, message: ReservationOutboxMessage) -> None:
         self._session.add(message)
+
+
+class SqlAlchemyShiftReminderRepository(
+    SqlAlchemyRepository[ShiftReminder], ShiftReminderRepository
+):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, ShiftReminder)
+
+    async def get_by_shift(self, shift_id: UUID) -> ShiftReminder | None:
+        stmt = select(ShiftReminder).where(shift_reminder_table.c.shift_id == shift_id)
+        return (await self._session.execute(stmt)).scalars().first()
+
+    async def list_due(self, *, now: datetime, limit: int) -> list[ShiftReminder]:
+        stmt = (
+            select(ShiftReminder)
+            .where(
+                shift_reminder_table.c.status == int(ShiftReminderStatus.PENDING),
+                shift_reminder_table.c.fire_at <= now,
+            )
+            .order_by(shift_reminder_table.c.fire_at.asc())
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars().all())

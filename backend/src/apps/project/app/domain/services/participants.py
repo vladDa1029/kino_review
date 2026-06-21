@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
@@ -139,3 +140,46 @@ class ShiftParticipantService:
         participant.status = ShiftParticipantStatus.CANCELLED
         participant.updated_at = now
         return needs_reservation_cancel
+
+    def cancel_unsettled_on_approval(
+        self, *, participant: ShiftParticipant, now: datetime
+    ) -> bool:
+        """Cancel a participant that is not fully reserved when its shift is approved.
+
+        Only RESERVED participants are kept on an approved shift; anyone still
+        awaiting confirmation/reservation (INVITED, CONFIRMED, RESERVING) or whose
+        reservation failed (RESERVE_FAILED) is moved to CANCELLED so they are not
+        expected on the shift. Returns ``True`` when a reservation cancellation must
+        be dispatched (the participant had already been reserved on the user side).
+        """
+        if participant.status in {
+            ShiftParticipantStatus.RESERVED,
+            ShiftParticipantStatus.CANCELLED,
+            ShiftParticipantStatus.DECLINED,
+        }:
+            return False
+        needs_reservation_cancel = participant.user_reservation_id is not None
+        participant.status = ShiftParticipantStatus.CANCELLED
+        participant.updated_at = now
+        return needs_reservation_cancel
+
+    def ensure_no_overlapping_commitment(
+        self,
+        *,
+        participant: ShiftParticipant,
+        active_participations: Iterable[ShiftParticipant],
+    ) -> None:
+        """A user may hold overlapping invitations but confirm only one of them.
+
+        ``active_participations`` are the user's other CONFIRMED/RESERVING/RESERVED
+        participations across shifts. Confirming an invitation that overlaps one of
+        them in time is rejected.
+        """
+        interval = participant.interval
+        for other in active_participations:
+            if other.oid == participant.oid:
+                continue
+            if other.interval.overlaps(interval):
+                raise StateTransitionError(
+                    "User already participates in another shift overlapping this time."
+                )

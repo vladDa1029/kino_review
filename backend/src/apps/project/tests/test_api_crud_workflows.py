@@ -87,6 +87,7 @@ from app.application.queries.shifts import (
     ListShiftParticipantsHandler,
 )
 from app.application.support import SystemClock
+from app.config import ShiftReminder as ShiftReminderSettings
 from app.domain.entities import (
     Document,
     ProjectMember,
@@ -136,6 +137,7 @@ from tests.test_project_management_service import (
     InMemoryProjectRepo,
     InMemoryReservationOutboxRepo,
     InMemoryResourceRequestRepo,
+    InMemoryShiftReminderRepo,
     InMemoryShiftRepo,
     InMemoryShiftReportRepo,
 )
@@ -186,10 +188,12 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
     reports = InMemoryShiftReportRepo()
     requests = InMemoryResourceRequestRepo()
     reservation_outbox = InMemoryReservationOutboxRepo()
+    shift_reminders = InMemoryShiftReminderRepo()
     storage = FakeStorage()
     clock = SystemClock()
     id_generator = FakeIdGenerator()
     report_tasks = FakeShiftReportTaskDispatcher()
+    shift_reminder_settings = ShiftReminderSettings()
 
     create_project_handler = CreateProjectHandler(
         transaction_manager=tx,
@@ -287,10 +291,20 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
     approve_shift_handler = ApproveShiftHandler(
         transaction_manager=tx,
         clock=clock,
+        id_generator=id_generator,
         publisher=publisher,
         project_members=members,
         shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        reservation_outbox=reservation_outbox,
+        shift_reports=reports,
+        shift_reminders=shift_reminders,
+        report_task_dispatcher=report_tasks,
         shift_service=ShiftService(),
+        shift_participant_service=ShiftParticipantService(),
+        resource_request_service=ResourceRequestService(),
+        shift_reminder_settings=shift_reminder_settings,
     )
     invite_participant_handler = InviteShiftParticipantHandler(
         transaction_manager=tx,
@@ -475,6 +489,7 @@ def build_project_api_crud_context() -> ProjectApiCrudContext:
         shift_participants=participants,
         resource_requests=requests,
         shift_reports=reports,
+        shift_reminders=shift_reminders,
         shift_service=ShiftService(),
         shift_participant_service=ShiftParticipantService(),
         resource_request_service=ResourceRequestService(),
@@ -868,23 +883,26 @@ def test_shift_reports_http_flow() -> None:
             )
             assert approve_shift_response.status_code == 200
 
-            create_report_response = client.post(
-                f"/shifts/{shift_id}/reports/generate",
-                headers={"X-User-Id": str(director_id)},
-            )
-            assert create_report_response.status_code == 200, create_report_response.text
-            report = create_report_response.json()
-            report_id = report["oid"]
-            assert report["version"] == 1
-            assert report["generation_status_name"] == "PENDING"
-            assert ctx.report_tasks.commands[0].report_id == UUID(report_id)
-
+            # Approving the shift auto-creates and schedules its report.
             list_reports_response = client.get(
                 f"/shifts/{shift_id}/reports",
                 headers={"X-User-Id": str(director_id)},
             )
             assert list_reports_response.status_code == 200
-            assert [item["oid"] for item in list_reports_response.json()["items"]] == [report_id]
+            report_items = list_reports_response.json()["items"]
+            assert len(report_items) == 1
+            report = report_items[0]
+            report_id = report["oid"]
+            assert report["version"] == 1
+            assert report["generation_status_name"] == "PENDING"
+            assert ctx.report_tasks.commands[0].report_id == UUID(report_id)
+
+            # A second manual generation is rejected while the first is in progress.
+            conflict_response = client.post(
+                f"/shifts/{shift_id}/reports/generate",
+                headers={"X-User-Id": str(director_id)},
+            )
+            assert conflict_response.status_code == 409
 
             stored_report = ctx.reports.data[UUID(report_id)]
             stored_report.generation_status = 40

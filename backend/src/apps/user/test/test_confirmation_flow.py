@@ -9,6 +9,9 @@ from app.application.commands.approval_notifications import (
     HandleParticipantApprovalRequestedHandler,
     HandleProjectMemberInvitationRequestedCommand,
     HandleProjectMemberInvitationRequestedHandler,
+    HandleShiftReminderRequestedCommand,
+    HandleShiftReminderRequestedHandler,
+    ShiftReminderResourceItem,
 )
 from app.application.commands.confirm_project_invitation import (
     ConfirmProjectInvitationByTokenHandler,
@@ -62,6 +65,7 @@ def _settings(ttl_hours: int = 24) -> ConfirmationSettings:
         CONFIRMATION_SECRET_KEY="test-secret-key-that-is-long-enough",
         CONFIRMATION_TTL_HOURS=ttl_hours,
         PUBLIC_BASE_URL="http://localhost:8000",
+        FRONTEND_BASE_URL="http://localhost:5173",
         CONFIRMATION_ALGORITHM="HS256",
     )
 
@@ -99,7 +103,91 @@ def test_participant_approval_request_publishes_email_event() -> None:
         assert event["template"] == "reservation_confirmation"
         assert event["payload"]["project_title"] == "Feature film"
         assert event["payload"]["role"] == "ACTOR"
-        assert event["payload"]["confirm_url"].startswith("http://localhost:8000/user/confirmations/")
+        assert event["payload"]["confirm_url"].startswith("http://localhost:5173/confirm/")
+
+    asyncio.run(scenario())
+
+
+def test_shift_reminder_request_publishes_email_event_with_resources() -> None:
+    async def scenario() -> None:
+        settings = _settings()
+        user_id = uuid4()
+        project_id = uuid4()
+        shift_id = uuid4()
+        publisher = FakePublisher()
+        handler = HandleShiftReminderRequestedHandler(
+            users=FakeEntityRepository([make_user(user_id)]),
+            publisher=publisher,
+            confirmation=settings,
+        )
+        now = now_utc()
+
+        await handler(
+            HandleShiftReminderRequestedCommand(
+                notification_id=uuid4(),
+                project_id=project_id,
+                project_title="Feature film",
+                shift_id=shift_id,
+                shift_title="Night shoot",
+                shift_description="desc",
+                start_time=now,
+                end_time=now + timedelta(hours=8),
+                user_id=user_id,
+                role="CAMERA",
+                resources=(
+                    ShiftReminderResourceItem(
+                        resource_type="cameras",
+                        time_from=now,
+                        time_to=now + timedelta(hours=2),
+                    ),
+                ),
+            )
+        )
+
+        assert publisher.events[0][0] == "notification.email_requested"
+        event = publisher.events[0][1]
+        assert event["template"] == "shift_reminder"
+        assert event["recipient_email"] == "user@example.com"
+        payload = event["payload"]
+        assert payload["project_title"] == "Feature film"
+        assert payload["role"] == "CAMERA"
+        assert payload["shift_url"] == (
+            f"http://localhost:5173/projects/{project_id}/shifts/{shift_id}"
+        )
+        assert "cameras" in payload["resources"]
+
+    asyncio.run(scenario())
+
+
+def test_shift_reminder_request_without_resources_sends_none() -> None:
+    async def scenario() -> None:
+        settings = _settings()
+        user_id = uuid4()
+        publisher = FakePublisher()
+        handler = HandleShiftReminderRequestedHandler(
+            users=FakeEntityRepository([make_user(user_id)]),
+            publisher=publisher,
+            confirmation=settings,
+        )
+        now = now_utc()
+
+        await handler(
+            HandleShiftReminderRequestedCommand(
+                notification_id=uuid4(),
+                project_id=uuid4(),
+                project_title="Feature film",
+                shift_id=uuid4(),
+                shift_title="Night shoot",
+                shift_description=None,
+                start_time=now,
+                end_time=now + timedelta(hours=8),
+                user_id=user_id,
+                role="DIRECTOR",
+                resources=(),
+            )
+        )
+
+        assert publisher.events[0][1]["payload"]["resources"] is None
 
     asyncio.run(scenario())
 
@@ -134,7 +222,7 @@ def test_project_member_invitation_request_publishes_email_event() -> None:
         assert event["payload"]["project_title"] == "Feature film"
         assert event["payload"]["role"] == "CAMERA"
         assert event["payload"]["accept_url"].startswith(
-            "http://localhost:8000/user/project-invitations/"
+            "http://localhost:5173/invitations/"
         )
 
     asyncio.run(scenario())

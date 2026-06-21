@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -41,6 +42,17 @@ from app.application.commands.resources import (
     CreateResourceRequestCommand,
     CreateResourceRequestHandler,
 )
+from app.application.commands.shift_reminders import (
+    SHIFT_REMINDER_REQUESTED_TOPIC,
+    ProcessShiftRemindersHandler,
+    build_reminder_notification_id,
+)
+from app.application.commands.shifts import (
+    ApproveShiftCommand,
+    ApproveShiftHandler,
+    CancelShiftCommand,
+    CancelShiftHandler,
+)
 from app.application.ports.domain import (
     StoredFile,
     UserIdentity,
@@ -72,6 +84,7 @@ from app.application.queries.resources import (
     ListProjectMembersQuery,
 )
 from app.application.support import SystemClock
+from app.config import ShiftReminder as ShiftReminderSettings
 from app.domain.entities import (
     Document,
     Project,
@@ -79,6 +92,7 @@ from app.domain.entities import (
     ReservationOutboxMessage,
     Shift,
     ShiftParticipant,
+    ShiftReminder,
     ShiftReport,
     ShiftResourceRequest,
 )
@@ -90,6 +104,7 @@ from app.domain.enums import (
     ProjectStatus,
     ResourceRequestStatus,
     ShiftParticipantStatus,
+    ShiftReminderStatus,
     ShiftReportActualityStatus,
     ShiftReportGenerationStatus,
     ShiftStatus,
@@ -100,6 +115,7 @@ from app.domain.services import (
     ProjectMembershipService,
     ResourceRequestService,
     ShiftParticipantService,
+    ShiftService,
 )
 
 
@@ -366,6 +382,18 @@ class InMemoryParticipantRepo:
     async def list_by_shift(self, shift_id: UUID) -> list[ShiftParticipant]:
         return [item for item in self.by_id.values() if item.shift_id == shift_id]
 
+    async def list_active_by_user(self, user_id: UUID) -> list[ShiftParticipant]:
+        active = {
+            ShiftParticipantStatus.CONFIRMED,
+            ShiftParticipantStatus.RESERVING,
+            ShiftParticipantStatus.RESERVED,
+        }
+        return [
+            item
+            for item in self.by_id.values()
+            if item.user_id == user_id and item.status in active
+        ]
+
     async def update(self, participant: ShiftParticipant) -> None:
         self.by_id[participant.oid] = participant
         self.by_shift_user[(participant.shift_id, participant.user_id)] = participant
@@ -428,6 +456,35 @@ class InMemoryReservationOutboxRepo:
 
     async def update(self, message: ReservationOutboxMessage) -> None:
         self.data[message.oid] = message
+
+
+class InMemoryShiftReminderRepo:
+    def __init__(self) -> None:
+        self.data: dict[UUID, ShiftReminder] = {}
+
+    async def add(self, reminder: ShiftReminder) -> None:
+        self.data[reminder.oid] = reminder
+
+    async def get_by_id(self, reminder_id: UUID) -> ShiftReminder | None:
+        return self.data.get(reminder_id)
+
+    async def get_by_shift(self, shift_id: UUID) -> ShiftReminder | None:
+        for reminder in self.data.values():
+            if reminder.shift_id == shift_id:
+                return reminder
+        return None
+
+    async def list_due(self, *, now: datetime, limit: int) -> list[ShiftReminder]:
+        due = [
+            reminder
+            for reminder in self.data.values()
+            if reminder.status == ShiftReminderStatus.PENDING and reminder.fire_at <= now
+        ]
+        due.sort(key=lambda item: item.fire_at)
+        return due[:limit]
+
+    async def update(self, reminder: ShiftReminder) -> None:
+        self.data[reminder.oid] = reminder
 
 
 class InMemoryShiftReportRepo:
@@ -2910,5 +2967,907 @@ def test_create_resource_request_uses_actor_role_resource_kinds() -> None:
 
         assert requests.data == {}
         assert tx.rollbacks == 1
+
+    asyncio.run(scenario())
+
+
+def _build_shift_reminder_context():
+    tx = FakeTx()
+    publisher = FakePublisher()
+    clock = SystemClock()
+    projects = InMemoryProjectRepo()
+    members = InMemoryProjectMemberRepo()
+    shifts = InMemoryShiftRepo()
+    participants = InMemoryParticipantRepo()
+    requests = InMemoryResourceRequestRepo()
+    reservation_outbox = InMemoryReservationOutboxRepo()
+    reports = InMemoryShiftReportRepo()
+    reminders = InMemoryShiftReminderRepo()
+    report_tasks = FakeShiftReportTaskDispatcher()
+    settings = ShiftReminderSettings()
+    approve_handler = ApproveShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=FakeIdGenerator(),
+        publisher=publisher,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        reservation_outbox=reservation_outbox,
+        shift_reports=reports,
+        shift_reminders=reminders,
+        report_task_dispatcher=report_tasks,
+        shift_service=ShiftService(),
+        shift_participant_service=ShiftParticipantService(),
+        resource_request_service=ResourceRequestService(),
+        shift_reminder_settings=settings,
+    )
+    cancel_handler = CancelShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        reservation_outbox=reservation_outbox,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        shift_reports=reports,
+        shift_reminders=reminders,
+        shift_service=ShiftService(),
+        shift_participant_service=ShiftParticipantService(),
+        resource_request_service=ResourceRequestService(),
+    )
+    process_handler = ProcessShiftRemindersHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        projects=projects,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        shift_reminders=reminders,
+    )
+    return (
+        tx,
+        publisher,
+        projects,
+        members,
+        shifts,
+        participants,
+        requests,
+        reminders,
+        settings,
+        approve_handler,
+        cancel_handler,
+        process_handler,
+    )
+
+
+def _seed_director(members: InMemoryProjectMemberRepo, *, project_id: UUID, now: datetime) -> UUID:
+    director_id = uuid4()
+    members.data[(project_id, director_id)] = ProjectMember(
+        oid=uuid4(),
+        project_id=project_id,
+        user_id=director_id,
+        role=ProjectRole.DIRECTOR,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=director_id,
+        created_at=now,
+        updated_at=now,
+    )
+    return director_id
+
+
+def test_approve_shift_creates_pending_reminder_one_offset_before_start() -> None:
+    async def scenario():
+        (
+            _tx,
+            _publisher,
+            projects,
+            members,
+            shifts,
+            _participants,
+            _requests,
+            reminders,
+            settings,
+            approve_handler,
+            _cancel_handler,
+            _process_handler,
+        ) = _build_shift_reminder_context()
+        now = now_utc()
+        project_id = uuid4()
+        director_id = _seed_director(members, project_id=project_id, now=now)
+        await projects.add(
+            Project(
+                title="P",
+                description="",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                oid=project_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        start_time = now + timedelta(days=1)
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project_id,
+            title="S",
+            description="D",
+            start_time=start_time,
+            end_time=start_time + timedelta(hours=3),
+            status=ShiftStatus.DRAFT,
+            created_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        shifts.data[shift.oid] = shift
+
+        await approve_handler(
+            ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id)
+        )
+
+        reminder = await reminders.get_by_shift(shift.oid)
+        assert reminder is not None
+        assert reminder.status == ShiftReminderStatus.PENDING
+        assert reminder.fire_at == start_time - timedelta(seconds=settings.offset_seconds)
+
+        # Re-approving reuses the same reminder row instead of duplicating it.
+        shift.status = ShiftStatus.DRAFT
+        await approve_handler(
+            ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id)
+        )
+        assert len(reminders.data) == 1
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_reminders_dispatches_eligible_participants_with_resources() -> None:
+    async def scenario():
+        (
+            _tx,
+            publisher,
+            projects,
+            members,
+            shifts,
+            participants,
+            requests,
+            reminders,
+            _settings,
+            approve_handler,
+            _cancel_handler,
+            process_handler,
+        ) = _build_shift_reminder_context()
+        now = now_utc()
+        project_id = uuid4()
+        director_id = _seed_director(members, project_id=project_id, now=now)
+        await projects.add(
+            Project(
+                title="Movie",
+                description="",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                oid=project_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        start_time = now + timedelta(minutes=30)
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project_id,
+            title="Night shoot",
+            description="D",
+            start_time=start_time,
+            end_time=start_time + timedelta(hours=3),
+            status=ShiftStatus.DRAFT,
+            created_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        shifts.data[shift.oid] = shift
+
+        confirmed_user = uuid4()
+        declined_user = uuid4()
+        confirmed_participant = ShiftParticipant(
+            oid=uuid4(),
+            shift_id=shift.oid,
+            user_id=confirmed_user,
+            role=ProjectRole.CAMERA,
+            time_from=start_time,
+            time_to=start_time + timedelta(hours=2),
+            status=ShiftParticipantStatus.RESERVED,
+            added_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        declined_participant = ShiftParticipant(
+            oid=uuid4(),
+            shift_id=shift.oid,
+            user_id=declined_user,
+            role=ProjectRole.SOUND,
+            time_from=start_time,
+            time_to=start_time + timedelta(hours=2),
+            status=ShiftParticipantStatus.DECLINED,
+            added_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        await participants.add(confirmed_participant)
+        await participants.add(declined_participant)
+
+        await requests.add(
+            ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift.oid,
+                resource_type="cameras",
+                resource_id=uuid4(),
+                resource_owner_user_id=confirmed_user,
+                requested_by_user_id=director_id,
+                time_from=start_time,
+                time_to=start_time + timedelta(hours=1),
+                status=ResourceRequestStatus.RESERVED,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        # Cancelled request must be ignored.
+        await requests.add(
+            ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift.oid,
+                resource_type="lights",
+                resource_id=uuid4(),
+                resource_owner_user_id=confirmed_user,
+                requested_by_user_id=director_id,
+                time_from=start_time,
+                time_to=start_time + timedelta(hours=1),
+                status=ResourceRequestStatus.CANCELLED,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        await approve_handler(
+            ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id)
+        )
+        reminder = await reminders.get_by_shift(shift.oid)
+        assert reminder is not None
+        # fire_at is already in the past (shift starts within the offset window).
+        assert reminder.fire_at <= now_utc()
+
+        processed = await process_handler(limit=10)
+
+        assert processed == 1
+        reminder = await reminders.get_by_shift(shift.oid)
+        assert reminder.status == ShiftReminderStatus.SENT
+
+        reminder_events = [
+            payload
+            for topic, payload in publisher.events
+            if topic == SHIFT_REMINDER_REQUESTED_TOPIC
+        ]
+        assert len(reminder_events) == 1
+        event = reminder_events[0]
+        assert event["user_id"] == str(confirmed_user)
+        assert event["shift_title"] == "Night shoot"
+        assert event["project_title"] == "Movie"
+        assert event["role"] == "CAMERA"
+        assert event["notification_id"] == str(
+            build_reminder_notification_id(
+                reminder_id=reminder.oid,
+                participant_id=confirmed_participant.oid,
+            )
+        )
+        assert [res["resource_type"] for res in event["resources"]] == ["cameras"]
+
+        # Already SENT: a second poll dispatches nothing.
+        assert await process_handler(limit=10) == 0
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_reminders_cancels_when_shift_not_approved() -> None:
+    async def scenario():
+        (
+            _tx,
+            publisher,
+            _projects,
+            members,
+            shifts,
+            _participants,
+            _requests,
+            reminders,
+            _settings,
+            _approve_handler,
+            _cancel_handler,
+            process_handler,
+        ) = _build_shift_reminder_context()
+        now = now_utc()
+        project_id = uuid4()
+        director_id = _seed_director(members, project_id=project_id, now=now)
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project_id,
+            title="S",
+            description="D",
+            start_time=now + timedelta(minutes=10),
+            end_time=now + timedelta(hours=3),
+            status=ShiftStatus.CANCELLED,
+            created_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        shifts.data[shift.oid] = shift
+        await reminders.add(
+            ShiftReminder(
+                oid=uuid4(),
+                shift_id=shift.oid,
+                fire_at=now - timedelta(minutes=1),
+                status=ShiftReminderStatus.PENDING,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        processed = await process_handler(limit=10)
+
+        assert processed == 1
+        reminder = await reminders.get_by_shift(shift.oid)
+        assert reminder.status == ShiftReminderStatus.CANCELLED
+        assert publisher.events == []
+
+    asyncio.run(scenario())
+
+
+def test_cancel_shift_cancels_pending_reminder() -> None:
+    async def scenario():
+        (
+            _tx,
+            _publisher,
+            projects,
+            members,
+            shifts,
+            _participants,
+            _requests,
+            reminders,
+            _settings,
+            approve_handler,
+            cancel_handler,
+            _process_handler,
+        ) = _build_shift_reminder_context()
+        now = now_utc()
+        project_id = uuid4()
+        director_id = _seed_director(members, project_id=project_id, now=now)
+        await projects.add(
+            Project(
+                title="P",
+                description="",
+                owner_id=director_id,
+                status=ProjectStatus.ACTIVE,
+                oid=project_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        start_time = now + timedelta(days=1)
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project_id,
+            title="S",
+            description="D",
+            start_time=start_time,
+            end_time=start_time + timedelta(hours=3),
+            status=ShiftStatus.DRAFT,
+            created_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        shifts.data[shift.oid] = shift
+
+        await approve_handler(
+            ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id)
+        )
+        await cancel_handler(
+            CancelShiftCommand(shift_id=shift.oid, actor_user_id=director_id)
+        )
+
+        reminder = await reminders.get_by_shift(shift.oid)
+        assert reminder is not None
+        assert reminder.status == ShiftReminderStatus.CANCELLED
+
+    asyncio.run(scenario())
+
+
+def test_process_shift_reminders_accepts_plain_int_statuses_from_orm() -> None:
+    # The ORM maps status/role columns as plain integers, so the worker must
+    # tolerate raw ints (not only enum members) when filtering and rendering.
+    async def scenario():
+        (
+            _tx,
+            publisher,
+            projects,
+            members,
+            shifts,
+            participants,
+            requests,
+            reminders,
+            _settings,
+            _approve_handler,
+            _cancel_handler,
+            process_handler,
+        ) = _build_shift_reminder_context()
+        now = now_utc()
+        project_id = uuid4()
+        director_id = _seed_director(members, project_id=project_id, now=now)
+        await projects.add(
+            Project(
+                title="Movie",
+                description="",
+                owner_id=director_id,
+                status=int(ProjectStatus.ACTIVE),
+                oid=project_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        start_time = now + timedelta(minutes=30)
+        shift = Shift(
+            oid=uuid4(),
+            project_id=project_id,
+            title="Night shoot",
+            description="D",
+            start_time=start_time,
+            end_time=start_time + timedelta(hours=3),
+            status=int(ShiftStatus.APPROVED),
+            created_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        shifts.data[shift.oid] = shift
+
+        member_user = uuid4()
+        participant = ShiftParticipant(
+            oid=uuid4(),
+            shift_id=shift.oid,
+            user_id=member_user,
+            role=int(ProjectRole.CAMERA),
+            time_from=start_time,
+            time_to=start_time + timedelta(hours=2),
+            status=int(ShiftParticipantStatus.RESERVED),
+            added_by=director_id,
+            created_at=now,
+            updated_at=now,
+        )
+        await participants.add(participant)
+        await requests.add(
+            ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift.oid,
+                resource_type="cameras",
+                resource_id=uuid4(),
+                resource_owner_user_id=member_user,
+                requested_by_user_id=director_id,
+                time_from=start_time,
+                time_to=start_time + timedelta(hours=1),
+                status=int(ResourceRequestStatus.RESERVED),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await reminders.add(
+            ShiftReminder(
+                oid=uuid4(),
+                shift_id=shift.oid,
+                fire_at=now - timedelta(minutes=1),
+                status=int(ShiftReminderStatus.PENDING),
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        processed = await process_handler(limit=10)
+
+        assert processed == 1
+        events = [
+            payload
+            for topic, payload in publisher.events
+            if topic == SHIFT_REMINDER_REQUESTED_TOPIC
+        ]
+        assert len(events) == 1
+        assert events[0]["role"] == "CAMERA"
+        assert [res["resource_type"] for res in events[0]["resources"]] == ["cameras"]
+
+    asyncio.run(scenario())
+
+
+def _build_approval_context() -> SimpleNamespace:
+    tx = FakeTx()
+    publisher = FakePublisher()
+    user_service = FakeUserService()
+    clock = SystemClock()
+    projects = InMemoryProjectRepo()
+    members = InMemoryProjectMemberRepo()
+    shifts = InMemoryShiftRepo()
+    participants = InMemoryParticipantRepo()
+    requests = InMemoryResourceRequestRepo()
+    reservation_outbox = InMemoryReservationOutboxRepo()
+    reports = InMemoryShiftReportRepo()
+    reminders = InMemoryShiftReminderRepo()
+    report_tasks = FakeShiftReportTaskDispatcher()
+    approve = ApproveShiftHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=FakeIdGenerator(),
+        publisher=publisher,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        resource_requests=requests,
+        reservation_outbox=reservation_outbox,
+        shift_reports=reports,
+        shift_reminders=reminders,
+        report_task_dispatcher=report_tasks,
+        shift_service=ShiftService(),
+        shift_participant_service=ShiftParticipantService(),
+        resource_request_service=ResourceRequestService(),
+        shift_reminder_settings=ShiftReminderSettings(),
+    )
+    confirm = ConfirmShiftParticipantHandler(
+        transaction_manager=tx,
+        clock=clock,
+        publisher=publisher,
+        reservation_outbox=reservation_outbox,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        shift_reports=reports,
+        shift_participant_service=ShiftParticipantService(),
+    )
+    invite = InviteShiftParticipantHandler(
+        transaction_manager=tx,
+        clock=clock,
+        id_generator=FakeIdGenerator(),
+        publisher=publisher,
+        user_service=user_service,
+        project_members=members,
+        shifts=shifts,
+        shift_participants=participants,
+        shift_reports=reports,
+        shift_participant_service=ShiftParticipantService(),
+    )
+    return SimpleNamespace(
+        tx=tx,
+        publisher=publisher,
+        user_service=user_service,
+        projects=projects,
+        members=members,
+        shifts=shifts,
+        participants=participants,
+        requests=requests,
+        reservation_outbox=reservation_outbox,
+        reports=reports,
+        reminders=reminders,
+        report_tasks=report_tasks,
+        approve=approve,
+        confirm=confirm,
+        invite=invite,
+    )
+
+
+async def _seed_project_and_member(
+    ctx: SimpleNamespace,
+    *,
+    user_id: UUID,
+    role: ProjectRole,
+    now: datetime,
+    project_id: UUID | None = None,
+) -> UUID:
+    project_id = project_id or uuid4()
+    if project_id not in ctx.projects.data:
+        await ctx.projects.add(
+            Project(
+                title="P",
+                description="",
+                owner_id=user_id,
+                status=ProjectStatus.ACTIVE,
+                oid=project_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    ctx.members.data[(project_id, user_id)] = ProjectMember(
+        oid=uuid4(),
+        project_id=project_id,
+        user_id=user_id,
+        role=role,
+        status=ProjectMemberStatus.ACTIVE,
+        invited_by=user_id,
+        created_at=now,
+        updated_at=now,
+    )
+    return project_id
+
+
+def _make_shift(*, project_id: UUID, director_id: UUID, start: datetime, hours: int) -> Shift:
+    return Shift(
+        oid=uuid4(),
+        project_id=project_id,
+        title="S",
+        description="D",
+        start_time=start,
+        end_time=start + timedelta(hours=hours),
+        status=ShiftStatus.DRAFT,
+        created_by=director_id,
+        created_at=start,
+        updated_at=start,
+    )
+
+
+def _make_participant(
+    *,
+    shift: Shift,
+    user_id: UUID,
+    status: ShiftParticipantStatus,
+    director_id: UUID,
+    now: datetime,
+    reservation_id: UUID | None = None,
+) -> ShiftParticipant:
+    return ShiftParticipant(
+        oid=uuid4(),
+        shift_id=shift.oid,
+        user_id=user_id,
+        role=ProjectRole.CAMERA,
+        time_from=shift.start_time,
+        time_to=shift.start_time + timedelta(hours=1),
+        status=status,
+        added_by=director_id,
+        created_at=now,
+        updated_at=now,
+        user_reservation_id=reservation_id,
+    )
+
+
+def test_approve_shift_keeps_only_reserved_participants_and_resources() -> None:
+    async def scenario():
+        ctx = _build_approval_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = await _seed_project_and_member(
+            ctx, user_id=director_id, role=ProjectRole.DIRECTOR, now=now
+        )
+        start = now + timedelta(days=1)
+        shift = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=4)
+        await ctx.shifts.add(shift)
+
+        reserved = _make_participant(
+            shift=shift,
+            user_id=uuid4(),
+            status=ShiftParticipantStatus.RESERVED,
+            director_id=director_id,
+            now=now,
+            reservation_id=uuid4(),
+        )
+        invited = _make_participant(
+            shift=shift,
+            user_id=uuid4(),
+            status=ShiftParticipantStatus.INVITED,
+            director_id=director_id,
+            now=now,
+        )
+        reserving = _make_participant(
+            shift=shift,
+            user_id=uuid4(),
+            status=ShiftParticipantStatus.RESERVING,
+            director_id=director_id,
+            now=now,
+        )
+        for participant in (reserved, invited, reserving):
+            await ctx.participants.add(participant)
+
+        def _make_request(status: ResourceRequestStatus, reservation_id=None):
+            return ShiftResourceRequest(
+                oid=uuid4(),
+                project_id=project_id,
+                shift_id=shift.oid,
+                resource_type="cameras",
+                resource_id=uuid4(),
+                resource_owner_user_id=uuid4(),
+                requested_by_user_id=director_id,
+                time_from=start,
+                time_to=start + timedelta(hours=1),
+                status=status,
+                created_at=now,
+                updated_at=now,
+                resource_reservation_id=reservation_id,
+            )
+
+        reserved_req = _make_request(ResourceRequestStatus.RESERVED, uuid4())
+        pending_req = _make_request(ResourceRequestStatus.PENDING_OWNER)
+        approved_req = _make_request(ResourceRequestStatus.APPROVED_OWNER)
+        for request in (reserved_req, pending_req, approved_req):
+            await ctx.requests.add(request)
+
+        await ctx.approve(ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id))
+
+        assert ctx.participants.by_id[reserved.oid].status == ShiftParticipantStatus.RESERVED
+        assert ctx.participants.by_id[invited.oid].status == ShiftParticipantStatus.CANCELLED
+        assert ctx.participants.by_id[reserving.oid].status == ShiftParticipantStatus.CANCELLED
+
+        assert ctx.requests.data[reserved_req.oid].status == ResourceRequestStatus.RESERVED
+        assert ctx.requests.data[pending_req.oid].status == ResourceRequestStatus.CANCELLED
+        assert ctx.requests.data[approved_req.oid].status == ResourceRequestStatus.CANCELLED
+
+        # The RESERVED participant had a reservation, so a cancel must NOT be enqueued
+        # (it stays on the shift); cancelled ones had no reservation -> no dispatch.
+        assert ctx.reservation_outbox.data == {}
+
+    asyncio.run(scenario())
+
+
+def test_approve_shift_creates_and_schedules_report() -> None:
+    async def scenario():
+        ctx = _build_approval_context()
+        now = now_utc()
+        director_id = uuid4()
+        project_id = await _seed_project_and_member(
+            ctx, user_id=director_id, role=ProjectRole.DIRECTOR, now=now
+        )
+        start = now + timedelta(days=1)
+        shift = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=4)
+        await ctx.shifts.add(shift)
+
+        await ctx.approve(ApproveShiftCommand(shift_id=shift.oid, actor_user_id=director_id))
+
+        reports = list(ctx.reports.data.values())
+        assert len(reports) == 1
+        report = reports[0]
+        assert report.version == 1
+        assert report.generation_status == ShiftReportGenerationStatus.PENDING
+        assert report.requested_by_user_id == director_id
+        assert len(ctx.report_tasks.commands) == 1
+        assert ctx.report_tasks.commands[0].report_id == report.oid
+
+    asyncio.run(scenario())
+
+
+def test_confirm_blocked_by_overlapping_active_participation() -> None:
+    async def scenario():
+        ctx = _build_approval_context()
+        now = now_utc()
+        director_id = uuid4()
+        user_id = uuid4()
+        project_id = await _seed_project_and_member(
+            ctx, user_id=director_id, role=ProjectRole.DIRECTOR, now=now
+        )
+        await _seed_project_and_member(
+            ctx, user_id=user_id, role=ProjectRole.CAMERA, now=now, project_id=project_id
+        )
+        start = now + timedelta(days=1)
+        shift_a = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=4)
+        shift_b = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=4)
+        await ctx.shifts.add(shift_a)
+        await ctx.shifts.add(shift_b)
+
+        # Same user invited to two overlapping shifts (allowed).
+        participant_a = _make_participant(
+            shift=shift_a,
+            user_id=user_id,
+            status=ShiftParticipantStatus.INVITED,
+            director_id=director_id,
+            now=now,
+        )
+        participant_b = _make_participant(
+            shift=shift_b,
+            user_id=user_id,
+            status=ShiftParticipantStatus.INVITED,
+            director_id=director_id,
+            now=now,
+        )
+        await ctx.participants.add(participant_a)
+        await ctx.participants.add(participant_b)
+
+        await ctx.confirm(
+            ConfirmShiftParticipantCommand(
+                participant_id=participant_a.oid, actor_user_id=user_id
+            )
+        )
+        # Now confirming the overlapping invitation is rejected.
+        with pytest.raises(StateTransitionError):
+            await ctx.confirm(
+                ConfirmShiftParticipantCommand(
+                    participant_id=participant_b.oid, actor_user_id=user_id
+                )
+            )
+        assert ctx.participants.by_id[participant_b.oid].status == ShiftParticipantStatus.INVITED
+
+    asyncio.run(scenario())
+
+
+def test_confirm_allowed_for_non_overlapping_shifts() -> None:
+    async def scenario():
+        ctx = _build_approval_context()
+        now = now_utc()
+        director_id = uuid4()
+        user_id = uuid4()
+        project_id = await _seed_project_and_member(
+            ctx, user_id=director_id, role=ProjectRole.DIRECTOR, now=now
+        )
+        await _seed_project_and_member(
+            ctx, user_id=user_id, role=ProjectRole.CAMERA, now=now, project_id=project_id
+        )
+        start = now + timedelta(days=1)
+        shift_a = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=2)
+        shift_b = _make_shift(
+            project_id=project_id,
+            director_id=director_id,
+            start=start + timedelta(hours=5),
+            hours=2,
+        )
+        await ctx.shifts.add(shift_a)
+        await ctx.shifts.add(shift_b)
+
+        participant_a = _make_participant(
+            shift=shift_a,
+            user_id=user_id,
+            status=ShiftParticipantStatus.INVITED,
+            director_id=director_id,
+            now=now,
+        )
+        participant_b = _make_participant(
+            shift=shift_b,
+            user_id=user_id,
+            status=ShiftParticipantStatus.INVITED,
+            director_id=director_id,
+            now=now,
+        )
+        await ctx.participants.add(participant_a)
+        await ctx.participants.add(participant_b)
+
+        await ctx.confirm(
+            ConfirmShiftParticipantCommand(
+                participant_id=participant_a.oid, actor_user_id=user_id
+            )
+        )
+        await ctx.confirm(
+            ConfirmShiftParticipantCommand(
+                participant_id=participant_b.oid, actor_user_id=user_id
+            )
+        )
+        assert ctx.participants.by_id[participant_a.oid].status == ShiftParticipantStatus.RESERVING
+        assert ctx.participants.by_id[participant_b.oid].status == ShiftParticipantStatus.RESERVING
+
+    asyncio.run(scenario())
+
+
+def test_invite_participant_rejected_for_non_project_member() -> None:
+    async def scenario():
+        ctx = _build_approval_context()
+        now = now_utc()
+        director_id = uuid4()
+        outsider_id = uuid4()
+        project_id = await _seed_project_and_member(
+            ctx, user_id=director_id, role=ProjectRole.DIRECTOR, now=now
+        )
+        start = now + timedelta(days=1)
+        shift = _make_shift(project_id=project_id, director_id=director_id, start=start, hours=4)
+        await ctx.shifts.add(shift)
+
+        with pytest.raises(EntityNotFoundError):
+            await ctx.invite(
+                InviteShiftParticipantCommand(
+                    shift_id=shift.oid,
+                    actor_user_id=director_id,
+                    participant_user_id=outsider_id,
+                    role=ProjectRole.CAMERA,
+                    time_from=start,
+                    time_to=start + timedelta(hours=1),
+                )
+            )
+        assert ctx.participants.by_id == {}
 
     asyncio.run(scenario())

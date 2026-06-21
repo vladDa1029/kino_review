@@ -132,6 +132,27 @@ class ResourceRequestService:
         request.updated_at = now
         return needs_reservation_cancel
 
+    def cancel_unsettled_on_approval(
+        self, *, request: ShiftResourceRequest, now: datetime
+    ) -> bool:
+        """Cancel a resource request that is not reserved when its shift is approved.
+
+        Only RESERVED requests are kept on an approved shift; anything still awaiting
+        the owner or its reservation (PENDING_OWNER, APPROVED_OWNER, RESERVING) or
+        whose reservation failed (RESERVE_FAILED) is moved to CANCELLED. Returns
+        ``True`` when a reservation cancellation must be dispatched.
+        """
+        if request.status in {
+            ResourceRequestStatus.RESERVED,
+            ResourceRequestStatus.CANCELLED,
+            ResourceRequestStatus.REJECTED_OWNER,
+        }:
+            return False
+        needs_reservation_cancel = request.resource_reservation_id is not None
+        request.status = ResourceRequestStatus.CANCELLED
+        request.updated_at = now
+        return needs_reservation_cancel
+
     def mark_reserving(self, *, request: ShiftResourceRequest, now: datetime) -> None:
         if request.status != ResourceRequestStatus.APPROVED_OWNER:
             raise StateTransitionError("Only APPROVED_OWNER request can move to RESERVING.")

@@ -518,6 +518,16 @@ export const archiveProject = async (projectId) =>
 export const inviteProjectMember = async (projectId, payload) =>
   createJsonRequest(`/project/projects/${projectId}/members`, 'POST', payload);
 
+export const inviteProjectMemberByEmail = async (projectId, payload) =>
+  createJsonRequest(`/project/projects/${projectId}/members/by-email`, 'POST', payload);
+
+// Email-link actions: the token comes from the URL of the frontend landing page.
+export const confirmReservationByToken = async (token) =>
+  apiClient(`/user/confirmations/${token}`, { method: 'POST', skipAuth: true });
+
+export const acceptProjectInvitationByToken = async (token) =>
+  apiClient(`/user/project-invitations/${token}`, { method: 'POST' });
+
 export const listProjectMembers = async (
   projectId,
   { userId, includeInactive = false } = {},

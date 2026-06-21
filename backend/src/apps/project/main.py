@@ -12,7 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from faststream.rabbit import RabbitBroker
 from taskiq import AsyncBroker
 
-from app.application.commands import ProcessReservationOutboxHandler
+from app.application.commands import (
+    ProcessReservationOutboxHandler,
+    ProcessShiftRemindersHandler,
+)
 from app.bootstrap import (
     create_container,
     create_message_broker,
@@ -24,6 +27,7 @@ from app.config import (
     ReservationOutbox,
     get_settings,
 )
+from app.config import ShiftReminder as ShiftReminderSettings
 from app.domain.errors.base import ApplicationError
 from app.infrastructure.adapters.orm import start_mappers
 from app.infrastructure.broker.request_reply import BrokerReplyInbox
@@ -49,6 +53,7 @@ async def lifespan(app: FastAPI):
     minio_settings = cast(Minio, app.state.minio_settings)
     task_manager = cast(AsyncBroker, app.state.task_manager)
     poll_task: asyncio.Task | None = None
+    reminder_poll_task: asyncio.Task | None = None
 
     await _prepare_storage(component="api", settings=minio_settings)
     await task_manager.startup()
@@ -75,17 +80,33 @@ async def lifespan(app: FastAPI):
                 log.warning("reservation.outbox.poll_failed", error=str(exc))
             await asyncio.sleep(interval)
 
+    async def poll_shift_reminders() -> None:
+        interval = cast(ShiftReminderSettings, app.state.shift_reminder).poll_interval_seconds
+        container = cast(AsyncContainer, app.state.dishka_container)
+        while True:
+            try:
+                async with container() as request_container:
+                    handler = await request_container.get(ProcessShiftRemindersHandler)
+                    await handler(limit=50)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                log.warning("shift.reminder.poll_failed", error=str(exc))
+            await asyncio.sleep(interval)
+
     poll_task = asyncio.create_task(poll_reservation_outbox())
+    reminder_poll_task = asyncio.create_task(poll_shift_reminders())
 
     try:
         yield
     finally:
-        if poll_task is not None:
-            poll_task.cancel()
-            try:
-                await poll_task
-            except asyncio.CancelledError:
-                pass
+        for background_task in (poll_task, reminder_poll_task):
+            if background_task is not None:
+                background_task.cancel()
+                try:
+                    await background_task
+                except asyncio.CancelledError:
+                    pass
         if broker_started:
             await broker.stop()
         await task_manager.shutdown()
@@ -185,6 +206,7 @@ def start_app_dev() -> FastAPI:
     app.state._broker = broker
     app.state.reply_inbox = reply_inbox
     app.state.reservation_outbox = settings.reservation_outbox
+    app.state.shift_reminder = settings.shift_rm
     app.state.minio_settings = settings.minio
     app.state.task_manager = task_manager
 

@@ -15,6 +15,7 @@ from app.config import (
     TaskIQ,
     UserService,
 )
+from app.config import ShiftReminder as ShiftReminderSettings
 from app.infrastructure.broker.consumer import (
     PROJECT_MEMBER_APPROVED_QUEUE,
     SHIFT_PARTICIPANT_APPROVAL_STATE_REQUESTED_QUEUE,
@@ -56,6 +57,7 @@ def create_container(
             UserService: settings.user_service,
             BrokerReplyInbox: reply_inbox,
             ReservationOutbox: settings.reservation_outbox,
+            ShiftReminderSettings: settings.shift_rm,
             TaskIQ: settings.taskiq,
             ReportGeneration: settings.report_generation,
             Minio: settings.minio,

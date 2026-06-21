@@ -118,6 +118,10 @@ class ConfirmationSettings(ConfigABC):
     )
     ttl_hours: int = Field(alias="CONFIRMATION_TTL_HOURS", default=24)
     public_base_url: str = Field(alias="PUBLIC_BASE_URL", default="http://localhost:8000")
+    frontend_base_url: str = Field(
+        alias="FRONTEND_BASE_URL",
+        default="http://localhost:5173",
+    )
     algorithm: str = Field(alias="CONFIRMATION_ALGORITHM", default="HS256")
 
 

@@ -18,7 +18,11 @@ class SMTPEmailSender(EmailSender):
         mime["From"] = _format_from(self._settings)
         mime["To"] = message.recipient_email
         mime["Subject"] = message.subject
+        # Plain-text part first; the HTML alternative (when present) is preferred by
+        # clients that can render it. This yields a multipart/alternative message.
         mime.set_content(message.body)
+        if message.html_body:
+            mime.add_alternative(message.html_body, subtype="html")
 
         if self._settings.use_tls:
             with smtplib.SMTP_SSL(

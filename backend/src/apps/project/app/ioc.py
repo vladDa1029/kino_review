@@ -34,6 +34,7 @@ from app.application.commands import (
     InviteProjectMemberHandler,
     InviteShiftParticipantHandler,
     ProcessReservationOutboxHandler,
+    ProcessShiftRemindersHandler,
     ProcessShiftReportGenerationHandler,
     RejectResourceRequestHandler,
     RemoveProjectMemberHandler,
@@ -52,6 +53,7 @@ from app.application.ports.domain import (
     ReservationOutboxRepository,
     ResourceRequestRepository,
     ShiftParticipantRepository,
+    ShiftReminderRepository,
     ShiftReportRepository,
     ShiftRepository,
     UserServicePort,
@@ -111,6 +113,7 @@ from app.config import (
     TaskIQ,
     UserService,
 )
+from app.config import ShiftReminder as ShiftReminderSettings
 from app.domain.policy import ActiveMemberPolicy, DirectorMemberPolicy
 from app.domain.services import (
     DocumentService,
@@ -130,6 +133,7 @@ from app.infrastructure.adapters.domain_repositories import (
     SqlAlchemyReservationOutboxRepository,
     SqlAlchemyResourceRequestRepository,
     SqlAlchemyShiftParticipantRepository,
+    SqlAlchemyShiftReminderRepository,
     SqlAlchemyShiftReportRepository,
     SqlAlchemyShiftRepository,
 )
@@ -173,6 +177,7 @@ def settings_provider() -> Provider:
     provider.from_context(provides=UserService)
     provider.from_context(provides=BrokerReplyInbox)
     provider.from_context(provides=ReservationOutbox)
+    provider.from_context(provides=ShiftReminderSettings)
     provider.from_context(provides=TaskIQ)
     provider.from_context(provides=ReportGeneration)
     provider.from_context(provides=Minio)
@@ -230,6 +235,10 @@ def adapters_provider() -> Provider:
     provider.provide(
         source=SqlAlchemyReservationOutboxRepository,
         provides=ReservationOutboxRepository,
+    )
+    provider.provide(
+        source=SqlAlchemyShiftReminderRepository,
+        provides=ShiftReminderRepository,
     )
     return provider
 
@@ -310,6 +319,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=HandleResourceReservationFailedHandler)
     provider.provide(make_process_shift_report_generation_handler, provides=ProcessShiftReportGenerationHandler)
     provider.provide(source=ProcessReservationOutboxHandler)
+    provider.provide(source=ProcessShiftRemindersHandler)
     return provider
 
 

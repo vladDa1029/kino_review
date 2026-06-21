@@ -13,10 +13,13 @@ import AdminReportsPage from './pages/AdminReportsPage';
 import AdminUserDetailsPage from './pages/AdminUserDetailsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import HomePage from './pages/HomePage';
+import InvitationAcceptPage from './pages/InvitationAcceptPage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectListPage from './pages/ProjectListPage';
 import Projects from './pages/Projects';
+import ReservationConfirmPage from './pages/ReservationConfirmPage';
 import ShiftPlanningPage from './pages/ShiftPlanningPage';
+import ShiftRedirectPage from './pages/ShiftRedirectPage';
 import { getUserDescription } from './services/api';
 import { ApiError } from './services/httpClient';
 import {
@@ -327,6 +330,11 @@ function App() {
 
       <Routes>
         <Route path="/" element={<HomePage onOpenAuth={() => setIsAuthModalOpen(true)} />} />
+        {/* Email-link landing pages. They handle auth internally so the token in the
+            URL is never lost to a redirect. */}
+        <Route path="/confirm/:token" element={<ReservationConfirmPage />} />
+        <Route path="/invitations/:token" element={<InvitationAcceptPage />} />
+        <Route path="/projects/:projectId/shifts/:shiftId" element={<ShiftRedirectPage />} />
         <Route
           path="/my-projects"
           element={(
@@ -462,7 +470,7 @@ function App() {
                     onClick={() => handleMenuNavigation('/admin')}
                   >
                     <AdminIcon />
-                    <span>РђРґРјРёРЅРєР°</span>
+                    <span>Админ панель</span>
                   </button>
                 ) : null}
               </nav>

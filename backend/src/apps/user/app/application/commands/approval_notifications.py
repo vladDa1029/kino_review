@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -219,21 +219,111 @@ class HandleProjectMemberInvitationRequestedHandler:
         )
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ShiftReminderResourceItem:
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HandleShiftReminderRequestedCommand:
+    notification_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    shift_description: str | None
+    start_time: datetime
+    end_time: datetime
+    user_id: UUID
+    role: str
+    resources: tuple[ShiftReminderResourceItem, ...] = field(default_factory=tuple)
+
+
+class HandleShiftReminderRequestedHandler:
+    def __init__(
+        self,
+        *,
+        users: UserRepository,
+        publisher: EventPublisher,
+        confirmation: ConfirmationSettings,
+    ) -> None:
+        self._users = users
+        self._publisher = publisher
+        self._confirmation = confirmation
+
+    async def __call__(self, command: HandleShiftReminderRequestedCommand) -> None:
+        user = await self._users.get(BaseId(command.user_id))
+        if user is None:
+            log.warning(
+                "reminder.user_not_found",
+                user_id=str(command.user_id),
+                shift_id=str(command.shift_id),
+                notification_id=str(command.notification_id),
+            )
+            return
+        await self._publisher.publish(
+            EMAIL_REQUESTED_TOPIC,
+            {
+                "notification_id": str(command.notification_id),
+                "template": "shift_reminder",
+                "recipient_email": str(user.email),
+                "subject": _shift_reminder_subject(command.shift_title),
+                "payload": {
+                    "shift_url": _shift_url(
+                        self._confirmation,
+                        project_id=command.project_id,
+                        shift_id=command.shift_id,
+                    ),
+                    "project_title": command.project_title,
+                    "shift_title": command.shift_title,
+                    "time_from": command.start_time.isoformat(),
+                    "time_to": command.end_time.isoformat(),
+                    "role": command.role,
+                    "resources": _format_resources(command.resources),
+                },
+            },
+        )
+
+
+def _format_resources(resources: tuple[ShiftReminderResourceItem, ...]) -> str | None:
+    if not resources:
+        return None
+    lines = [
+        f"- {item.resource_type} ({_format_time(item.time_from)} - {_format_time(item.time_to)})"
+        for item in resources
+    ]
+    return "\n".join(lines)
+
+
+def _format_time(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
+def _shift_url(settings: ConfirmationSettings, *, project_id: UUID, shift_id: UUID) -> str:
+    return f"{settings.frontend_base_url.rstrip('/')}/projects/{project_id}/shifts/{shift_id}"
+
+
+def _shift_reminder_subject(shift_title: str) -> str:
+    return f"Напоминание: смена «{shift_title}» скоро начнётся"
+
+
 def _confirm_url(settings: ConfirmationSettings, token: str) -> str:
-    return f"{settings.public_base_url.rstrip('/')}/user/confirmations/{token}"
+    return f"{settings.frontend_base_url.rstrip('/')}/confirm/{token}"
 
 
 def _project_invitation_url(settings: ConfirmationSettings, token: str) -> str:
-    return f"{settings.public_base_url.rstrip('/')}/user/project-invitations/{token}"
+    return f"{settings.frontend_base_url.rstrip('/')}/invitations/{token}"
 
 
 def _participant_subject(shift_title: str) -> str:
-    return f"Confirm reservation for shift '{shift_title}'"
+    return f"Подтвердите участие в смене «{shift_title}»"
 
 
 def _resource_subject(shift_title: str) -> str:
-    return f"Confirm resource reservation for shift '{shift_title}'"
+    return f"Подтвердите бронирование ресурса для смены «{shift_title}»"
 
 
 def _project_member_invitation_subject(project_title: str) -> str:
-    return f"Project invitation: {project_title}"
+    return f"Приглашение в проект: {project_title}"

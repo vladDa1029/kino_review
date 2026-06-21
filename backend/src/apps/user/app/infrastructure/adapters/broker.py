@@ -86,6 +86,12 @@ SHIFT_REPORT_SNAPSHOT_REQUESTED_QUEUE = RabbitQueue(
     routing_key="shift.report_snapshot_requested",
 )
 
+SHIFT_REMINDER_REQUESTED_QUEUE = RabbitQueue(
+    name="shift.reminder_requested.user",
+    durable=True,
+    routing_key="shift.reminder_requested",
+)
+
 
 class RabbitPublisher(EventPublisher):
     def __init__(self, broker: RabbitBroker) -> None:

@@ -67,6 +67,7 @@ from app.application.commands.resources import (
     RejectResourceRequestCommand,
     RejectResourceRequestHandler,
 )
+from app.application.commands.shift_reminders import ProcessShiftRemindersHandler
 from app.application.commands.shifts import (
     ApproveShiftCommand,
     ApproveShiftHandler,
@@ -124,6 +125,7 @@ __all__ = [
     "ProcessShiftReportGenerationCommand",
     "ProcessShiftReportGenerationHandler",
     "ProcessReservationOutboxHandler",
+    "ProcessShiftRemindersHandler",
     "HandleParticipantReservationCheckSucceededCommand",
     "HandleParticipantReservationCheckSucceededHandler",
     "HandleParticipantReservationCheckFailedCommand",

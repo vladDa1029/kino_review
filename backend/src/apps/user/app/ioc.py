@@ -21,6 +21,7 @@ from app.application.commands.approval_notifications import (
     HandleParticipantApprovalRequestedHandler,
     HandleProjectMemberInvitationRequestedHandler,
     HandleResourceApprovalRequestedHandler,
+    HandleShiftReminderRequestedHandler,
 )
 from app.application.commands.check_availability import CheckAvailabilityHandler
 from app.application.commands.confirm_project_invitation import (
@@ -349,6 +350,7 @@ def use_case_provider() -> Provider:
     provider.provide(source=HandleProjectMemberInvitationRequestedHandler)
     provider.provide(source=HandleParticipantApprovalRequestedHandler)
     provider.provide(source=HandleResourceApprovalRequestedHandler)
+    provider.provide(source=HandleShiftReminderRequestedHandler)
     provider.provide(source=ConfirmProjectInvitationByTokenHandler)
     provider.provide(source=ConfirmReservationByTokenHandler)
     provider.provide(source=ReserveAvailabilityHandler)

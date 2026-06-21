@@ -158,6 +158,26 @@ class BrokerShiftResourceRequestReservationCheckRequested(BaseModel):
     end_time: datetime
 
 
+class BrokerShiftReminderResource(BaseModel):
+    resource_type: str
+    time_from: datetime
+    time_to: datetime
+
+
+class BrokerShiftReminderRequested(BaseModel):
+    notification_id: UUID
+    project_id: UUID
+    project_title: str
+    shift_id: UUID
+    shift_title: str
+    shift_description: str | None = None
+    start_time: datetime
+    end_time: datetime
+    user_id: UUID
+    role: str
+    resources: list[BrokerShiftReminderResource] = Field(default_factory=list)
+
+
 class BrokerShiftParticipantApprovalRequested(BaseModel):
     request_id: UUID
     project_id: UUID
